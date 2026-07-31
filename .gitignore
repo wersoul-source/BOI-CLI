@@ -1,5 +1,41 @@
-﻿.boi/
-หลักการสร้าง Agent.md
+﻿# ── Binaries ──
+bin/
+*.exe
+build/
+
+# ── Go ──
+*.test
+*.out
+vendor/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── Generated output ──
+*_output/
+8art_*.txt
+banner*.txt
+*.ansi.txt
+
+# ── User data ──
+.boi/
 dist/
 obj/
 
+# ── Env (secret) ──
+.env
+!.env.example
