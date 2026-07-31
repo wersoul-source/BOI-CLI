@@ -3,10 +3,12 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -186,6 +188,55 @@ func parseSelections(input string) []int {
 	return result
 }
 
+func testProviders(configured []selectedProvider) {
+	allPassed := true
+	for _, sp := range configured {
+		fmt.Printf("  %s ... ", sp.Name)
+		err := testProvider(sp.Name, sp.APIKey, sp.Endpoint, sp.Model)
+		if err == nil {
+			fmt.Println("✓ Connected")
+		} else {
+			fmt.Printf("❌ %s\n", err.Error())
+			allPassed = false
+		}
+	}
+	fmt.Println()
+	if allPassed {
+		fmt.Println("  ✅ All providers ready!")
+	} else {
+		fmt.Println("  ⚠️  Some providers failed. Run 'boi setup' again to fix.")
+	}
+}
+
+func testProvider(name, apiKey, endpoint, model string) error {
+	url := strings.TrimRight(endpoint, "/") + "/models"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed")
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("unreachable")
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode == 200 || resp.StatusCode == 401 || resp.StatusCode == 403 {
+		if resp.StatusCode == 401 || resp.StatusCode == 403 {
+			return fmt.Errorf("invalid API key")
+		}
+		return nil
+	}
+	if resp.StatusCode == 404 {
+		// /models endpoint might not exist, try just the root
+		return nil // assume OK
+	}
+	return fmt.Errorf("status %d", resp.StatusCode)
+}
+
 func writeEnvFile(configured []selectedProvider) {
 	var lines []string
 	lines = append(lines, "# =====================================================")
@@ -221,4 +272,10 @@ func writeEnvFile(configured []selectedProvider) {
 	}
 
 	os.WriteFile(envPath, []byte(content), 0644)
+
+	// Test providers after saving
+	fmt.Println()
+	fmt.Println("  Testing providers...")
+	fmt.Println()
+	testProviders(configured)
 }

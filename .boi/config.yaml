@@ -1,4 +1,4 @@
-provider: openai
+provider: anthropic
 model: gpt-4.1-mini
 persona: kamkaew
 log_level: info
