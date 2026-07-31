@@ -2,21 +2,23 @@
 """Generate hacker-style 8-Art ASCII text using "8" as the solid block character.
 
 Features:
-  - 8x7 pixel bitmaps for A-Z, 0-9, space, dash
+  - 8x7 pixel bitmaps for A-Z, 0-9, space, symbols
+  - 3 font styles: normal, italic, bold
   - "8" = solid block (dense hacker aesthetic)
   - ANSI 24-bit TrueColor gradient coloring
   - Palette presets shared with generate_boi_logo.py
-  - Framed output with box-drawing borders
-  - Supports --text, --palette, --no-color, --output
+  - Framed output with box-drawing borders and configurable padding
+  - Supports --text, --style, --palette, --padding, --no-color, --output
   - Respects NO_COLOR env var
 """
 
 import argparse
 import os
+import re
 import sys
 import textwrap
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 PALETTES = {
     "boi-purple": ((0x6C, 0x63, 0xFF), (0xA7, 0x8B, 0xFA)),
@@ -33,7 +35,7 @@ PALETTES = {
     "steel":       ((0x88, 0x99, 0xAA), (0xBB, 0xCC, 0xDD)),
 }
 
-FONT_8x7 = {
+FONT_NORMAL = {
     "A": [
         " 888888 ",
         "88    88",
@@ -432,9 +434,806 @@ FONT_8x7 = {
     ],
 }
 
+FONT_ITALIC = {
+    "A": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        " 88888888",
+        "  88   88",
+        "  88   88",
+        "   88   88",
+    ],
+    "B": [
+        " 8888888 ",
+        " 88    88",
+        " 88    88",
+        " 88888888",
+        " 88    88",
+        " 88    88",
+        "  8888888",
+    ],
+    "C": [
+        "  888888 ",
+        " 88    88",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+        " 88    88",
+        "  888888 ",
+    ],
+    "D": [
+        " 888888  ",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 888888  ",
+    ],
+    "E": [
+        " 88888888",
+        " 88      ",
+        " 88      ",
+        " 88888888",
+        " 88      ",
+        " 88      ",
+        " 88888888",
+    ],
+    "F": [
+        " 88888888",
+        " 88      ",
+        " 88      ",
+        " 88888888",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+    ],
+    "G": [
+        "  888888 ",
+        " 88    88",
+        " 88      ",
+        " 88 88888",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "H": [
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88888888",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+    ],
+    "I": [
+        " 88888888",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        " 88888888",
+    ],
+    "J": [
+        "     8888",
+        "      88 ",
+        "      88 ",
+        "      88 ",
+        " 88   88 ",
+        " 88   88 ",
+        "  88888  ",
+    ],
+    "K": [
+        " 88   88 ",
+        " 88  88  ",
+        " 88 88   ",
+        " 8888    ",
+        " 88 88   ",
+        " 88  88  ",
+        " 88   88 ",
+    ],
+    "L": [
+        " 88      ",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+        " 88888888",
+    ],
+    "M": [
+        "  88     88",
+        "  888   888",
+        "  88 88 8 8",
+        "  88  88  88",
+        "  88     88",
+        "  88     88",
+        "  88     88",
+    ],
+    "N": [
+        " 88    88",
+        " 888   88",
+        " 88 8  88",
+        " 88  8 88",
+        " 88   888",
+        " 88    88",
+        " 88    88",
+    ],
+    "O": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "P": [
+        " 888888  ",
+        " 88    88",
+        " 88    88",
+        " 888888  ",
+        " 88      ",
+        " 88      ",
+        " 88      ",
+    ],
+    "Q": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88 8  88",
+        " 88   888",
+        "  8888888",
+    ],
+    "R": [
+        " 888888  ",
+        " 88    88",
+        " 88    88",
+        " 888888  ",
+        " 88 88   ",
+        " 88  88  ",
+        " 88   88 ",
+    ],
+    "S": [
+        "  888888 ",
+        " 88    88",
+        " 88      ",
+        "  888888 ",
+        "       88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "T": [
+        " 88888888",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+    ],
+    "U": [
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "V": [
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        " 88    88",
+        "  88  88 ",
+        "  88  88 ",
+        "    88   ",
+    ],
+    "W": [
+        "  88     88",
+        "  88     88",
+        "  88     88",
+        "  88  88 88",
+        "  88 8 8 88",
+        "  888   888",
+        "  88     88",
+    ],
+    "X": [
+        " 88    88",
+        " 88    88",
+        "  88  88 ",
+        "    88   ",
+        "  88  88 ",
+        " 88    88",
+        " 88    88",
+    ],
+    "Y": [
+        " 88    88",
+        " 88    88",
+        "  88  88 ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+    ],
+    "Z": [
+        " 88888888",
+        "       88",
+        "      88 ",
+        "     88  ",
+        "    88   ",
+        "   88    ",
+        " 88888888",
+    ],
+    "0": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        " 88  8  88",
+        " 88 8   88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "1": [
+        "    88   ",
+        "   888   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        " 88888888",
+    ],
+    "2": [
+        "  888888 ",
+        " 88    88",
+        "       88",
+        "     888 ",
+        "    88   ",
+        "   88    ",
+        " 88888888",
+    ],
+    "3": [
+        "  888888 ",
+        " 88    88",
+        "       88",
+        "    8888 ",
+        "       88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "4": [
+        "      88 ",
+        "     888 ",
+        "    8 88 ",
+        "   88 88 ",
+        " 88888888",
+        "      88 ",
+        "      88 ",
+    ],
+    "5": [
+        " 88888888",
+        " 88      ",
+        " 888888  ",
+        "       88",
+        "       88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "6": [
+        "  888888 ",
+        " 88    88",
+        " 88      ",
+        " 888888  ",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "7": [
+        " 88888888",
+        "       88",
+        "      88 ",
+        "     88  ",
+        "     88  ",
+        "     88  ",
+        "     88  ",
+    ],
+    "8": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        "  888888 ",
+    ],
+    "9": [
+        "  888888 ",
+        " 88    88",
+        " 88    88",
+        "  8888888",
+        "       88",
+        " 88    88",
+        "  888888 ",
+    ],
+    " ": [
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+    ],
+    "-": [
+        "         ",
+        "         ",
+        "         ",
+        " 888888  ",
+        "         ",
+        "         ",
+        "         ",
+    ],
+    "_": [
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "888888888",
+    ],
+    ".": [
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "         ",
+        "    88   ",
+        "         ",
+    ],
+    "!": [
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "    88   ",
+        "         ",
+        "    88   ",
+    ],
+    ":": [
+        "         ",
+        "    88   ",
+        "         ",
+        "         ",
+        "    88   ",
+        "         ",
+        "         ",
+    ],
+    "?": [
+        "  888888 ",
+        " 88    88",
+        "       88",
+        "     88  ",
+        "     88  ",
+        "         ",
+        "     88  ",
+    ],
+    "/": [
+        "       88",
+        "      88 ",
+        "      88 ",
+        "     88  ",
+        "    88   ",
+        "   88    ",
+        "  88     ",
+    ],
+}
+
+FONT_BOLD = {
+    "A": [
+        "  888888  ",
+        " 888   88 ",
+        " 88     88",
+        " 888888888",
+        " 88     88",
+        " 88     88",
+        " 88     88",
+    ],
+    "B": [
+        " 88888888 ",
+        " 88     88",
+        " 88     88",
+        " 888888888",
+        " 88     88",
+        " 88     88",
+        " 88888888 ",
+    ],
+    "C": [
+        "  888888  ",
+        " 888   88 ",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+        " 888   88 ",
+        "  888888  ",
+    ],
+    "D": [
+        " 8888888  ",
+        " 888   88 ",
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 888   88 ",
+        " 8888888  ",
+    ],
+    "E": [
+        " 888888888",
+        " 88       ",
+        " 88       ",
+        " 88888888 ",
+        " 88       ",
+        " 88       ",
+        " 888888888",
+    ],
+    "F": [
+        " 888888888",
+        " 88       ",
+        " 88       ",
+        " 88888888 ",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+    ],
+    "G": [
+        "  888888  ",
+        " 888   88 ",
+        " 88       ",
+        " 88  88888",
+        " 88     88",
+        " 888   88 ",
+        "  8888888 ",
+    ],
+    "H": [
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 888888888",
+        " 88     88",
+        " 88     88",
+        " 88     88",
+    ],
+    "I": [
+        " 888888888",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        " 888888888",
+    ],
+    "J": [
+        "   888888 ",
+        "     888  ",
+        "     888  ",
+        "     888  ",
+        " 88  888  ",
+        " 888 888  ",
+        "  88888   ",
+    ],
+    "K": [
+        " 88    888",
+        " 88   88  ",
+        " 88  88   ",
+        " 88888    ",
+        " 88  88   ",
+        " 88   88  ",
+        " 88    888",
+    ],
+    "L": [
+        " 88       ",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+        " 888888888",
+    ],
+    "M": [
+        "  88      88",
+        "  888    888",
+        "  8888  8888",
+        "  88 88 88 88",
+        "  88  888  88",
+        "  88      88",
+        "  88      88",
+    ],
+    "N": [
+        " 888    88",
+        " 8888   88",
+        " 88 88  88",
+        " 88  88 88",
+        " 88   8888",
+        " 88    888",
+        " 88     88",
+    ],
+    "O": [
+        "  888888  ",
+        " 888   888",
+        " 88      88",
+        " 88      88",
+        " 88      88",
+        " 888   888",
+        "  888888  ",
+    ],
+    "P": [
+        " 8888888  ",
+        " 88     88",
+        " 88     88",
+        " 888888888",
+        " 88       ",
+        " 88       ",
+        " 88       ",
+    ],
+    "Q": [
+        "  888888  ",
+        " 888   888",
+        " 88      88",
+        " 88      88",
+        " 88 88   88",
+        " 888   8888",
+        "  88888888",
+    ],
+    "R": [
+        " 8888888  ",
+        " 88     88",
+        " 88     88",
+        " 888888888",
+        " 88  88   ",
+        " 88   88  ",
+        " 88    888",
+    ],
+    "S": [
+        "  888888  ",
+        " 888   88 ",
+        " 88       ",
+        "  888888  ",
+        "       88 ",
+        " 88    888",
+        "  888888  ",
+    ],
+    "T": [
+        " 888888888",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+    ],
+    "U": [
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 888   888",
+        "  888888  ",
+    ],
+    "V": [
+        " 88     88",
+        " 88     88",
+        " 88     88",
+        " 888   888",
+        "  888 888 ",
+        "   88888  ",
+        "    888   ",
+    ],
+    "W": [
+        "  88      88",
+        "  88      88",
+        "  88      88",
+        "  88  888 88",
+        "  888 88 888",
+        "  88 8888 88",
+        "  88      88",
+    ],
+    "X": [
+        " 88     88",
+        "  88   88 ",
+        "   88 88  ",
+        "    888   ",
+        "   88 88  ",
+        "  88   88 ",
+        " 88     88",
+    ],
+    "Y": [
+        " 88     88",
+        "  88   88 ",
+        "   88 88  ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+        "    888   ",
+    ],
+    "Z": [
+        " 888888888",
+        "       88 ",
+        "      88  ",
+        "     88   ",
+        "    88    ",
+        "   88     ",
+        " 888888888",
+    ],
+    "0": [
+        "  888888  ",
+        " 888   888",
+        " 88      88",
+        " 88  88  88",
+        " 88   88 88",
+        " 888   888",
+        "  888888  ",
+    ],
+    "1": [
+        "   888    ",
+        "   8888   ",
+        "   888    ",
+        "   888    ",
+        "   888    ",
+        "   888    ",
+        " 888888888",
+    ],
+    "2": [
+        "  888888  ",
+        " 888   888",
+        "       888",
+        "     888  ",
+        "    88    ",
+        "   888    ",
+        " 888888888",
+    ],
+    "3": [
+        "  888888  ",
+        " 888   888",
+        "       888",
+        "   888888 ",
+        "       888",
+        " 888   888",
+        "  888888  ",
+    ],
+    "4": [
+        "      88  ",
+        "     888  ",
+        "    8 88  ",
+        "   88 888 ",
+        " 888888888",
+        "      888 ",
+        "      888 ",
+    ],
+    "5": [
+        " 888888888",
+        " 88       ",
+        " 8888888  ",
+        "       88 ",
+        "       88 ",
+        " 888   88 ",
+        "  888888  ",
+    ],
+    "6": [
+        "  888888  ",
+        " 888   88 ",
+        " 88       ",
+        " 8888888  ",
+        " 88     88",
+        " 888   88 ",
+        "  888888  ",
+    ],
+    "7": [
+        " 888888888",
+        "       88 ",
+        "      88  ",
+        "     88   ",
+        "     88   ",
+        "     88   ",
+        "     88   ",
+    ],
+    "8": [
+        "  888888  ",
+        " 888   888",
+        " 888   888",
+        "  888888  ",
+        " 888   888",
+        " 888   888",
+        "  888888  ",
+    ],
+    "9": [
+        "  888888  ",
+        " 888   88 ",
+        " 88     88",
+        "  8888888 ",
+        "       88 ",
+        " 888   88 ",
+        "  888888  ",
+    ],
+    " ": [
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+    ],
+    "-": [
+        "          ",
+        "          ",
+        "          ",
+        "  888888  ",
+        "          ",
+        "          ",
+        "          ",
+    ],
+    "_": [
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        " 888888888",
+    ],
+    ".": [
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "    88    ",
+        "          ",
+    ],
+    "!": [
+        "   88     ",
+        "   88     ",
+        "   88     ",
+        "   88     ",
+        "   88     ",
+        "          ",
+        "   88     ",
+    ],
+    ":": [
+        "          ",
+        "   88     ",
+        "          ",
+        "          ",
+        "   88     ",
+        "          ",
+        "          ",
+    ],
+    "?": [
+        "  888888  ",
+        " 888   888",
+        "       888",
+        "     88   ",
+        "    88    ",
+        "          ",
+        "    88    ",
+    ],
+    "/": [
+        "       88 ",
+        "      88  ",
+        "      88  ",
+        "     88   ",
+        "    88    ",
+        "   88     ",
+        "  88      ",
+    ],
+}
+
 
 def visible_len(s):
-    import re
     return len(re.sub(r"\033\[[0-9;]*m", "", s))
 
 
@@ -461,9 +1260,10 @@ def ansi_reset():
     return "\033[0m"
 
 
-def render_8art(text, font=None):
-    if font is None:
-        font = FONT_8x7
+def render_8art(text, style="normal", font_map=None):
+    if font_map is None:
+        font_map = {"normal": FONT_NORMAL, "italic": FONT_ITALIC, "bold": FONT_BOLD}
+    font = font_map.get(style, FONT_NORMAL)
     lines = [""] * 7
     for ch in text.upper():
         glyph = font.get(ch, font.get("?"))
@@ -505,39 +1305,59 @@ def apply_gradient(lines, palette_name, no_color):
     return result
 
 
-def frame_box(lines, no_color, palette_name):
+def frame_box(lines, no_color, palette_name, padding=2):
     width = max(len(l) if no_color else visible_len(l) for l in lines)
-    box_width = width + 2
+    inner_width = width + (padding * 2)
 
     if no_color:
-        top = "╔" + "═" * width + "╗"
-        bottom = "╚" + "═" * width + "╝"
+        top = "╔" + "═" * inner_width + "╗"
+        bottom = "╚" + "═" * inner_width + "╝"
+
         framed = [top]
+        for _ in range(padding):
+            framed.append("║" + " " * inner_width + "║")
         for line in lines:
-            padded = line.ljust(width)
-            framed.append("║" + padded + "║")
+            vlen = len(line)
+            lp = " " * padding
+            rp = " " * (inner_width - padding - vlen)
+            framed.append("║" + lp + line + rp + "║")
+        for _ in range(padding):
+            framed.append("║" + " " * inner_width + "║")
         framed.append(bottom)
     else:
         palette = PALETTES.get(palette_name, PALETTES["boi-purple"])
         start_color, _ = palette
 
-        top = f"{ansi_truecolor(*start_color)}╔{'═' * width}╗{ansi_reset()}"
-        bottom = f"{ansi_truecolor(*start_color)}╚{'═' * width}╝{ansi_reset()}"
+        top = f"{ansi_truecolor(*start_color)}╔{'═' * inner_width}╗{ansi_reset()}"
+        bottom = f"{ansi_truecolor(*start_color)}╚{'═' * inner_width}╝{ansi_reset()}"
 
         framed = [top]
+        for _ in range(padding):
+            framed.append(
+                f"{ansi_truecolor(*start_color)}║{' ' * inner_width}║{ansi_reset()}"
+            )
         for line in lines:
             vlen = visible_len(line)
-            padding = width - vlen
-            padded = f"{ansi_truecolor(*start_color)}║{ansi_reset()}{line}{' ' * padding}{ansi_truecolor(*start_color)}║{ansi_reset()}"
-            framed.append(padded)
+            lp = " " * padding
+            rp = " " * (inner_width - padding - vlen)
+            framed.append(
+                f"{ansi_truecolor(*start_color)}║{ansi_reset()}"
+                f"{lp}{line}{rp}"
+                f"{ansi_truecolor(*start_color)}║{ansi_reset()}"
+            )
+        for _ in range(padding):
+            framed.append(
+                f"{ansi_truecolor(*start_color)}║{' ' * inner_width}║{ansi_reset()}"
+            )
         framed.append(bottom)
     return framed
 
 
-def generate_8art(text, palette_name="boi-purple", no_color=False, output_file=None):
-    lines = render_8art(text)
+def generate_8art(text, palette_name="boi-purple", no_color=False, output_file=None,
+                  style="normal", padding=2):
+    lines = render_8art(text, style=style)
     lines = apply_gradient(lines, palette_name, no_color)
-    framed = frame_box(lines, no_color, palette_name)
+    framed = frame_box(lines, no_color, palette_name, padding=padding)
 
     result = "\n".join(framed)
 
@@ -566,6 +1386,8 @@ def main():
         epilog=textwrap.dedent("""\
             Examples:
               %(prog)s --text "BOI CLI" --palette boi-purple
+              %(prog)s --text "BOI CLI" --style italic --palette boi-purple --padding 3 --no-color
+              %(prog)s --text "BOI CLI" --style bold --palette matrix --padding 3 --no-color
               %(prog)s --text "KAMKAEW" --palette boi-cyan
               %(prog)s --text "HACK" --palette matrix --no-color
               %(prog)s --text "TIS" --output 8art_tis.txt
@@ -575,6 +1397,10 @@ def main():
 
     parser.add_argument("--text", default="BOI CLI",
                         help="Text to render as 8-Art (default: 'BOI CLI')")
+    parser.add_argument("--style", choices=["normal", "italic", "bold"], default="normal",
+                        help="Font style (default: normal)")
+    parser.add_argument("--padding", type=int, default=2,
+                        help="Padding inside frame (default: 2)")
     parser.add_argument("--palette", default="boi-purple",
                         choices=list(PALETTES.keys()),
                         help="Color palette preset (default: boi-purple)")
@@ -600,6 +1426,8 @@ def main():
         palette_name=args.palette,
         no_color=no_color,
         output_file=args.output,
+        style=args.style,
+        padding=args.padding,
     )
 
     if not args.output:
