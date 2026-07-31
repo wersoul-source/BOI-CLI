@@ -155,7 +155,13 @@ func (s *SplashModel) View() string {
 	}
 
 	statusLines = append(statusLines, "")
-	statusLines = append(statusLines, fmt.Sprintf("  %s", splashPromptStyle.Render("Press Enter to start...")))
+
+	setupReady := s.providerCount > 0 && s.personaNames != ""
+	if setupReady {
+		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("Ready"), splashPromptStyle.Render("Press Enter to start...")))
+	} else {
+		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("Setup needed"), splashPromptStyle.Render("Press Enter to start anyway...")))
+	}
 
 	allLines := append(boxLines, statusLines...)
 	content := strings.Join(allLines, "\n")

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/persona"
 	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var personaCmd = &cobra.Command{
@@ -149,8 +152,112 @@ var personaInitCmd = &cobra.Command{
 	},
 }
 
+type personaWizardEntry struct {
+	Name         string
+	Emoji        string
+	Label        string
+	Introduction string
+}
+
+var personaWizardEntries = []personaWizardEntry{
+	{Name: "boi", Emoji: "🏛️", Label: "boi — สถาปนิกระบบ (Architecture & System Design)", Introduction: `"ผมมองทุกอย่างเป็น Layer ออกแบบระบบเป็นขั้นๆ ดูทั้ง Big Picture และ Detail"`},
+	{Name: "kamkaew", Emoji: "🌀", Label: "kamkaew — นักท่องมิติ (Runtime Orchestrator)", Introduction: `"จัดการงานหลายๆ อย่างพร้อมกัน แบ่งงานให้คนที่ถนัด ดูทุกมิติ"`},
+	{Name: "kampun", Emoji: "⛏️", Label: "kampun — Wiki Root Cause (Knowledge Miner)", Introduction: `"ขุดคุ้ยหาข้อมูลให้ลึกที่สุด เจาะทุกรากของปัญหา สกัด Pattern จากทุกอย่าง"`},
+	{Name: "dang", Emoji: "🔧", Label: "dang — ด่างก็คือด่าง (Debug Specialist)", Introduction: `"หาบั๊ก แก้โค้ด ตรงประเด็น ไม่มีน้ำ ไม่มีฟลัฟ ถ้าเวิร์คก็คือเวิร์ค"`},
+	{Name: "don", Emoji: "📚", Label: "don — เจ้าพ่อ Context Windows (Research & Documentation)", Introduction: `"อ่านทุกอย่าง สรุปชัดเจน เขียนสวย อ่านแล้วเก็ททันที ไม่ตกหล่น"`},
+	{Name: "kine", Emoji: "🎨", Label: "kine — ครีเอเตอร์ เอเลี่ยน (Creative Designer)", Introduction: `"ลองคิดนอกกรอบดู... จินตนาการว่าถ้าไม่มีข้อจำกัดเลย จะสร้างอะไรได้บ้าง"`},
+}
+
+var personaWizardCmd = &cobra.Command{
+	Use:   "wizard",
+	Short: "Interactive persona selection wizard",
+	Long:  `Shows all BOI Family personas with introductions and lets you pick one.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return RunPersonaWizard()
+	},
+}
+
+func RunPersonaWizard() error {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println()
+	fmt.Println("╔══════════════════════════════════════════════╗")
+	fmt.Println("║         Choose Your Persona                 ║")
+	fmt.Println("║         BOI Family — Persona Selection      ║")
+	fmt.Println("╚══════════════════════════════════════════════╝")
+	fmt.Println()
+	fmt.Println("  Each persona has a unique thinking style and specialty.")
+	fmt.Println("  Choose the one that matches how you want BOI to think.")
+	fmt.Println()
+
+	for i, entry := range personaWizardEntries {
+		fmt.Printf("  %2d. %s  %s\n", i+1, entry.Emoji, entry.Label)
+		fmt.Printf("       %s\n", entry.Introduction)
+		fmt.Println()
+	}
+
+	defaultChoice := "1"
+	fmt.Printf("  Your choice [%s]: ", defaultChoice)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input == "" {
+		input = defaultChoice
+	}
+
+	idx, err := strconv.Atoi(input)
+	if err != nil || idx < 1 || idx > len(personaWizardEntries) {
+		return fmt.Errorf("invalid selection: %s", input)
+	}
+
+	chosen := personaWizardEntries[idx-1]
+
+	root, err := workspace.DetectRoot()
+	if err != nil {
+		root, _ = os.Getwd()
+	}
+
+	cfgPath := filepath.Join(workspace.GetBoiDir(root), "config.yaml")
+
+	var cfg *config.Config
+	cfg, err = config.LoadFrom(cfgPath)
+	if err != nil {
+		cfg = config.Default()
+	}
+
+	if chosen.Name == "boi" || chosen.Name == "kamkaew" || chosen.Name == "kampun" {
+		data, readErr := persona.DefaultPersonas.ReadFile("defaults/" + chosen.Name + ".yaml")
+		if readErr == nil {
+			var p persona.Persona
+			if yaml.Unmarshal(data, &p) == nil {
+				if cfg.Provider == "" || cfg.Provider == "openai" {
+					if len(p.PreferredProviders) > 0 {
+						cfg.Provider = p.PreferredProviders[0]
+					}
+				}
+				if p.Model != "" {
+					cfg.Model = p.Model
+				}
+			}
+		}
+	}
+
+	cfg.Persona = chosen.Name
+
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Println()
+	fmt.Printf("  ✅ Persona set to: %s %s\n", chosen.Emoji, chosen.Label)
+	fmt.Printf("     %s\n", chosen.Introduction)
+	fmt.Println()
+
+	return nil
+}
+
 func init() {
 	personaCmd.AddCommand(personaListCmd)
 	personaCmd.AddCommand(personaSwitchCmd)
 	personaCmd.AddCommand(personaInitCmd)
+	personaCmd.AddCommand(personaWizardCmd)
 }
