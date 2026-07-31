@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/boi-family/boi-cli/internal/tui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func runTUI() {

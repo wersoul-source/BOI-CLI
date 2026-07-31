@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/boi-family/boi-cli/internal/persona"
 	"github.com/boi-family/boi-cli/internal/workspace"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type tickMsg time.Time

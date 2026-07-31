@@ -13,8 +13,8 @@ import (
 
 // Store is the Phantom DB — file-based memory store
 type Store struct {
-	mu   sync.RWMutex
-	dir  string
+	mu  sync.RWMutex
+	dir string
 }
 
 // MemoryEntry represents a stored memory
@@ -194,8 +194,8 @@ func (s *Store) SearchMemory(query string, limit int) ([]SearchResult, error) {
 	}
 
 	type result struct {
-		entry  MemoryEntry
-		score  float64
+		entry MemoryEntry
+		score float64
 	}
 
 	var scored []result

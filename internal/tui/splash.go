@@ -29,24 +29,24 @@ var (
 			Foreground(lipgloss.Color("#6C63FF"))
 
 	splashVersionStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#4E44CE"))
+				Foreground(lipgloss.Color("#4E44CE"))
 
 	splashBorderStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C63FF"))
+				Foreground(lipgloss.Color("#6C63FF"))
 
 	splashLabelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#A78BFA")).
-			Bold(true)
+				Foreground(lipgloss.Color("#A78BFA")).
+				Bold(true)
 
 	splashValueStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#E2E8F0"))
+				Foreground(lipgloss.Color("#E2E8F0"))
 
 	splashDimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#6B7280"))
 
 	splashPromptStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C63FF")).
-			Bold(true)
+				Foreground(lipgloss.Color("#6C63FF")).
+				Bold(true)
 )
 
 type SplashModel struct {
@@ -209,5 +209,3 @@ func listSkills(dir string) ([]string, int) {
 	}
 	return names, len(names)
 }
-
-

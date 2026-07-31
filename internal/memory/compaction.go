@@ -4,7 +4,7 @@ package memory
 type CompactLevel int
 
 const (
-	CompactNone  CompactLevel = iota
+	CompactNone CompactLevel = iota
 	CompactMicro
 	CompactAuto
 	CompactFull

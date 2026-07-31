@@ -35,8 +35,8 @@ var (
 			BorderForeground(borderColor)
 
 	InputBorderStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(borderColor)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(borderColor)
 
 	SpinnerStyle = lipgloss.NewStyle().
 			Foreground(boiOrange)

@@ -52,7 +52,7 @@ func Render(name, subtitle, version string) string {
 	edgeL := borderStyle.Render("║")
 	edgeR := borderStyle.Render("║")
 
-	emptyLine := edgeL + lipgloss.NewStyle().Width(boxWidth - 2).Render("") + edgeR
+	emptyLine := edgeL + lipgloss.NewStyle().Width(boxWidth-2).Render("") + edgeR
 
 	lines := []string{
 		top,
