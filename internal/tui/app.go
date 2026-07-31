@@ -61,8 +61,7 @@ func NewApp() *Model {
 		help:   NewHelp(),
 	}
 
-	m.chat.AddMessage("system", fmt.Sprintf("BOI CLI v0.1.0 — %d personas loaded", len(personaNames)))
-	m.chat.AddMessage("system", fmt.Sprintf("Active persona: %s | Provider: %s", activePersona, provider))
+	renderWelcomeBanner(m, len(personaNames), activePersona, provider)
 
 	return m
 }
@@ -163,6 +162,17 @@ func (m *Model) processInput(input string) {
 	}
 
 	m.status.SetStatus("idle")
+}
+
+func renderWelcomeBanner(m *Model, personaCount int, activePersona, provider string) {
+	m.chat.AddMessage("system", "Welcome to")
+	m.chat.AddMessage("system", `╔══════════════════════════════════════╗
+║          B O I   C L I              ║
+║     Chimera Architecture             ║
+║            v0.1.0                    ║
+╚══════════════════════════════════════╝`)
+	m.chat.AddMessage("system", fmt.Sprintf("%d personas loaded | Active: %s", personaCount, activePersona))
+	m.chat.AddMessage("system", fmt.Sprintf("Provider: %s | Type /help for commands", provider))
 }
 
 func (m *Model) View() string {
