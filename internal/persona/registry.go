@@ -9,8 +9,19 @@ import (
 )
 
 type Registry struct {
-	personas map[string]*Persona
+	personas    map[string]*Persona
 	defaultName string
+}
+
+func NewRegistry() *Registry {
+	return &Registry{
+		personas:    make(map[string]*Persona),
+		defaultName: "kamkaew",
+	}
+}
+
+func (r *Registry) Register(p *Persona) {
+	r.personas[strings.ToLower(strings.TrimSpace(p.Name))] = p
 }
 
 func Load(path string) (*Registry, error) {
@@ -46,6 +57,15 @@ func Load(path string) (*Registry, error) {
 	}
 
 	return r, nil
+}
+
+func (r *Registry) Find(name string) *Persona {
+	name = strings.ToLower(strings.TrimSpace(name))
+	p, ok := r.personas[name]
+	if !ok {
+		return nil
+	}
+	return p
 }
 
 func (r *Registry) Get(name string) (*Persona, error) {

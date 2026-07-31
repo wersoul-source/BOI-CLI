@@ -98,7 +98,7 @@ var memorySaveCmd = &cobra.Command{
 		defer store.Close()
 
 		entry := &memory.MemoryEntry{
-			ID:        fmt.Sprintf("mem_%d", time.Now().UnixNano()),
+			MemID:     fmt.Sprintf("mem_%d", time.Now().UnixNano()),
 			SessionID: "cli",
 			Type:      args[0],
 			Key:       args[1],

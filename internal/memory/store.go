@@ -19,7 +19,7 @@ type Store struct {
 
 // MemoryEntry represents a stored memory
 type MemoryEntry struct {
-	ID        string    `json:"id"`
+	MemID     string    `json:"id"`
 	SessionID string    `json:"session_id"`
 	Type      string    `json:"type"`
 	Key       string    `json:"key"`
@@ -43,7 +43,7 @@ func (s *Store) Save(entry *MemoryEntry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	path := filepath.Join(s.dir, entry.ID+".json")
+	path := filepath.Join(s.dir, entry.MemID+".json")
 	data, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (s *Store) CleanExpired() (int64, error) {
 	now := time.Now().Unix()
 	for _, m := range all {
 		if m.TTL > 0 && (m.CreatedAt.Unix()+m.TTL) < now {
-			path := filepath.Join(s.dir, m.ID+".json")
+			path := filepath.Join(s.dir, m.MemID+".json")
 			if os.Remove(path) == nil {
 				removed++
 			}
