@@ -7,17 +7,11 @@
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="License">
 </p>
 
-<h3 align="center">An AI team of 6 personas in your terminal. One binary. No server.</h3>
+<p align="center">
+  <img src="assets/boi-logo.svg" alt="BOI CLI" width="550">
+</p>
 
-```
-  88888888     888888     888888888                888888     88          888888888
-  88     88   888   888      888                  888   88    88             888
-  88     88   88      88      888                  88          88             888
-  888888888   88      88      888                  88          88             888
-  88     88   88      88      888                  88          88             888
-  88     88   888   888      888                  888   88    88             888
-  88888888     888888     888888888                888888     888888888   888888888
-```
+<h3 align="center">An AI team of 6 personas in your terminal. One binary. No server.</h3>
 
 ---
 

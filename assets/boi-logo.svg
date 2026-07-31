@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="550" height="130" viewBox="0 0 550 130">
+  <rect width="550" height="130" fill="#0D1117"/>
+  <text x="20" y="30" font-family="monospace" font-size="14" fill="#6C63FF" xml:space="preserve">_______    ______    __            ______    __      __</text>
+  <text x="20" y="46" font-family="monospace" font-size="14" fill="#6C63FF" xml:space="preserve">|       \ /      \  |  \          /      \  |  \    |  \</text>
+  <text x="20" y="62" font-family="monospace" font-size="14" fill="#A78BFA" xml:space="preserve">| ▓▓▓▓▓▓▓\|  ▓▓▓▓▓▓\| ▓▓          |  ▓▓▓▓▓▓\| ▓▓    | ▓▓</text>
+  <text x="20" y="78" font-family="monospace" font-size="14" fill="#A78BFA" xml:space="preserve">| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓    | ▓▓</text>
+  <text x="20" y="94" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓    ▓▓| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓</text>
+  <text x="20" y="110" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓▓▓▓▓▓\| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓</text>
+  <text x="20" y="126" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓___ | ▓▓</text>
+  <text x="20" y="142" font-family="monospace" font-size="14" fill="#7B6FE0" xml:space="preserve">| ▓▓    ▓▓|  \▓▓▓▓▓▓| __/         |  \▓▓▓▓▓▓|  \▓▓ \| __/</text>
+  <text x="20" y="158" font-family="monospace" font-size="14" fill="#7B6FE0" xml:space="preserve"> \▓▓▓▓▓▓▓  \_____/   \_/           \_____/   \▓▓▓▓▓▓ \_/</text>
+</svg>
