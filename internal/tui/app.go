@@ -16,21 +16,25 @@ import (
 type tickMsg time.Time
 
 type Model struct {
-	chat    ChatModel
-	input   InputModel
-	status  StatusModel
-	help    HelpModel
-	width   int
-	height  int
+	splash *SplashModel
+	chat   ChatModel
+	input  InputModel
+	status StatusModel
+	help   HelpModel
+	width  int
+	height int
+	mode   string
 }
 
 func NewApp() *Model {
 	var personaNames []string
 	activePersona := "kamkaew"
 	provider := "none"
+	root := ""
 
-	root, err := workspace.DetectRoot()
+	r, err := workspace.DetectRoot()
 	if err == nil {
+		root = r
 		personaDir := filepath.Join(workspace.GetBoiDir(root), "personas")
 		reg, regErr := persona.Load(personaDir)
 		if regErr == nil {
@@ -54,14 +58,21 @@ func NewApp() *Model {
 		personaNames = []string{"kamkaew", "kampun", "dang", "don", "kine", "boi"}
 	}
 
+	boiDir := filepath.Join(root, ".boi")
+	memoryCount := countMemoryEntries(filepath.Join(boiDir, "memory"))
+	skillList, skillCount := listSkills(filepath.Join(boiDir, "skills"))
+	providerCount := countPSCProviders()
+
+	splash := NewSplash(root, len(personaNames), strings.Join(personaNames, ", "), providerCount, memoryCount, skillCount, strings.Join(skillList, ", "))
+
 	m := &Model{
+		splash: splash,
 		chat:   NewChat(),
 		input:  NewInput(),
 		status: NewStatus(activePersona, provider, personaNames),
 		help:   NewHelp(),
+		mode:   "splash",
 	}
-
-	renderWelcomeBanner(m, len(personaNames), activePersona, provider)
 
 	return m
 }
@@ -69,7 +80,7 @@ func NewApp() *Model {
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.EnterAltScreen,
-		tickCmd(),
+		splashTimeoutCmd(),
 	)
 }
 
@@ -79,7 +90,40 @@ func tickCmd() tea.Cmd {
 	})
 }
 
+func (m *Model) transitionToChat() tea.Cmd {
+	m.mode = "chat"
+	m.status.SetWidth(m.width)
+	m.help.SetWidth(m.width)
+	m.chat.SetSize(m.width, m.height-6)
+	m.input.SetWidth(m.width)
+	m.chat.AddMessage("system", "BOI CLI ready. Type /help for commands.")
+	return tickCmd()
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.mode == "splash" {
+		switch msg := msg.(type) {
+		case tea.WindowSizeMsg:
+			m.width = msg.Width
+			m.height = msg.Height
+			m.splash.SetSize(msg.Width, msg.Height)
+			return m, nil
+
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+c", "esc":
+				return m, tea.Quit
+			case "enter":
+				return m, m.transitionToChat()
+			}
+			return m, nil
+
+		case splashTimeoutMsg:
+			return m, m.transitionToChat()
+		}
+		return m, nil
+	}
+
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -164,18 +208,11 @@ func (m *Model) processInput(input string) {
 	m.status.SetStatus("idle")
 }
 
-func renderWelcomeBanner(m *Model, personaCount int, activePersona, provider string) {
-	m.chat.AddMessage("system", "Welcome to")
-	m.chat.AddMessage("system", `╔══════════════════════════════════════╗
-║          B O I   C L I              ║
-║     Chimera Architecture             ║
-║            v0.1.0                    ║
-╚══════════════════════════════════════╝`)
-	m.chat.AddMessage("system", fmt.Sprintf("%d personas loaded | Active: %s", personaCount, activePersona))
-	m.chat.AddMessage("system", fmt.Sprintf("Provider: %s | Type /help for commands", provider))
-}
-
 func (m *Model) View() string {
+	if m.mode == "splash" {
+		return m.splash.View()
+	}
+
 	status := m.status.View()
 	chat := m.chat.View()
 	input := m.input.View()
