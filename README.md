@@ -1,44 +1,49 @@
 ﻿<p align="center">
-  <img src="https://img.shields.io/badge/BOI_CLI-0.1.0-6C63FF?style=for-the-badge" alt="BOI CLI">
+  <img src="https://img.shields.io/badge/BOI_CLI-0.1.1-6C63FF?style=for-the-badge" alt="BOI CLI">
   <br>
+  <img src="https://img.shields.io/github/v/release/wersoul-source/BOI-CLI?color=6C63FF" alt="Release">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go">
-  <img src="https://img.shields.io/badge/Binary-~7MB-success?style=flat" alt="Binary">
   <img src="https://img.shields.io/badge/Platform-Win%20|%20Mac%20|%20Linux-lightgrey?style=flat" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="License">
 </p>
 
 <h3 align="center">An AI team of 6 personas in your terminal. One binary. No server.</h3>
 
-```bash
-git clone https://github.com/wersoul-source/BOI-CLI.git && cd BOI-CLI && go build -o bin/boi ./cmd/boi && ./bin/boi init
 ```
-
-```
- 888888b.    .d88888b.  8888888
- 888  "88b  d88P" "Y88b   888
- 888  .88P  888     888   888
- 8888888K.  888     888   888
- 888  "88b  888     888   888
- 888  .88P  888     888   888
- 8888888K.  Y88b. .d88P   888
- 888   Y88b  "Y88888P"  8888888
+_______    ______    __            ______    __      __
+|       \ /      \  |  \          /      \  |  \    |  \
+| ▓▓▓▓▓▓▓\|  ▓▓▓▓▓▓\| ▓▓          |  ▓▓▓▓▓▓\| ▓▓    | ▓▓
+| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓    | ▓▓
+| ▓▓    ▓▓| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓
+| ▓▓▓▓▓▓▓\| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓
+| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓___ | ▓▓
+| ▓▓    ▓▓|  \▓▓▓▓▓▓| __/         |  \▓▓▓▓▓▓|  \▓▓ \| __/
+ \▓▓▓▓▓▓▓  \_____/   \_/           \_____/   \▓▓▓▓▓▓ \_/
 ```
 
 ---
 
-## Quick Start
+## ⚡ Install
 
 ```bash
-cp .env.example .env          # Add your API key
-./bin/boi ask "hello"         # Test AI response
-./bin/boi                     # Launch TUI
+# Download binary (Windows)
+curl -LO https://github.com/wersoul-source/BOI-CLI/releases/download/v0.1.1/boi_0.1.1_windows_amd64.tar.gz
+tar -xzf boi_0.1.1_windows_amd64.tar.gz
+
+# Or build from source
+git clone https://github.com/wersoul-source/BOI-CLI.git && cd BOI-CLI && go build -o bin/boi ./cmd/boi
+```
+
+```bash
+./bin/boi init     # One-time setup
+./bin/boi          # Launch TUI (full-screen terminal)
 ```
 
 > No API keys? BOI runs in simulated mode — test the interface instantly.
 
 ---
 
-## Features
+## ✨ Features
 
 | | |
 |---|---|
@@ -50,16 +55,16 @@ cp .env.example .env          # Add your API key
 
 ---
 
-## Personas
+## 🧩 Personas
 
 | Persona | Role | Model | Temp |
 |---------|------|-------|------|
-| **kamkaew** | Orchestration *(default)* | gpt-4.1-mini | 0.5 |
-| **boi** | Architecture & Strategy | claude-sonnet-5 | 0.4 |
-| **kampun** | Root Cause & Pattern Analysis | claude-sonnet-5 | 0.3 |
+| **kamkaew** | Runtime Orchestration *(default)* | gpt-4.1-mini | 0.5 |
+| **boi** | Architecture & System Design | claude-sonnet-5 | 0.4 |
+| **kampun** | Knowledge Mining & Pattern Analysis | claude-sonnet-5 | 0.3 |
 | **dang** | Debug & Code Specialist | gpt-4.1-mini | 0.2 |
-| **don** | Documentation Specialist | gpt-4.1-nano | 0.5 |
-| **kine** | UI/UX & Creative Design | gpt-4o | 0.8 |
+| **don** | Research & Documentation | gpt-4.1-nano | 0.5 |
+| **kine** | Creative Design & Imagination | gpt-4o | 0.8 |
 
 ```bash
 boi persona list              # View all
@@ -69,7 +74,7 @@ boi ask "debug this" -p dang  # Use for one query
 
 ---
 
-## Commands
+## 📖 Commands
 
 | Command | Description |
 |---------|-------------|
@@ -77,23 +82,20 @@ boi ask "debug this" -p dang  # Use for one query
 | `boi ask "..."` | AI agent query (ReAct loop) |
 | `boi run "..."` | Execute shell command |
 | `boi init` | Initialize workspace |
-| `boi config` | View configuration |
-| `boi persona list` | List all personas |
-| `boi persona switch <name>` | Switch active persona |
-| `boi skill list` | List loaded skills |
-| `boi memory search "..."` | Search Phantom DB |
-| `boi memory stats` | Memory statistics |
-| `boi memory save <type> <key> <val>` | Manual memory entry |
-| `boi memory repomap` | Repository structure scan |
+| `boi doctor` | System health check |
+| `boi persona list/switch` | Manage personas |
+| `boi skill list/init` | Manage skills |
+| `boi memory search/stats` | Phantom DB memory |
 | `boi weight explain <id>` | Memory weight breakdown |
+| `boi upgrade` | Self-update to latest |
+| `boi version` | Show version |
 
 ---
 
-## Screenshot
+## 📸 Screenshot
 
 ```
 ┌─ BOI CLI — 🔨 Hephaestus | Mid ── Persona: kampun ─── idle ────────┐
-│                   █████████████████████████████████████              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ▶ You: login bug เกิดจากอะไร                                       │
@@ -104,47 +106,37 @@ boi ask "debug this" -p dang  # Use for one query
 │  │ [solution] login-fix   weight: 0.72                          │  │
 │  │   Fixed by URL-encoding password in auth.js line 45          │  │
 │  │ [fact]     login-bug   weight: 0.65                          │  │
-│  │   Login page crashes when password has special characters    │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ◆ BOI: Root cause — special characters in password                │
 │                                                                     │
 │  ✅ 2 steps  ·  450 tokens  ·  0.3s                                 │
-│                                                                     │
 ├─────────────────────────────────────────────────────────────────────┤
 │ > login bug มันเกิดจากอะไรครับ                                      │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Tab:persona  Enter:send  Ctrl+N:newline  Ctrl+Q:quit               │
+│  Tab:persona  Enter:send  Ctrl+Q:quit                               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## FAQ
+## ❓ FAQ
 
-### Do I need a server or database?
-No. BOI CLI is a single Go binary. Everything — memory, personas, skills — lives on your filesystem in `.boi/`.
+**Do I need a server or database?** No. Single Go binary. Everything lives in `.boi/`.
 
-### Does it work without an API key?
-Yes. Without `.env` configured, `boi ask` runs in simulated response mode. Add at least one `PSC_*` provider to get real AI responses.
+**Does it work without an API key?** Yes — simulated mode. Add `PSC_*` in `.env` for real AI.
 
-### How is this different from Claude Code or Codex CLI?
-BOI CLI gives you **6 specialized personas** (not one), cross-session memory with a weight engine, and 4-provider fallback — all as a single binary. No npm, no Python, no Node.
-
-### What LLM providers are supported?
-OpenAI, Anthropic, and any OpenAI-compatible endpoint. Chain up to 4 providers — if one fails, BOI auto-falls-back to the next.
+**How is this different from Claude Code / Codex CLI?** 6 specialized personas, cross-session memory with weight engine, 4-provider auto-fallback — all as a single binary.
 
 ---
 
-## Community
-
 <p align="center">
   <a href="https://github.com/wersoul-source/BOI-CLI">
-    <img src="https://img.shields.io/github/stars/wersoul-source/BOI-CLI?style=social" alt="GitHub Stars">
+    <img src="https://img.shields.io/github/stars/wersoul-source/BOI-CLI?style=social" alt="Stars">
   </a>
 </p>
 
 <p align="center">
   <b>BOI CLI</b> — Built by <b>Kampun (คำปัน)</b> &amp; the <b>BOI Family</b><br>
-  <sub>Licensed under MIT. &copy; July 2026</sub>
+  <sub>MIT License · July 2026</sub>
 </p>
