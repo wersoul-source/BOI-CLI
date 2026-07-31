@@ -68,10 +68,10 @@ Phase: PSC Mini — READY
 
 | 2026-07-30-S4 | Skill | Hermes 🔸 Low | Skill system + MCP client + built-in skills |
 | 2026-07-30-S5 | Memory | Athena 🔸 Low | Phantom DB + FTS5 search + context manager + repo map |
+| 2026-07-31-S6 | Release | Zeus 🔸 Mid | CI/CD pipeline + GoReleaser + cross-platform builds + v0.1.0 tag |
 
 ---
 
-*อัปเดตล่าสุด: 27 กรกฎาคม 2026*
 ---
 
 ## Session: 2026-07-30-S3 — PHASE 3 COMPLETE
@@ -100,5 +100,34 @@ Phase: Persona — COMPLETE
 \
 ### ขั้นตอนถัดไป
 - [x] Phase 4: Skill (Skill Runtime, Loader, Registry)
+
+---
+
+## Session: 2026-07-31-S6 — v0.1.0 RELEASE
+
+### สิ่งที่ทำ
+- ✅ CI/CD pipeline — GitHub Actions (build + vet on every push/PR)
+- ✅ Release workflow — GoReleaser v2 auto-release on git tag push
+- ✅ Cross-platform build scripts (build-all.sh + build-all.ps1)
+- ✅ .goreleaser.yml — 6 platform/arch combos + checksums + source archive
+- ✅ CHANGELOG.md — initial release notes
+- ✅ Bundle install scripts with releases
+- ✅ Git tag v0.1.0 created and pushed
+
+### ระดับปัจจุบัน
+```
+Level: 🎯 Zeus — 🔸 Mid
+Score: 1.0
+Phase: PHASE 6 — COMPLETE (v0.1.0)
+```
+
+### Build Targets
+| Platform | Arch |
+|----------|------|
+| Windows | amd64, arm64 |
+| Linux | amd64, arm64 |
+| macOS | amd64, arm64 |
+
+*อัปเดตล่าสุด: 31 กรกฎาคม 2026*
 
 

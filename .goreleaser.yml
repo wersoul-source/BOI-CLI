@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - id: boi
     main: ./cmd/boi
@@ -13,9 +15,18 @@ archives:
   - format: tar.gz
     name_template: >-
       boi_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+      - scripts/install.sh
+      - scripts/install.ps1
 
 checksum:
   name_template: checksums.txt
+
+source:
+  enabled: true
 
 changelog:
   sort: asc
@@ -23,3 +34,8 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
+release:
+  github:
+    owner: wersoul-source
+    name: BOI-CLI
