@@ -11,7 +11,7 @@ var rootCmd = &cobra.Command{
 
 Built with Go, inspired by Chimera Architecture.
 DNA from: OpenCode, Hermes, Claude Code, Codex CLI, Antigravity, Agent Zero, ZeroClaw.`,
-	Version: "0.1.0",
+	Version: Version,
 }
 
 // Execute runs the root command
