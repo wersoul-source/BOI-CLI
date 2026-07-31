@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="550" height="130" viewBox="0 0 550 130">
-  <rect width="550" height="130" fill="#0D1117"/>
-  <text x="20" y="30" font-family="monospace" font-size="14" fill="#6C63FF" xml:space="preserve">_______    ______    __            ______    __      __</text>
-  <text x="20" y="46" font-family="monospace" font-size="14" fill="#6C63FF" xml:space="preserve">|       \ /      \  |  \          /      \  |  \    |  \</text>
-  <text x="20" y="62" font-family="monospace" font-size="14" fill="#A78BFA" xml:space="preserve">| ▓▓▓▓▓▓▓\|  ▓▓▓▓▓▓\| ▓▓          |  ▓▓▓▓▓▓\| ▓▓    | ▓▓</text>
-  <text x="20" y="78" font-family="monospace" font-size="14" fill="#A78BFA" xml:space="preserve">| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓    | ▓▓</text>
-  <text x="20" y="94" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓    ▓▓| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓</text>
-  <text x="20" y="110" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓▓▓▓▓▓\| ▓▓    ▓▓| ▓▓          | ▓▓      | ▓▓    | ▓▓</text>
-  <text x="20" y="126" font-family="monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">| ▓▓__/ ▓▓| ▓▓__/ ▓▓| ▓▓          | ▓▓__/ ▓▓| ▓▓___ | ▓▓</text>
-  <text x="20" y="142" font-family="monospace" font-size="14" fill="#7B6FE0" xml:space="preserve">| ▓▓    ▓▓|  \▓▓▓▓▓▓| __/         |  \▓▓▓▓▓▓|  \▓▓ \| __/</text>
-  <text x="20" y="158" font-family="monospace" font-size="14" fill="#7B6FE0" xml:space="preserve"> \▓▓▓▓▓▓▓  \_____/   \_/           \_____/   \▓▓▓▓▓▓ \_/</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="150" viewBox="0 0 480 150">
+  <rect width="480" height="150" fill="#0D1117" rx="8"/>
+  <text x="20" y="30" font-family="'Courier New', monospace" font-size="14" fill="#6C63FF" xml:space="preserve">888888b.    .d88888b. 8888888       .d8888b.  888      8888888</text>
+  <text x="20" y="46" font-family="'Courier New', monospace" font-size="14" fill="#7B6FE0" xml:space="preserve">888  "88b  d88P" "Y88b  888        d88P  Y88b 888        888  </text>
+  <text x="20" y="62" font-family="'Courier New', monospace" font-size="14" fill="#8F80ED" xml:space="preserve">888  .88P  888     888  888        888    888 888        888  </text>
+  <text x="20" y="78" font-family="'Courier New', monospace" font-size="14" fill="#A78BFA" xml:space="preserve">8888888K.  888     888  888        888        888        888  </text>
+  <text x="20" y="94" font-family="'Courier New', monospace" font-size="14" fill="#9F8BFA" xml:space="preserve">888  "Y88b 888     888  888        888        888        888  </text>
+  <text x="20" y="110" font-family="'Courier New', monospace" font-size="14" fill="#8F80ED" xml:space="preserve">888    888 888     888  888        888    888 888        888  </text>
+  <text x="20" y="126" font-family="'Courier New', monospace" font-size="14" fill="#7B6FE0" xml:space="preserve">888   d88P Y88b. .d88P  888        Y88b  d88P 888        888  </text>
+  <text x="20" y="142" font-family="'Courier New', monospace" font-size="14" fill="#6C63FF" xml:space="preserve">8888888P"   "Y88888P" 8888888       "Y8888P"  88888888 8888888</text>
 </svg>
