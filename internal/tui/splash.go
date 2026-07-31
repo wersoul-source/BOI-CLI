@@ -4,11 +4,21 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	tea "github.com/charmbracelet/bubbletea"
 )
+
+var boiLogoDOS = []string{
+	"_______    _______   ______         ______   __       ______ ",
+	"|       \\ /      \\ |      \\       /      \\ |  \\     |      \\",
+	"| ▓▓▓▓▓▓▓\\  ▓▓▓▓▓▓\\\\▓▓▓▓▓▓      |  ▓▓▓▓▓▓\\ ▓▓      \\▓▓▓▓▓▓",
+	"| ▓▓__/ ▓▓ ▓▓  | ▓▓ | ▓▓        | ▓▓   \\▓▓ ▓▓       | ▓▓  ",
+	"| ▓▓    ▓▓ ▓▓  | ▓▓ | ▓▓        | ▓▓     | ▓▓       | ▓▓  ",
+	"| ▓▓▓▓▓▓▓\\ ▓▓  | ▓▓ | ▓▓        | ▓▓   __| ▓▓       | ▓▓  ",
+	"| ▓▓__/ ▓▓ ▓▓__/ ▓▓_| ▓▓_       | ▓▓__/  \\ ▓▓_____ _| ▓▓_ ",
+	"| ▓▓    ▓▓\\▓▓    ▓▓   ▓▓ \\      \\▓▓    ▓▓ ▓▓     \\   ▓▓ \\",
+	" \\▓▓▓▓▓▓▓  \\▓▓▓▓▓▓ \\▓▓▓▓▓▓       \\▓▓▓▓▓▓ \\▓▓▓▓▓▓▓▓\\▓▓▓▓▓▓",
+}
 
 var (
 	splashLogoStyle = lipgloss.NewStyle().
@@ -36,11 +46,8 @@ var (
 
 	splashPromptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#6C63FF")).
-			Bold(true).
-			Blink(true)
+			Bold(true)
 )
-
-type splashTimeoutMsg struct{}
 
 type SplashModel struct {
 	width         int
@@ -72,7 +79,7 @@ func (s *SplashModel) SetSize(w, h int) {
 }
 
 func (s *SplashModel) View() string {
-	logoLines := Render8Art("BOI CLI")
+	logoLines := boiLogoDOS
 
 	logoWidth := 0
 	for _, l := range logoLines {
@@ -160,12 +167,6 @@ func (s *SplashModel) View() string {
 		)
 	}
 	return content
-}
-
-func splashTimeoutCmd() tea.Cmd {
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
-		return splashTimeoutMsg{}
-	})
 }
 
 func countPSCProviders() int {

@@ -78,10 +78,7 @@ func NewApp() *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(
-		tea.EnterAltScreen,
-		splashTimeoutCmd(),
-	)
+	return tea.EnterAltScreen
 }
 
 func tickCmd() tea.Cmd {
@@ -117,9 +114,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.transitionToChat()
 			}
 			return m, nil
-
-		case splashTimeoutMsg:
-			return m, m.transitionToChat()
 		}
 		return m, nil
 	}
