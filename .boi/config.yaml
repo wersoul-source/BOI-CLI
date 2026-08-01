@@ -1,10 +1,9 @@
-provider: anthropic
+provider: openai
 model: gpt-4.1-mini
-persona: kamkaew
+persona: ""
 log_level: info
 workspace: ""
-api_keys:
-    google: AQ.A...XuHw
+api_keys: {}
 sandbox:
     enabled: true
     deny_commands:
