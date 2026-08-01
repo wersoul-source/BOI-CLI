@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="https://img.shields.io/badge/BOI_CLI-0.1.1-6C63FF?style=for-the-badge" alt="BOI CLI">
+  <img src="https://img.shields.io/badge/BOI_CLI-0.1.2-6C63FF?style=for-the-badge" alt="BOI CLI">
   <br>
   <img src="https://img.shields.io/github/v/release/wersoul-source/BOI-CLI?color=6C63FF" alt="Release">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go">
@@ -15,23 +15,35 @@
 
 ---
 
-## ⚡ Install
+## 🚀 Get Started
 
+### 1. Install
 ```bash
-# Download binary (Windows)
-curl -LO https://github.com/wersoul-source/BOI-CLI/releases/download/v0.1.1/boi_0.1.1_windows_amd64.tar.gz
-tar -xzf boi_0.1.1_windows_amd64.tar.gz
-
-# Or build from source
-git clone https://github.com/wersoul-source/BOI-CLI.git && cd BOI-CLI && go build -o bin/boi ./cmd/boi
+# Download latest release (Windows)
+Invoke-WebRequest -Uri "https://github.com/wersoul-source/BOI-CLI/releases/download/v0.1.2/boi_0.1.2_windows_amd64.tar.gz" -OutFile boi.tar.gz
+tar -xzf boi.tar.gz && cd boi_0.1.2_windows_amd64
+.\boi.exe init
 ```
 
+### 2. Setup Providers
 ```bash
-./bin/boi init     # One-time setup
-./bin/boi          # Launch TUI (full-screen terminal)
+boi setup
+```
+Pick from 10 providers (OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, xAI, Ollama, OpenRouter, Together) or add custom. Add 2+ for auto-fallback.
+
+### 3. Choose Persona
+```bash
+boi persona wizard
+```
+Each persona introduces itself — pick your thinking style.
+
+### 4. Launch!
+```bash
+boi                        # Splash → Press Enter → Chat (TUI)
+boi ask "hello" --verbose  # Or CLI mode
 ```
 
-> No API keys? BOI runs in simulated mode — test the interface instantly.
+> No API keys? BOI runs in simulated mode.
 
 ---
 
