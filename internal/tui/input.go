@@ -27,6 +27,11 @@ func (i *InputModel) Value() string {
 	return i.textarea.Value()
 }
 
+func (i *InputModel) SetValue(v string) {
+	i.textarea.SetValue(v)
+	i.textarea.Focus()
+}
+
 func (i *InputModel) Reset() {
 	i.textarea.Reset()
 	i.textarea.Focus()

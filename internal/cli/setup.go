@@ -1,281 +1,49 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/boi-family/boi-cli/internal/registry"
+	"github.com/boi-family/boi-cli/internal/tui/setup"
 	"github.com/spf13/cobra"
 )
 
-type ProviderOption struct {
-	Name            string
-	Label           string
-	DefaultEndpoint string
-	DefaultModel    string
-}
+var (
+	setupRefresh bool
+)
 
-var providers = []ProviderOption{
-	{Name: "openai", Label: "OpenAI (GPT-4.1, GPT-4o)", DefaultEndpoint: "https://api.openai.com/v1", DefaultModel: "gpt-4.1-mini"},
-	{Name: "anthropic", Label: "Anthropic (Claude Sonnet, Opus)", DefaultEndpoint: "https://api.anthropic.com/v1", DefaultModel: "claude-sonnet-5"},
-	{Name: "google", Label: "Google (Gemini 2.5)", DefaultEndpoint: "https://generativelanguage.googleapis.com/v1beta", DefaultModel: "gemini-2.5-flash"},
-	{Name: "groq", Label: "Groq (fast inference)", DefaultEndpoint: "https://api.groq.com/openai/v1", DefaultModel: "llama-3.3-70b"},
-	{Name: "deepseek", Label: "DeepSeek (V3, R1)", DefaultEndpoint: "https://api.deepseek.com/v1", DefaultModel: "deepseek-chat"},
-	{Name: "mistral", Label: "Mistral (Large, Small)", DefaultEndpoint: "https://api.mistral.ai/v1", DefaultModel: "mistral-small"},
-	{Name: "xai", Label: "xAI (Grok)", DefaultEndpoint: "https://api.x.ai/v1", DefaultModel: "grok-4.5"},
-	{Name: "ollama", Label: "Ollama (local models)", DefaultEndpoint: "http://localhost:11434/v1", DefaultModel: "llama3.3"},
-	{Name: "openrouter", Label: "OpenRouter (multi-provider)", DefaultEndpoint: "https://openrouter.ai/api/v1", DefaultModel: "openai/gpt-4.1-mini"},
-	{Name: "together", Label: "Together AI", DefaultEndpoint: "https://api.together.xyz/v1", DefaultModel: "meta-llama/Llama-3.3-70B"},
-	{Name: "other", Label: "Other (custom endpoint)", DefaultEndpoint: "", DefaultModel: ""},
-}
-
-type selectedProvider struct {
-	Name     string
-	APIKey   string
-	Endpoint string
-	Model    string
+func init() {
+	setupCmd.Flags().BoolVar(&setupRefresh, "refresh", false, "Refresh endpoint registry from remote source")
 }
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Configure AI providers interactively",
-	Long:  `Interactive wizard to configure AI provider API keys for auto-fallback.`,
+	Short: "Configure AI providers interactively (TUI wizard)",
+	Long:  `Interactive TUI wizard to configure AI provider API keys for auto-fallback.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		RunSetupWizard()
+		RunSetupWizard(setupRefresh)
 		return nil
 	},
 }
 
-func RunSetupWizard() {
-	reader := bufio.NewReader(os.Stdin)
+// RunSetupWizard launches the interactive provider setup TUI.
+func RunSetupWizard(refresh bool) {
+	reg := registry.LoadEmbedded()
 
-	fmt.Println()
-	fmt.Println("╔══════════════════════════════════════════════╗")
-	fmt.Println("║        Configure AI Providers               ║")
-	fmt.Println("║        BOI CLI — Provider Setup              ║")
-	fmt.Println("╚══════════════════════════════════════════════╝")
-	fmt.Println()
-	fmt.Println("Welcome to BOI CLI! Let's set up your AI providers.")
-	fmt.Println("You can configure multiple providers for auto-fallback.")
-	fmt.Println()
-
-	fmt.Println("  Choose providers (comma-separated numbers):")
-	fmt.Println("  ─────────────────────────────────────────")
-	for i, p := range providers {
-		fmt.Printf("  %2d. %s\n", i+1, p.Label)
-	}
-	fmt.Println()
-
-	defaultChoice := "1"
-	fmt.Printf("  Selection [%s]: ", defaultChoice)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if input == "" {
-		input = defaultChoice
+	if refresh {
+		fmt.Println("  Fetching latest provider registry...")
+		// Future: fetch from GitHub and merge
+		// For now, use embedded
+		fmt.Println("  Using embedded registry.")
 	}
 
-	selections := parseSelections(input)
-	if len(selections) == 0 {
-		fmt.Println("  No providers selected. Setup cancelled.")
+	result := setup.Run(reg)
+	if result.Cancelled {
+		fmt.Println("  Setup cancelled.")
 		return
 	}
-
-	var configured []selectedProvider
-
-	for _, idx := range selections {
-		prov := providers[idx]
-
-		fmt.Println()
-		fmt.Printf("  ── Provider: %s ──\n", prov.Label)
-
-		if prov.Name == "other" {
-			fmt.Print("  Provider name: ")
-			name, _ := reader.ReadString('\n')
-			name = strings.TrimSpace(name)
-			if name == "" {
-				fmt.Println("  Skipped.")
-				continue
-			}
-
-			fmt.Print("  API endpoint URL: ")
-			endpoint, _ := reader.ReadString('\n')
-			endpoint = strings.TrimSpace(endpoint)
-
-			fmt.Print("  Default model: ")
-			model, _ := reader.ReadString('\n')
-			model = strings.TrimSpace(model)
-
-			fmt.Print("  API Key: ")
-			apiKey, _ := reader.ReadString('\n')
-			apiKey = strings.TrimSpace(apiKey)
-
-			if apiKey == "" {
-				fmt.Println("  No API key provided. Skipped.")
-				continue
-			}
-
-			configured = append(configured, selectedProvider{
-				Name:     name,
-				APIKey:   apiKey,
-				Endpoint: endpoint,
-				Model:    model,
-			})
-		} else {
-			fmt.Printf("  Endpoint: %s\n", prov.DefaultEndpoint)
-			fmt.Printf("  Default model: %s\n", prov.DefaultModel)
-
-			fmt.Print("  API Key: ")
-			apiKey, _ := reader.ReadString('\n')
-			apiKey = strings.TrimSpace(apiKey)
-
-			if apiKey == "" {
-				fmt.Println("  No API key provided. Skipped.")
-				continue
-			}
-
-			configured = append(configured, selectedProvider{
-				Name:     prov.Name,
-				APIKey:   apiKey,
-				Endpoint: prov.DefaultEndpoint,
-				Model:    prov.DefaultModel,
-			})
-		}
-	}
-
-	if len(configured) == 0 {
-		fmt.Println()
-		fmt.Println("  No providers configured. Setup complete.")
+	if len(result.Providers) == 0 {
+		fmt.Println("  No providers configured.")
 		return
 	}
-
-	writeEnvFile(configured)
-
-	fmt.Println()
-	if len(configured) >= 2 {
-		fmt.Println("✅ Auto-fallback enabled! Providers will be tried in order:")
-	} else {
-		fmt.Println("✅ Provider configured:")
-	}
-	for i, sp := range configured {
-		fmt.Printf("   %d. %s (%s)\n", i+1, sp.Name, sp.Model)
-	}
-	fmt.Println()
-	fmt.Println("   .env file created.")
-	fmt.Println("   Run 'boi' to start using BOI CLI!")
-}
-
-func parseSelections(input string) []int {
-	var result []int
-	seen := make(map[int]bool)
-	parts := strings.Split(input, ",")
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		n, err := strconv.Atoi(p)
-		if err != nil || n < 1 || n > len(providers) {
-			continue
-		}
-		idx := n - 1
-		if !seen[idx] {
-			seen[idx] = true
-			result = append(result, idx)
-		}
-	}
-	return result
-}
-
-func testProviders(configured []selectedProvider) {
-	allPassed := true
-	for _, sp := range configured {
-		fmt.Printf("  %s ... ", sp.Name)
-		err := testProvider(sp.Name, sp.APIKey, sp.Endpoint, sp.Model)
-		if err == nil {
-			fmt.Println("✓ Connected")
-		} else {
-			fmt.Printf("❌ %s\n", err.Error())
-			allPassed = false
-		}
-	}
-	fmt.Println()
-	if allPassed {
-		fmt.Println("  ✅ All providers ready!")
-	} else {
-		fmt.Println("  ⚠️  Some providers failed. Run 'boi setup' again to fix.")
-	}
-}
-
-func testProvider(name, apiKey, endpoint, model string) error {
-	url := strings.TrimRight(endpoint, "/") + "/models"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed")
-	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("unreachable")
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode == 200 || resp.StatusCode == 401 || resp.StatusCode == 403 {
-		if resp.StatusCode == 401 || resp.StatusCode == 403 {
-			return fmt.Errorf("invalid API key")
-		}
-		return nil
-	}
-	if resp.StatusCode == 404 {
-		// /models endpoint might not exist, try just the root
-		return nil // assume OK
-	}
-	return fmt.Errorf("status %d", resp.StatusCode)
-}
-
-func writeEnvFile(configured []selectedProvider) {
-	var lines []string
-	lines = append(lines, "# =====================================================")
-	lines = append(lines, "#  BOI CLI — Provider Supply Chain")
-	lines = append(lines, "#  Auto-fallback configured via 'boi setup'")
-	lines = append(lines, "# =====================================================")
-	lines = append(lines, "")
-
-	for i, sp := range configured {
-		n := i + 1
-		lines = append(lines, fmt.Sprintf("# --- Provider %d ---", n))
-		lines = append(lines, fmt.Sprintf("PSC_%d_NAME=%s", n, sp.Name))
-		lines = append(lines, fmt.Sprintf("PSC_%d_API_KEY=%s", n, sp.APIKey))
-		lines = append(lines, fmt.Sprintf("PSC_%d_BASE_URL=%s", n, sp.Endpoint))
-		lines = append(lines, fmt.Sprintf("PSC_%d_MODEL=%s", n, sp.Model))
-		lines = append(lines, "")
-	}
-
-	content := strings.Join(lines, "\n")
-
-	cwd, _ := os.Getwd()
-	envPath := filepath.Join(cwd, ".env")
-
-	if _, err := os.Stat(envPath); err == nil {
-		fmt.Println()
-		fmt.Print("  ⚠  .env already exists. Overwrite? [y/N]: ")
-		var answer string
-		fmt.Scanln(&answer)
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-			fmt.Println("  Setup cancelled. Existing .env preserved.")
-			return
-		}
-	}
-
-	os.WriteFile(envPath, []byte(content), 0644)
-
-	// Test providers after saving
-	fmt.Println()
-	fmt.Println("  Testing providers...")
-	fmt.Println()
-	testProviders(configured)
 }

@@ -47,4 +47,56 @@ var (
 
 	InfoStyle = lipgloss.NewStyle().
 			Foreground(textDim)
+
+	HighlightStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("78")).
+			Bold(true)
+
+	SuggestionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("141"))
+
+	DimStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	SystemStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
+
+	timeStampStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
+)
+
+// bubbleStyle holds ASCII box-drawing characters and styled sub-elements.
+type bubbleStyle struct {
+	topLeft  string
+	topRight string
+	botLeft  string
+	botRight string
+	vert     string
+	horiz    string
+	header   lipgloss.Style
+	meta     lipgloss.Style
+}
+
+var (
+	UserBubbleStyle = bubbleStyle{
+		topLeft:  lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("╭─"),
+		topRight: lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("─╮"),
+		botLeft:  lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("╰─"),
+		botRight: lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("─╯"),
+		vert:     lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("│"),
+		horiz:    "─",
+		header:   UserStyle.Copy().Foreground(lipgloss.Color("78")),
+		meta:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+	}
+
+	AgentBubbleStyle = bubbleStyle{
+		topLeft:  lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("╭─"),
+		topRight: lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("─╮"),
+		botLeft:  lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("╰─"),
+		botRight: lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("─╯"),
+		vert:     lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("│"),
+		horiz:    "─",
+		header:   AgentStyle.Copy().Foreground(lipgloss.Color("99")),
+		meta:     lipgloss.NewStyle().Foreground(lipgloss.Color("141")),
+	}
 )

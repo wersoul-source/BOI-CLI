@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	llmfactory "github.com/boi-family/boi-cli/internal/llm/factory"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -53,6 +54,7 @@ type SplashModel struct {
 	width         int
 	height        int
 	wd            string
+	version       string
 	personaCount  int
 	personaNames  string
 	providerCount int
@@ -61,9 +63,10 @@ type SplashModel struct {
 	skillNames    string
 }
 
-func NewSplash(wd string, personaCount int, personaNames string, providerCount, memoryCount, skillCount int, skillNames string) *SplashModel {
+func NewSplash(wd string, personaCount int, personaNames string, providerCount, memoryCount, skillCount int, skillNames string, version string) *SplashModel {
 	return &SplashModel{
 		wd:            wd,
+		version:       version,
 		personaCount:  personaCount,
 		personaNames:  personaNames,
 		providerCount: providerCount,
@@ -89,19 +92,22 @@ func (s *SplashModel) View() string {
 	}
 
 	subtitle := "Chimera Architecture"
-	version := "v0.1.0"
 
 	contentWidth := logoWidth
 	if len(subtitle) > contentWidth {
 		contentWidth = len(subtitle)
 	}
-	if len(version) > contentWidth {
-		contentWidth = len(version)
+	if len(s.version) > contentWidth {
+		contentWidth = len(s.version)
 	}
 
-	innerWidth := contentWidth + 6
-	if innerWidth < 52 {
-		innerWidth = 52
+	innerWidth := contentWidth + 4
+	if innerWidth < 50 {
+		innerWidth = 50
+	}
+	// Cap frame at half terminal width for compact look
+	if s.width > 0 && innerWidth > s.width/2 {
+		innerWidth = s.width / 2
 	}
 
 	pad := func(s string, w int) string {
@@ -126,41 +132,41 @@ func (s *SplashModel) View() string {
 
 	boxLines = append(boxLines, empty)
 	boxLines = append(boxLines, edgeL+pad(splashSubStyle.Render(subtitle), innerWidth)+edgeR)
-	boxLines = append(boxLines, edgeL+pad(splashVersionStyle.Render(version), innerWidth)+edgeR)
+	boxLines = append(boxLines, edgeL+pad(splashVersionStyle.Render(s.version), innerWidth)+edgeR)
 	boxLines = append(boxLines, empty)
 	boxLines = append(boxLines, bot)
 
 	var statusLines []string
 	statusLines = append(statusLines, "")
-	statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("Workspace:"), splashValueStyle.Render(s.wd)))
-	statusLines = append(statusLines, fmt.Sprintf("  %s %d loaded (%s)", splashLabelStyle.Render("Personas:"), s.personaCount, splashValueStyle.Render(s.personaNames)))
+	statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("◈"), splashValueStyle.Render(s.wd)))
+	statusLines = append(statusLines, fmt.Sprintf("  %s %d loaded  %s", splashLabelStyle.Render("⚡"), s.personaCount, splashValueStyle.Render(s.personaNames)))
 
 	if s.providerCount > 0 {
 		provStatus := fmt.Sprintf("%d configured", s.providerCount)
-		statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("Providers:"), splashValueStyle.Render(provStatus)))
+		statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("⛭"), splashValueStyle.Render(provStatus)))
 	} else {
-		statusLines = append(statusLines, fmt.Sprintf("  %s %s  %s", splashLabelStyle.Render("Providers:"), splashDimStyle.Render("0 configured"), splashDimStyle.Render("[Set PSC_* in .env]")))
+		statusLines = append(statusLines, fmt.Sprintf("  %s %s  %s", splashLabelStyle.Render("⛭"), splashDimStyle.Render("0 configured"), splashDimStyle.Render("[Set PSC_* in .env]")))
 	}
 
 	memStatus := "Phantom DB ready"
 	if s.memoryCount > 0 {
 		memStatus = fmt.Sprintf("Phantom DB (%d entries)", s.memoryCount)
 	}
-	statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("Memory:"), splashValueStyle.Render(memStatus)))
+	statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("⟡"), splashValueStyle.Render(memStatus)))
 
 	if s.skillCount > 0 {
-		statusLines = append(statusLines, fmt.Sprintf("  %s %d loaded (%s)", splashLabelStyle.Render("Skills:"), s.skillCount, splashValueStyle.Render(s.skillNames)))
+		statusLines = append(statusLines, fmt.Sprintf("  %s %d loaded  %s", splashLabelStyle.Render("◎"), s.skillCount, splashValueStyle.Render(s.skillNames)))
 	} else {
-		statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("Skills:"), splashDimStyle.Render("none loaded")))
+		statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("◎"), splashDimStyle.Render("none loaded")))
 	}
 
 	statusLines = append(statusLines, "")
 
 	setupReady := s.providerCount > 0 && s.personaNames != ""
 	if setupReady {
-		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("Ready"), splashPromptStyle.Render("Press Enter to start...")))
+		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("▶"), splashPromptStyle.Render("Press Enter to start...")))
 	} else {
-		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("Setup needed"), splashPromptStyle.Render("Press Enter to start anyway...")))
+		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("▶"), splashPromptStyle.Render("Press Enter to start anyway...")))
 	}
 
 	allLines := append(boxLines, statusLines...)
@@ -168,7 +174,7 @@ func (s *SplashModel) View() string {
 
 	if s.width > 0 && s.height > 0 {
 		return lipgloss.Place(s.width, s.height,
-			lipgloss.Center, lipgloss.Center,
+			lipgloss.Left, lipgloss.Center,
 			content,
 		)
 	}
@@ -176,15 +182,7 @@ func (s *SplashModel) View() string {
 }
 
 func countPSCProviders() int {
-	count := 0
-	for i := 1; i <= 4; i++ {
-		name := os.Getenv(fmt.Sprintf("PSC_%d_NAME", i))
-		key := os.Getenv(fmt.Sprintf("PSC_%d_API_KEY", i))
-		if name != "" && key != "" {
-			count++
-		}
-	}
-	return count
+	return llmfactory.CountProvidersFromEnv()
 }
 
 func countMemoryEntries(dir string) int {

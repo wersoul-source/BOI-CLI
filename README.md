@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="https://img.shields.io/badge/BOI_CLI-0.1.2-6C63FF?style=for-the-badge" alt="BOI CLI">
+  <img src="https://img.shields.io/badge/BOI_CLI-0.2.0-6C63FF?style=for-the-badge" alt="BOI CLI">
   <br>
   <img src="https://img.shields.io/github/v/release/wersoul-source/BOI-CLI?color=6C63FF" alt="Release">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go">
@@ -19,31 +19,30 @@
 
 ### 1. Install
 ```bash
-# Download latest release (Windows)
-Invoke-WebRequest -Uri "https://github.com/wersoul-source/BOI-CLI/releases/download/v0.1.2/boi_0.1.2_windows_amd64.tar.gz" -OutFile boi.tar.gz
-tar -xzf boi.tar.gz && cd boi_0.1.2_windows_amd64
-.\boi.exe init
+# Download from GitHub Releases → extract → add to PATH
+# Or: go install github.com/boi-family/boi-cli/cmd/boi@latest
 ```
 
-### 2. Setup Providers
+### 2. Setup
 ```bash
 boi setup
 ```
-Pick from 10 providers (OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, xAI, Ollama, OpenRouter, Together) or add custom. Add 2+ for auto-fallback.
+TUI wizard — asks how many providers, then arrow-key pick from 10 providers,
+enter API key, select model from curated list. Add 2+ for auto-fallback with rotation.
 
-### 3. Choose Persona
+### 3. Pick Persona
 ```bash
 boi persona wizard
 ```
-Each persona introduces itself — pick your thinking style.
+6 personalities — each says hi. Pick your thinking style.
 
-### 4. Launch!
+### 4. Launch
 ```bash
-boi                        # Splash → Press Enter → Chat (TUI)
+boi                        # Splash → Enter → Chat
 boi ask "hello" --verbose  # Or CLI mode
 ```
 
-> No API keys? BOI runs in simulated mode.
+> First run auto-detects and walks you through setup. No API keys? Runs in simulated mode.
 
 ---
 
@@ -51,11 +50,12 @@ boi ask "hello" --verbose  # Or CLI mode
 
 | | |
 |---|---|
-| 🧠 **Agent Loop** | ReAct pattern — plan → execute → review → learn, cross-session memory |
-| 🎭 **6 Personas** | Switch between specialized AI profiles for architecture, debug, docs, creative |
-| 🔌 **PSC Fallback** | Provider Supply Chain — chain up to 4 LLM providers with automatic failover |
+| 🔌 **PSC Rotation** | 10+ providers with auto-fallback + `████░░` usage bar — rotate before exhaustion |
+| 🎭 **6 Personas** | Switch between specialized AI profiles — each with unique system prompt & provider binding |
+| 🎨 **TUI Wizard** | Bubbletea setup wizard — arrow keys, model picker, endpoint registry (70+ models) |
 | 💾 **Phantom DB** | File-based memory with weight engine — remembers what matters across sessions |
-| 🖥️ **TUI + CLI** | Full-screen Bubbletea terminal UI or direct CLI commands — your choice |
+| ⌨️ **Command Palette** | Type `/` for commands, Tab to autocomplete — `/provider` `/model` `/clear` |
+| 🖥️ **TUI + CLI** | Full-screen terminal UI with bubble chat or direct CLI — your choice |
 
 ---
 
@@ -83,14 +83,12 @@ boi ask "debug this" -p dang  # Use for one query
 | Command | Description |
 |---------|-------------|
 | `boi` | Launch TUI (full-screen terminal) |
+| `boi setup` | TUI wizard — configure providers with arrow keys |
 | `boi ask "..."` | AI agent query (ReAct loop) |
-| `boi run "..."` | Execute shell command |
-| `boi init` | Initialize workspace |
-| `boi doctor` | System health check |
-| `boi persona list/switch` | Manage personas |
-| `boi skill list/init` | Manage skills |
-| `boi memory search/stats` | Phantom DB memory |
-| `boi weight explain <id>` | Memory weight breakdown |
+| `boi persona list/switch/wizard` | Manage personas |
+| `boi provider list/switch` | Manage LLM providers |
+| `boi model <name>` | Set default model |
+| `boi config` | View configuration |
 | `boi upgrade` | Self-update to latest |
 | `boi version` | Show version |
 
@@ -99,38 +97,40 @@ boi ask "debug this" -p dang  # Use for one query
 ## 📸 Screenshot
 
 ```
-┌─ BOI CLI — 🔨 Hephaestus | Mid ── Persona: kampun ─── idle ────────┐
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ▶ You: login bug เกิดจากอะไร                                       │
-│                                                                     │
-│  ◆ BOI: 🔍 Phantom DB found 3 related memories...                  │
-│                                                                     │
-│  ┌─ <memory-context> ───────────────────────────────────────────┐  │
-│  │ [solution] login-fix   weight: 0.72                          │  │
-│  │   Fixed by URL-encoding password in auth.js line 45          │  │
-│  │ [fact]     login-bug   weight: 0.65                          │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-│  ◆ BOI: Root cause — special characters in password                │
-│                                                                     │
-│  ✅ 2 steps  ·  450 tokens  ·  0.3s                                 │
-├─────────────────────────────────────────────────────────────────────┤
-│ > login bug มันเกิดจากอะไรครับ                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  Tab:persona  Enter:send  Ctrl+Q:quit                               │
-└─────────────────────────────────────────────────────────────────────┘
+┌─ BOI CLI  [Mid] ─── Persona: kampun ── openai ████░░  idle ✓ ──────┐
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ╭─ ▶ You                                            15:04 ──────────╮│
+│ │                                                                   ││
+│ │  login bug เกิดจากอะไร                                             ││
+│ │                                                                   ││
+│ ╰───────────────────────────────────────────────────────────────────╯│
+│                                                                      │
+│ ╭─ ◆ BOI · openai/gpt-4.1-mini · 450 tok            15:04 ─────────╮│
+│ │                                                                   ││
+│ │  Root cause: special characters in password                       ││
+│ │  Fixed by URL-encoding in auth.js line 45                         ││
+│ │                                                                   ││
+│ ╰───────────────────────────────────────────────────────────────────╯│
+│                                                                      │
+├──────────────────────────────────────────────────────────────────────┤
+│ > login bug มันเกิดจากอะไรครับ                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│ ▸ /help  /persona  /clear  /provider  /model                        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## ❓ FAQ
 
-**Do I need a server or database?** No. Single Go binary. Everything lives in `.boi/`.
+**Do I need a server or database?** No. Single Go binary (15 MB). Everything lives in `.boi/`.
 
-**Does it work without an API key?** Yes — simulated mode. Add `PSC_*` in `.env` for real AI.
+**Does it work without an API key?** Yes — simulated mode. Run `boi setup` for real AI.
 
-**How is this different from Claude Code / Codex CLI?** 6 specialized personas, cross-session memory with weight engine, 4-provider auto-fallback — all as a single binary.
+**How many providers can I chain?** Up to 20. Auto-rotate when near limit — status bar shows `████░░`.
+
+**How is this different from Claude Code / Codex CLI?** 6 specialized personas, TUI setup wizard with model picker, auto-fallback rotation with usage %, chat bubbles with metadata — all as a single binary.
 
 ---
 

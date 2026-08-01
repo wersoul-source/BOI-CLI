@@ -1,0 +1,128 @@
+[
+  {
+    "name": "openai",
+    "label": "OpenAI",
+    "base_url": "https://api.openai.com/v1",
+    "models": [
+      "gpt-4.1",
+      "gpt-4.1-mini",
+      "gpt-4.1-nano",
+      "gpt-4o",
+      "gpt-4o-mini",
+      "o3-mini",
+      "o1",
+      "o1-mini"
+    ]
+  },
+  {
+    "name": "anthropic",
+    "label": "Anthropic Claude",
+    "base_url": "https://api.anthropic.com/v1",
+    "models": [
+      "claude-sonnet-5",
+      "claude-sonnet-4",
+      "claude-opus-5",
+      "claude-haiku-4",
+      "claude-sonnet-3.7"
+    ]
+  },
+  {
+    "name": "google",
+    "label": "Google Gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "models": [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-3-flash",
+      "gemini-3-pro",
+      "gemini-2.0-flash"
+    ]
+  },
+  {
+    "name": "groq",
+    "label": "Groq",
+    "base_url": "https://api.groq.com/openai/v1",
+    "models": [
+      "llama-3.3-70b",
+      "llama-3.1-8b",
+      "mixtral-8x7b",
+      "deepseek-r1-distill-llama-70b",
+      "qwen-2.5-32b",
+      "gemma2-9b"
+    ]
+  },
+  {
+    "name": "deepseek",
+    "label": "DeepSeek",
+    "base_url": "https://api.deepseek.com/v1",
+    "models": [
+      "deepseek-chat",
+      "deepseek-reasoner",
+      "deepseek-v3"
+    ]
+  },
+  {
+    "name": "mistral",
+    "label": "Mistral AI",
+    "base_url": "https://api.mistral.ai/v1",
+    "models": [
+      "mistral-large-2",
+      "mistral-medium",
+      "mistral-small",
+      "pixtral-large",
+      "codestral"
+    ]
+  },
+  {
+    "name": "xai",
+    "label": "xAI Grok",
+    "base_url": "https://api.x.ai/v1",
+    "models": [
+      "grok-4.5",
+      "grok-3",
+      "grok-3-mini"
+    ]
+  },
+  {
+    "name": "ollama",
+    "label": "Ollama (local)",
+    "base_url": "http://localhost:11434/v1",
+    "models": [
+      "llama3.3",
+      "llama3.1",
+      "mistral",
+      "codellama",
+      "deepseek-r1",
+      "gemma3",
+      "qwen2.5",
+      "phi4"
+    ]
+  },
+  {
+    "name": "openrouter",
+    "label": "OpenRouter",
+    "base_url": "https://openrouter.ai/api/v1",
+    "models": [
+      "openai/gpt-4.1-mini",
+      "openai/gpt-4o",
+      "anthropic/claude-sonnet-5",
+      "google/gemini-2.5-flash",
+      "deepseek/deepseek-chat",
+      "meta-llama/llama-3.3-70b",
+      "mistralai/mistral-large"
+    ]
+  },
+  {
+    "name": "together",
+    "label": "Together AI",
+    "base_url": "https://api.together.xyz/v1",
+    "models": [
+      "meta-llama/Llama-3.3-70B",
+      "meta-llama/Llama-3.1-405B",
+      "mistralai/Mixtral-8x22B",
+      "deepseek-ai/DeepSeek-R1",
+      "Qwen/Qwen2.5-72B",
+      "databricks/dbrx-instruct"
+    ]
+  }
+]

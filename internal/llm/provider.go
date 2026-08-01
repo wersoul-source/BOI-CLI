@@ -19,6 +19,9 @@ type CompletionResponse struct {
 	OutputTokens int
 	Model        string
 	Provider     string
+	// Rate-limit info from API headers (0 if unknown)
+	RateLimitRemaining int
+	RateLimitTotal     int
 }
 
 type Token struct {

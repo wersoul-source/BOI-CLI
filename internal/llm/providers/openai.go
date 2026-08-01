@@ -114,13 +114,36 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		return nil, fmt.Errorf("provider %s: no choices in response", p.name)
 	}
 
+	rateLimitRemaining, rateLimitTotal := parseRateLimitHeaders(resp.Header)
+
 	return &llm.CompletionResponse{
-		Content:      result.Choices[0].Message.Content,
-		InputTokens:  result.Usage.PromptTokens,
-		OutputTokens: result.Usage.CompletionTokens,
-		Model:        result.Model,
-		Provider:     p.name,
+		Content:            result.Choices[0].Message.Content,
+		InputTokens:        result.Usage.PromptTokens,
+		OutputTokens:       result.Usage.CompletionTokens,
+		Model:              result.Model,
+		Provider:           p.name,
+		RateLimitRemaining: rateLimitRemaining,
+		RateLimitTotal:     rateLimitTotal,
 	}, nil
+}
+
+func parseRateLimitHeaders(h http.Header) (remaining, total int) {
+	if v := h.Get("x-ratelimit-remaining-tokens"); v != "" {
+		fmt.Sscanf(v, "%d", &remaining)
+	}
+	if v := h.Get("x-ratelimit-limit-tokens"); v != "" {
+		fmt.Sscanf(v, "%d", &total)
+	}
+	// Try requests-based headers as fallback
+	if remaining == 0 && total == 0 {
+		if v := h.Get("x-ratelimit-remaining-requests"); v != "" {
+			fmt.Sscanf(v, "%d", &remaining)
+		}
+		if v := h.Get("x-ratelimit-limit-requests"); v != "" {
+			fmt.Sscanf(v, "%d", &total)
+		}
+	}
+	return
 }
 
 func (p *OpenAIProvider) Stream(ctx context.Context, req llm.CompletionRequest) (<-chan llm.Token, error) {

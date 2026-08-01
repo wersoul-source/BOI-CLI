@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/boi-family/boi-cli/internal/cli"
 	"github.com/boi-family/boi-cli/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func runTUI() {
 	p := tea.NewProgram(
-		tui.NewApp(),
+		tui.NewApp(cli.Version),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)

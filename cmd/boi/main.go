@@ -1,24 +1,31 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/boi-family/boi-cli/internal/cli"
 	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/boi-family/boi-cli/internal/envfile"
+	"github.com/boi-family/boi-cli/internal/term"
 	"github.com/boi-family/boi-cli/internal/workspace"
 )
 
 func main() {
+	// Fix Thai/UTF-8 rendering in every terminal (WT, cmd, mintty, wezterm...)
+	// Must be called before any fmt.Println or terminal I/O
+	term.SetUTF8Console()
+
 	if len(os.Args) <= 1 {
 		firstRunExperience()
 		runTUI()
 		return
 	}
+
+	// Load .env for CLI commands (boi ask, boi config, etc.)
+	root := detectRoot()
+	envfile.Load(filepath.Join(root, ".env"))
 
 	if err := cli.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -44,13 +51,21 @@ func firstRunExperience() {
 
 	if needsInit {
 		fmt.Println()
-		fmt.Println("🔧 First run detected! Initializing BOI CLI workspace...")
+		fmt.Println("🔧 First run — initializing BOI CLI workspace...")
 		if err := cli.RunInit(true); err != nil {
 			fmt.Printf("  Warning: auto-init failed: %v\n", err)
 		} else {
 			fmt.Println("  ✅ Workspace initialized.")
 		}
-		fmt.Println()
+
+		// Ensure Thai font available (user-level install, no admin required)
+		// On Windows 8+ Leelawadee UI already exists → this is a fast no-op
+		installed, err := term.EnsureThaiFont()
+		if err != nil {
+			fmt.Printf("  ⚠️  Thai font check failed: %v\n", err)
+		} else if installed {
+			fmt.Println("  ✅ Thai font installed (Noto Sans Thai)")
+		}
 	}
 
 	needsSetup := !envfile.HasProviders(envPath)
@@ -62,32 +77,29 @@ func firstRunExperience() {
 		needsPersona = false
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	if needsSetup || needsPersona {
+		fmt.Println()
+		fmt.Println("⚡ Quick Setup — let's get BOI ready:")
+		fmt.Println()
 
-	if needsSetup {
-		fmt.Println("⚠️  No AI providers configured.")
-		fmt.Print("   Set up AI providers now? [Y/n]: ")
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer == "" || answer == "y" {
-			cli.RunSetupWizard()
+		if needsSetup {
+			fmt.Println("  Step 1: Configure AI Providers")
+			fmt.Println("  (TUI wizard — arrow keys, model picker)")
+			fmt.Println()
+			cli.RunSetupWizard(false)
 			envfile.Load(envPath)
+			fmt.Println()
 		}
-		fmt.Println()
-	}
 
-	if needsPersona {
-		fmt.Println("⚠️  No persona selected.")
-		fmt.Print("   Choose a persona now? [Y/n]: ")
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer == "" || answer == "y" {
+		if needsPersona {
+			fmt.Println("  Step 2: Choose Your Persona")
 			cli.RunPersonaWizard()
+			fmt.Println()
 		}
-		fmt.Println()
 	}
 
-	fmt.Println("Launching BOI CLI...")
+	fmt.Println()
+	fmt.Println("🚀 Launching BOI CLI...")
 	fmt.Println()
 }
 
