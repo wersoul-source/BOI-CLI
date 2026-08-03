@@ -101,7 +101,13 @@ echo -e "  Version: ${GRAY}$VERSION_TAG${NC}"
 
 echo -e "${YELLOW}[3/8] Building download URL...${NC}"
 
-BINARY_NAME="boi_${OS}_${ARCH}.tar.gz"
+# Normalize OS name to lowercase (Linux → linux, Darwin → darwin)
+OS_LOWER=$(echo "$OS" | tr '[:upper:]' '[:lower:]')
+
+# Strip 'v' prefix from version tag for asset naming (v0.3.0 → 0.3.0)
+VER_NUM="${VERSION_TAG#v}"
+
+BINARY_NAME="boi_${VER_NUM}_${OS_LOWER}_${ARCH}.tar.gz"
 DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "\"browser_download_url\": *\"[^\"]*$BINARY_NAME\"" | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
 
 if [ -z "$DOWNLOAD_URL" ]; then
@@ -192,7 +198,7 @@ if [ "$SKIP_CHECKSUM" = "0" ]; then
         
         EXPECTED_HASH=""
         if [ -n "$CHECKSUMS" ]; then
-            EXPECTED_HASH=$(echo "$CHECKSUMS" | grep "boi_${OS}_${ARCH}" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+            EXPECTED_HASH=$(echo "$CHECKSUMS" | grep "boi_${VER_NUM}_${OS_LOWER}_${ARCH}" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
         fi
         
         if [ -n "$EXPECTED_HASH" ]; then

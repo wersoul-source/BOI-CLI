@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="https://img.shields.io/badge/BOI_CLI-0.2.0-6C63FF?style=for-the-badge" alt="BOI CLI">
+  <img src="https://img.shields.io/badge/BOI_CLI-0.3.0-6C63FF?style=for-the-badge" alt="BOI CLI">
   <br>
   <img src="https://img.shields.io/github/v/release/wersoul-source/BOI-CLI?color=6C63FF" alt="Release">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go">
