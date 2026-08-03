@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/registry"
+	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -398,8 +399,17 @@ func (m *WizardModel) writeEnv() error {
 		lines = append(lines, "")
 	}
 	content := strings.Join(lines, "\n")
-	cwd, _ := os.Getwd()
-	envPath := filepath.Join(cwd, ".env")
+
+	// Write to project root (workspace), not cwd
+	root, err := workspace.DetectRoot()
+	var envPath string
+	if err == nil {
+		envPath = filepath.Join(root, ".env")
+	} else {
+		// Fallback to cwd if no workspace found
+		cwd, _ := os.Getwd()
+		envPath = filepath.Join(cwd, ".env")
+	}
 	return os.WriteFile(envPath, []byte(content), 0644)
 }
 
