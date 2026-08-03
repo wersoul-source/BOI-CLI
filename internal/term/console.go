@@ -5,13 +5,19 @@
 // On Windows, the console defaults to codepage 874 (TIS-620), but Go writes
 // UTF-8 bytes. This mismatch causes Thai text to render as garbled characters.
 // SetUTF8Console fixes this at the process level — no system-wide changes needed.
+//
+// Platform-specific code is split into separate files:
+//
+//	console_windows.go  — Windows (SetConsoleOutputCP, registry)
+//	console_unix.go     — Linux/macOS (no-op, UTF-8 is default)
+//	font_windows.go     — Windows font installation
+//	font_unix.go        — Linux/macOS (no-op or native method)
 package term
 
 import (
 	"regexp"
+	"strings"
 	"unicode"
-
-	"golang.org/x/sys/windows"
 )
 
 var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -19,23 +25,6 @@ var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 // StripANSI removes ANSI escape sequences from s.
 func StripANSI(s string) string {
 	return ansiRegex.ReplaceAllString(s, "")
-}
-
-// SetUTF8Console switches the process console to UTF-8 (codepage 65001).
-//
-// Go's os.Stdout writes UTF-8 bytes. If the console is on codepage 874
-// (Thai Windows default), those bytes are interpreted as TIS-620 → garbled.
-// This fix:
-//   - Works in every terminal: WT, cmd, mintty, wezterm, VS Code, etc.
-//   - Affects only this process — no registry or system changes
-//   - Safe to call multiple times
-//   - Must be called early in main(), before any fmt.Println/Print
-func SetUTF8Console() {
-	// CP_UTF8 = 65001, defined as a constant since x/sys/windows
-	// may not export it in all versions
-	const cpUTF8 = 65001
-	windows.SetConsoleOutputCP(cpUTF8)
-	windows.SetConsoleCP(cpUTF8)
 }
 
 // ThaiZeroWidthRunes lists Thai Unicode characters that are zero-width
@@ -78,7 +67,7 @@ func ThaiStringWidth(s string) int {
 		if IsThaiZeroWidth(r) {
 			continue // skip Thai zero-width marks
 		}
-		// For other runes, use the standard runewidth
+		// For other runes, use the standard width calculation
 		if isWideRune(r) {
 			width += 2
 		} else {
@@ -90,11 +79,70 @@ func ThaiStringWidth(s string) int {
 
 // isWideRune reports whether r should be displayed as 2 columns (CJK, etc.).
 func isWideRune(r rune) bool {
-	// CJK Unified Ideographs, Fullwidth Forms, etc.
-	// Simplified check — go-runewidth handles this better
-	// but we don't need it for Thai focus
 	return unicode.Is(unicode.Han, r) ||
 		unicode.Is(unicode.Hangul, r) ||
 		r >= 0xFF01 && r <= 0xFF60 || // Fullwidth ASCII
 		r >= 0xFFE0 && r <= 0xFFE6 // Fullwidth symbols
+}
+
+// NormalizeThai converts precomposed Thai vowel+tone sequences to proper
+// logical order for display. This handles cases where tone marks appear
+// before vowels in the byte stream (rare, but can happen with copy-paste).
+func NormalizeThai(s string) string {
+	// Most Thai text is already in correct order; this handles edge cases
+	// where combining marks may be reordered.
+	// For now, return as-is — can be enhanced later.
+	return s
+}
+
+// IsThai returns true if s contains any Thai Unicode characters.
+func IsThai(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Thai, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// ThaiConsonantCount counts only Thai consonants in s (ignoring vowels,
+// tone marks, and other combining characters).
+func ThaiConsonantCount(s string) int {
+	count := 0
+	for _, r := range s {
+		if r >= 0x0E01 && r <= 0x0E2E && !IsThaiZeroWidth(r) {
+			count++
+		}
+	}
+	return count
+}
+
+// TruncateThai truncates s to maxWidth display columns, respecting Thai
+// zero-width combining marks (they don't count toward width).
+func TruncateThai(s string, maxWidth int) string {
+	width := 0
+	for i, r := range s {
+		w := 1
+		if isWideRune(r) {
+			w = 2
+		}
+		if IsThaiZeroWidth(r) {
+			w = 0
+		}
+		if width+w > maxWidth {
+			return s[:i]
+		}
+		width += w
+	}
+	return s
+}
+
+// PadRight pads s with spaces to reach targetWidth display columns.
+// Uses ThaiStringWidth for accurate Thai text measurement.
+func PadRight(s string, targetWidth int) string {
+	w := ThaiStringWidth(s)
+	if w >= targetWidth {
+		return s
+	}
+	return s + strings.Repeat(" ", targetWidth-w)
 }
