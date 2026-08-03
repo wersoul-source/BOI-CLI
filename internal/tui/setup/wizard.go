@@ -116,6 +116,8 @@ func (m *WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancelled = true
 			m.done = true
 			return m, tea.Quit
+		case "esc":
+			return m.goBack()
 		}
 
 		switch m.step {
@@ -513,15 +515,52 @@ func (m *WizardModel) viewDone() string {
 func (m *WizardModel) viewHelp() string {
 	switch m.step {
 	case stepCount:
-		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Ctrl+C: cancel")
+		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Esc: cancel    Ctrl+C: quit")
 	case stepSelect, stepModel:
-		return "\n\n  " + infoMsgStyle.Render("↑↓: navigate    Enter: select    Ctrl+C: cancel")
+		return "\n\n  " + infoMsgStyle.Render("↑↓: navigate    Enter: select    Esc: back    Ctrl+C: quit")
 	case stepAPIKey:
-		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Ctrl+C: cancel")
+		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Esc: back    Ctrl+C: quit")
 	case stepDone:
 		return "\n\n  " + infoMsgStyle.Render("Press any key to exit")
 	}
 	return ""
+}
+
+// goBack moves to the previous step, preserving user input.
+func (m *WizardModel) goBack() (tea.Model, tea.Cmd) {
+	switch m.step {
+	case stepSelect:
+		// Back to count
+		m.step = stepCount
+		m.errorMsg = ""
+		m.infoMsg = ""
+	case stepAPIKey:
+		// Back to provider selection (keep provider name)
+		m.cursor = 0
+		m.buildProviderList()
+		m.listMode = "provider"
+		m.step = stepSelect
+		m.errorMsg = ""
+		m.infoMsg = ""
+	case stepModel:
+		// Back to API key (keep the key in textInput)
+		if m.curCustomText {
+			m.curCustomText = false
+		}
+		m.textInput.SetValue(m.textInput.Value()) // keep current value
+		m.textInput.EchoMode = textinput.EchoPassword
+		m.textInput.Placeholder = "sk-..."
+		m.step = stepAPIKey
+		m.errorMsg = ""
+		m.infoMsg = ""
+		m.textInput.Focus()
+	case stepCount:
+		// At the beginning — cancel
+		m.cancelled = true
+		m.done = true
+		return m, tea.Quit
+	}
+	return m, textinput.Blink
 }
 
 // Result returns the configured providers (nil if not done).
