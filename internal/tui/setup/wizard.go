@@ -108,6 +108,8 @@ func (m *WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if m.step == stepDone {
+			m.done = true
+			m.cancelled = false
 			return m, tea.Quit
 		}
 
@@ -341,6 +343,8 @@ func (m *WizardModel) confirmProvider(model string) (tea.Model, tea.Cmd) {
 func (m *WizardModel) finish() (tea.Model, tea.Cmd) {
 	m.testAllProviders()
 	m.step = stepDone
+	m.done = true
+	m.cancelled = false
 	return m, nil
 }
 
@@ -577,7 +581,8 @@ func (m *WizardModel) Result() *WizardResult {
 // Run runs the setup wizard TUI and returns the result.
 func Run(r *registry.Registry) *WizardResult {
 	w := NewWizard(r)
-	p := tea.NewProgram(w, tea.WithAltScreen())
+	// Note: WithoutAltScreen for better compatibility with PowerShell 7 / conpty
+	p := tea.NewProgram(w)
 	model, err := p.Run()
 	if err != nil {
 		return &WizardResult{Cancelled: true}

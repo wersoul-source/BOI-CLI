@@ -63,7 +63,10 @@ func CountProvidersFromEnv() int {
 func createProvider(cfg ProviderConfig) llm.Provider {
 	switch cfg.Name {
 	case "openai", "groq", "deepseek", "mistral", "xai",
-		"ollama", "openrouter", "together":
+		"ollama", "openrouter", "together",
+		"cerebras", "fireworks", "hyperbolic", "cohere",
+		"perplexity", "replicate", "nvidia", "deepinfra",
+		"novita", "runpod":
 		return providers.NewOpenAIProvider(cfg.Name, cfg.APIKey, cfg.BaseURL, cfg.Model)
 	case "anthropic":
 		return providers.NewAnthropicProvider(cfg.Name, cfg.APIKey, cfg.BaseURL, cfg.Model)

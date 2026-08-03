@@ -4,12 +4,17 @@
     "label": "OpenAI",
     "base_url": "https://api.openai.com/v1",
     "models": [
+      "gpt-5",
+      "gpt-5-mini",
+      "gpt-5-nano",
       "gpt-4.1",
       "gpt-4.1-mini",
       "gpt-4.1-nano",
       "gpt-4o",
       "gpt-4o-mini",
+      "o3",
       "o3-mini",
+      "o4-mini",
       "o1",
       "o1-mini"
     ]
@@ -20,10 +25,12 @@
     "base_url": "https://api.anthropic.com/v1",
     "models": [
       "claude-sonnet-5",
-      "claude-sonnet-4",
       "claude-opus-5",
+      "claude-sonnet-4",
+      "claude-opus-4",
       "claude-haiku-4",
-      "claude-sonnet-3.7"
+      "claude-sonnet-3.7",
+      "claude-sonnet-3.5"
     ]
   },
   {
@@ -31,11 +38,12 @@
     "label": "Google Gemini",
     "base_url": "https://generativelanguage.googleapis.com/v1beta",
     "models": [
-      "gemini-2.5-flash",
-      "gemini-2.5-pro",
-      "gemini-3-flash",
       "gemini-3-pro",
-      "gemini-2.0-flash"
+      "gemini-3-flash",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite"
     ]
   },
   {
@@ -43,12 +51,14 @@
     "label": "Groq",
     "base_url": "https://api.groq.com/openai/v1",
     "models": [
-      "llama-3.3-70b",
-      "llama-3.1-8b",
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
       "mixtral-8x7b",
       "deepseek-r1-distill-llama-70b",
       "qwen-2.5-32b",
-      "gemma2-9b"
+      "qwen-3-32b",
+      "gemma2-9b",
+      "llama-guard-4-12b"
     ]
   },
   {
@@ -58,7 +68,8 @@
     "models": [
       "deepseek-chat",
       "deepseek-reasoner",
-      "deepseek-v3"
+      "deepseek-v3",
+      "deepseek-r1"
     ]
   },
   {
@@ -67,10 +78,12 @@
     "base_url": "https://api.mistral.ai/v1",
     "models": [
       "mistral-large-2",
-      "mistral-medium",
-      "mistral-small",
+      "mistral-medium-3",
+      "mistral-small-latest",
       "pixtral-large",
-      "codestral"
+      "pixtral-12b",
+      "codestral",
+      "mistral-embed"
     ]
   },
   {
@@ -78,9 +91,10 @@
     "label": "xAI Grok",
     "base_url": "https://api.x.ai/v1",
     "models": [
-      "grok-4.5",
+      "grok-4",
       "grok-3",
-      "grok-3-mini"
+      "grok-3-mini",
+      "grok-code-1"
     ]
   },
   {
@@ -89,13 +103,17 @@
     "base_url": "http://localhost:11434/v1",
     "models": [
       "llama3.3",
+      "llama3.2",
       "llama3.1",
       "mistral",
       "codellama",
       "deepseek-r1",
       "gemma3",
+      "gemma2",
+      "qwen3",
       "qwen2.5",
-      "phi4"
+      "phi4",
+      "phi3"
     ]
   },
   {
@@ -103,13 +121,18 @@
     "label": "OpenRouter",
     "base_url": "https://openrouter.ai/api/v1",
     "models": [
+      "openai/gpt-5",
       "openai/gpt-4.1-mini",
       "openai/gpt-4o",
       "anthropic/claude-sonnet-5",
+      "anthropic/claude-opus-5",
+      "google/gemini-3-pro",
       "google/gemini-2.5-flash",
       "deepseek/deepseek-chat",
       "meta-llama/llama-3.3-70b",
-      "mistralai/mistral-large"
+      "mistralai/mistral-large",
+      "x-ai/grok-3",
+      "qwen/qwen3-32b"
     ]
   },
   {
@@ -121,8 +144,127 @@
       "meta-llama/Llama-3.1-405B",
       "mistralai/Mixtral-8x22B",
       "deepseek-ai/DeepSeek-R1",
+      "deepseek-ai/DeepSeek-V3",
+      "Qwen/Qwen3-72B",
       "Qwen/Qwen2.5-72B",
       "databricks/dbrx-instruct"
+    ]
+  },
+  {
+    "name": "cerebras",
+    "label": "Cerebras",
+    "base_url": "https://api.cerebras.ai/v1",
+    "models": [
+      "llama-3.3-70b",
+      "llama-3.1-8b",
+      "llama-3.1-70b"
+    ]
+  },
+  {
+    "name": "fireworks",
+    "label": "Fireworks AI",
+    "base_url": "https://api.fireworks.ai/inference/v1",
+    "models": [
+      "accounts/fireworks/models/llama-v3p3-70b-instruct",
+      "accounts/fireworks/models/llama-v3p1-405b-instruct",
+      "accounts/fireworks/models/qwen2p5-72b-instruct",
+      "accounts/fireworks/models/deepseek-r1",
+      "accounts/fireworks/models/mixtral-8x22b-instruct"
+    ]
+  },
+  {
+    "name": "hyperbolic",
+    "label": "Hyperbolic",
+    "base_url": "https://api.hyperbolic.xyz/v1",
+    "models": [
+      "meta-llama/Llama-3.3-70B-Instruct",
+      "meta-llama/Meta-Llama-3.1-405B",
+      "Qwen/Qwen2.5-72B-Instruct",
+      "deepseek-ai/DeepSeek-R1",
+      "deepseek-ai/DeepSeek-V3"
+    ]
+  },
+  {
+    "name": "cohere",
+    "label": "Cohere",
+    "base_url": "https://api.cohere.ai/v1",
+    "models": [
+      "command-r-plus",
+      "command-r",
+      "command-light",
+      "embed-english-v3",
+      "rerank-english-v3"
+    ]
+  },
+  {
+    "name": "perplexity",
+    "label": "Perplexity AI",
+    "base_url": "https://api.perplexity.ai",
+    "models": [
+      "sonar-pro",
+      "sonar",
+      "sonar-reasoning-pro",
+      "sonar-reasoning",
+      "sonar-deep-research"
+    ]
+  },
+  {
+    "name": "replicate",
+    "label": "Replicate",
+    "base_url": "https://api.replicate.com/v1",
+    "models": [
+      "meta/llama-3.3-70b-instruct",
+      "meta/llama-3.1-405b-instruct",
+      "mistralai/mixtral-8x22b-instruct",
+      "deepseek/deepseek-r1",
+      "qwen/qwen2.5-72b-instruct"
+    ]
+  },
+  {
+    "name": "nvidia",
+    "label": "NVIDIA NIM",
+    "base_url": "https://integrate.api.nvidia.com/v1",
+    "models": [
+      "meta/llama-3.3-70b-instruct",
+      "meta/llama-3.1-405b-instruct",
+      "mistralai/mistral-large-2-instruct",
+      "google/gemma-2-27b-it",
+      "nvidia/llama-3.1-nemotron-70b-instruct"
+    ]
+  },
+  {
+    "name": "deepinfra",
+    "label": "DeepInfra",
+    "base_url": "https://api.deepinfra.com/v1/openai",
+    "models": [
+      "meta-llama/Llama-3.3-70B-Instruct",
+      "meta-llama/Meta-Llama-3.1-405B-Instruct",
+      "Qwen/Qwen2.5-72B-Instruct",
+      "mistralai/Mistral-Nemo-Instruct-2407",
+      "deepseek-ai/DeepSeek-R1"
+    ]
+  },
+  {
+    "name": "novita",
+    "label": "Novita AI",
+    "base_url": "https://api.novita.ai/v3/openai",
+    "models": [
+      "meta-llama/llama-3.3-70b-instruct",
+      "meta-llama/llama-3.1-70b-instruct",
+      "deepseek/deepseek-r1",
+      "qwen/qwen2.5-72b-instruct",
+      "mistralai/mistral-nemo"
+    ]
+  },
+  {
+    "name": "runpod",
+    "label": "RunPod Serverless",
+    "base_url": "https://api.runpod.ai/v1",
+    "models": [
+      "llama-3.3-70b-instruct",
+      "llama-3.1-405b-instruct",
+      "deepseek-r1",
+      "qwen2.5-72b-instruct"
     ]
   }
 ]
