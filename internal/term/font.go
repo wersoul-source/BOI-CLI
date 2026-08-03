@@ -125,7 +125,10 @@ func registerFont(path string) error {
 
 	// 2. Load into current session
 	pathPtr, _ := windows.UTF16PtrFromString(path)
-	procAddFontResourceW.Call(uintptr(unsafe.Pointer(pathPtr)))
+	ret, _, err := procAddFontResourceW.Call(uintptr(unsafe.Pointer(pathPtr)))
+	if ret == 0 {
+		return fmt.Errorf("AddFontResourceW failed: %w", err)
+	}
 
 	// 3. Notify all windows (so apps pick up the font without restart)
 	const (
@@ -133,6 +136,7 @@ func registerFont(path string) error {
 		wmFontChange  = 0x001D
 	)
 	procSendMessageW.Call(hwndBroadcast, wmFontChange, 0, 0)
+	// SendMessage error is non-critical — font still loaded even if broadcast fails
 
 	return nil
 }

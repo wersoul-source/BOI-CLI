@@ -258,7 +258,10 @@ func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	return m, nil
+	// Forward all other keys to textinput (let user type the API key)
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
 func (m *WizardModel) updateModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

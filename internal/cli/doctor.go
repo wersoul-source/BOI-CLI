@@ -155,9 +155,9 @@ var doctorCmd = &cobra.Command{
 					fixMsg = "Run 'boi init'"
 				}
 			}
-			fmt.Printf("All checks passed! (%d/%d)", passed, total)
+			fmt.Printf("Checks: %d/%d passed", passed, total)
 			if fixMsg != "" {
-				fmt.Printf(" \u2014 %s to fix issues.", fixMsg)
+				fmt.Printf(" — %s to fix issues.", fixMsg)
 			}
 			fmt.Println()
 		}
@@ -184,7 +184,7 @@ func checkGoVersion(v string) bool {
 
 func countPSCProviders() int {
 	count := 0
-	for i := 1; i <= 4; i++ {
+	for i := 1; i <= 20; i++ { // Match factory.maxProviders = 20
 		name := os.Getenv(fmt.Sprintf("PSC_%d_NAME", i))
 		key := os.Getenv(fmt.Sprintf("PSC_%d_API_KEY", i))
 		if name != "" && key != "" {
