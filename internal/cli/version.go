@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	Version   = "0.1.0"
+var (
+	Version   = "0.3.0"
 	BuildGo   = "1.24"
 	BuildArch = "Chimera"
 )

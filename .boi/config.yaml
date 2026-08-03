@@ -1,9 +1,10 @@
-provider: ""
-model: ""
-persona: ""
+provider: anthropic
+model: claude-sonnet-5
+persona: boi
 log_level: info
 workspace: ""
-api_keys: {}
+api_keys:
+    google: AQ.A...XuHw
 sandbox:
     enabled: true
     deny_commands:
