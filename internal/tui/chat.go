@@ -84,12 +84,14 @@ func (c *ChatModel) renderBubble(sb *strings.Builder, msg Message, style bubbleS
 		return
 	}
 
-	// Calculate max line width from content
+	// Calculate max line width from content (display width, not byte length —
+	// len() would count UTF-8 bytes and break the box shape for Thai text).
 	lines := strings.Split(content, "\n")
 	maxLine := 0
 	for _, l := range lines {
-		if len(l) > maxLine {
-			maxLine = len(l)
+		w := term.ThaiStringWidth(l)
+		if w > maxLine {
+			maxLine = w
 		}
 	}
 	headerLen := term.ThaiStringWidth(header)
@@ -128,7 +130,7 @@ func (c *ChatModel) renderBubble(sb *strings.Builder, msg Message, style bubbleS
 	// Content lines
 	for _, line := range lines {
 		sb.WriteString(style.vert + " " + line)
-		pad := boxW - len(line) - 1
+		pad := boxW - term.ThaiStringWidth(line) - 1
 		if pad < 0 {
 			pad = 0
 		}
@@ -140,7 +142,11 @@ func (c *ChatModel) renderBubble(sb *strings.Builder, msg Message, style bubbleS
 
 	// Bottom
 	sb.WriteString(style.botLeft)
-	sb.WriteString(strings.Repeat(style.horiz, boxW))
+	// botLeft/botRight already include the "─" connector chars, so repeat
+	// boxW-2 here to keep the bottom edge the same width as the header and
+	// content lines (boxW+2). Without this the box is 2 columns wider at the
+	// bottom — a broken shape.
+	sb.WriteString(strings.Repeat(style.horiz, max(1, boxW-2)))
 	sb.WriteString(style.botRight)
 	sb.WriteString("\n")
 }

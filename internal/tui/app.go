@@ -133,10 +133,20 @@ func (m *Model) transitionToChat() tea.Cmd {
 	m.mode = "chat"
 	m.status.SetWidth(m.width)
 	m.help.SetWidth(m.width)
-	m.chat.SetSize(m.width, m.height-6)
+	m.chat.SetSize(m.width, m.chatHeight())
 	m.input.SetWidth(m.width)
 	m.chat.AddMessage("system", "BOI CLI ready. Type /help for commands.")
 	return tickCmd()
+}
+
+// chatHeight computes the chat viewport height from the real layout:
+// total - status bar - input box (grows/shrinks) - help bar - 1 breathing row.
+func (m *Model) chatHeight() int {
+	h := m.height - m.status.Height() - m.input.Height() - m.help.Height() - 1
+	if h < 1 {
+		h = 1
+	}
+	return h
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -168,7 +178,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.status.SetWidth(msg.Width)
 		m.help.SetWidth(msg.Width)
-		m.chat.SetSize(msg.Width, msg.Height-6)
+		m.chat.SetSize(msg.Width, m.chatHeight())
 		m.input.SetWidth(msg.Width)
 
 	case tickMsg:

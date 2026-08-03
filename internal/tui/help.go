@@ -29,6 +29,14 @@ func (h *HelpModel) SetWidth(w int) {
 	h.width = w
 }
 
+// Height returns the current help bar height (0 when hidden).
+func (h *HelpModel) Height() int {
+	if h.show {
+		return 1
+	}
+	return 0
+}
+
 func (h *HelpModel) Toggle() {
 	h.show = !h.show
 }

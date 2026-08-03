@@ -68,6 +68,11 @@ func (s *StatusModel) SetWidth(w int) {
 	s.width = w
 }
 
+// Height returns the fixed status bar height (1 row).
+func (s *StatusModel) Height() int {
+	return 1
+}
+
 func (s *StatusModel) SwitchPersona() string {
 	if len(s.personas) == 0 {
 		return s.persona
