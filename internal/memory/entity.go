@@ -3,7 +3,7 @@ package memory
 import (
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/weight"
+	"github.com/boi-family/boi-cli/internal/memory/weight"
 )
 
 var _ weight.Entity = (*MemoryEntry)(nil)

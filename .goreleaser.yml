@@ -9,7 +9,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X github.com/boi-family/boi-cli/internal/cli.Version={{.Version}}
+      - -s -w -X github.com/boi-family/boi-cli/internal/transport/cli.Version={{.Version}}
 
 archives:
   - format: tar.gz

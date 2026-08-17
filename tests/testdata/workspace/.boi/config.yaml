@@ -1,0 +1,12 @@
+provider: openai
+model: test-model
+persona: boi
+log_level: info
+workspace: ""
+api_keys: {}
+sandbox:
+  enabled: true
+  deny_commands:
+    - "sudo "
+    - "mkfs."
+    - "dd if="

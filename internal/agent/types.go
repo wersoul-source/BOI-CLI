@@ -40,4 +40,6 @@ type AgentResult struct {
 	Tokens   int
 	Duration time.Duration
 	Memory   []string
+	Provider string
+	Model    string
 }

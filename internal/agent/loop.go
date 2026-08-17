@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/llm"
 	"github.com/boi-family/boi-cli/internal/memory"
 	"github.com/boi-family/boi-cli/internal/persona"
+	llm "github.com/boi-family/boi-cli/internal/provider"
 )
 
 type Loop struct {
@@ -87,6 +87,8 @@ func (l *Loop) Run(ctx context.Context, query string) (*AgentResult, error) {
 				Steps:    i + 1,
 				Tokens:   resp.InputTokens + resp.OutputTokens,
 				Duration: time.Since(l.state.StartedAt),
+				Provider: resp.Provider,
+				Model:    resp.Model,
 			}, nil
 		}
 
