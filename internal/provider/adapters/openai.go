@@ -102,7 +102,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("provider %s: status %d: %s", p.name, resp.StatusCode, string(respBody))
+		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
 	}
 
 	var result openAIResponse

@@ -1,10 +1,13 @@
 package process
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/boi-family/boi-cli/internal/workspace"
 )
@@ -28,6 +31,19 @@ func TestRunWithDirRejectsOutsideWorkspaceBeforeExecution(t *testing.T) {
 	_, err = executor.RunWithDir("this-command-must-never-run", outside)
 	if !errors.Is(err, workspace.ErrOutsideWorkspace) {
 		t.Fatalf("RunWithDir() error = %v, want ErrOutsideWorkspace", err)
+	}
+}
+
+func TestRunContextHonorsCancellation(t *testing.T) {
+	command := "sleep 5"
+	if runtime.GOOS == "windows" {
+		command = "Start-Sleep -Seconds 5"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := NewExecutor().RunContext(ctx, command)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline, got %v", err)
 	}
 }
 

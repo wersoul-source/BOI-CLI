@@ -3,16 +3,16 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/agent"
+	"github.com/boi-family/boi-cli/internal/app"
 	"github.com/boi-family/boi-cli/internal/memory"
 	"github.com/boi-family/boi-cli/internal/persona"
+	llm "github.com/boi-family/boi-cli/internal/provider"
 	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
-	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +30,11 @@ var askCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := strings.Join(args, " ")
 
-		root, _ := workspace.DetectRoot()
-		personaDir := filepath.Join(workspace.GetBoiDir(root), "personas")
+		runtime, ok := app.RuntimeFromContext(cmd.Context())
+		if !ok || runtime == nil {
+			return fmt.Errorf("application runtime is not configured")
+		}
+		personaDir := filepath.Join(runtime.BoiDir, "personas")
 		reg := persona.NewRegistry()
 		if loaded, err := persona.LoadDir(personaDir); err == nil {
 			for _, p := range loaded {
@@ -45,12 +48,10 @@ var askCmd = &cobra.Command{
 
 		providers, err := llmfactory.LoadProvidersFromEnv()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: no providers configured: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Set PSC_1_NAME, PSC_1_API_KEY, etc. in .env\n")
-			fmt.Fprintf(os.Stderr, "Falling back to simulated response mode\n\n")
+			return fmt.Errorf("load providers: %w", err)
 		}
 
-		dbDir := filepath.Join(workspace.GetBoiDir(root), "memory")
+		dbDir := filepath.Join(runtime.BoiDir, "memory")
 		store, err := memory.Open(dbDir)
 		var memHook *memory.MemoryHook
 		if err == nil {
@@ -59,19 +60,21 @@ var askCmd = &cobra.Command{
 			defer store.Close()
 		}
 
-		loop := agent.NewLoop(p, providers, memHook)
-		loop.MaxSteps = agentSteps
+		service := agent.NewService(p, llm.NewRouter(providers), memHook, runtime.Sandbox)
+		limits := agent.DefaultEngineLimits()
+		limits.MaxSteps = agentSteps
+		service.SetLimits(limits)
 
 		if agentVerbose {
 			fmt.Printf("Agent: %s (%s)\n", p.Name, p.Model)
-			fmt.Printf("Steps: max %d\n", loop.MaxSteps)
+			fmt.Printf("Steps: max %d\n", limits.MaxSteps)
 			fmt.Println("---")
 		}
 
 		ctx := context.Background()
 		start := time.Now()
 
-		result, err := loop.Run(ctx, query)
+		result, err := service.Run(ctx, query)
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
 		}

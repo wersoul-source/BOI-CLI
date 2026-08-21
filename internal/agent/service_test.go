@@ -3,9 +3,11 @@ package agent
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/boi-family/boi-cli/internal/persona"
 	llm "github.com/boi-family/boi-cli/internal/provider"
@@ -77,5 +79,31 @@ func TestServiceRequiresProvider(t *testing.T) {
 	service := NewService(persona.DefaultPersona(), nil, nil, nil)
 	if _, err := service.Run(context.Background(), "hello"); err != ErrNoProvider {
 		t.Fatalf("Run() error = %v, want ErrNoProvider", err)
+	}
+}
+
+func TestServiceInteractiveApprovalCompletesWriteLoop(t *testing.T) {
+	root := t.TempDir()
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &sequenceProvider{responses: []string{`<boi-action>{"id":"write-1","tool":"workspace.write","purpose":"save note","arguments":{"path":"note.txt","content":"hello"}}</boi-action>`, "saved"}}
+	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events := service.Start(ctx, "save note")
+	approval := <-events
+	if approval.Approval == nil {
+		t.Fatalf("expected approval, got %#v", approval)
+	}
+	approval.Approval.Decisions <- ApprovalDecision{RequestID: approval.Approval.Request.ID, State: ApprovalApproved, DecidedAt: time.Now()}
+	completed := <-events
+	if completed.Err != nil || completed.Result == nil || completed.Result.Response != "saved" {
+		t.Fatalf("unexpected completion: %#v", completed)
+	}
+	content, err := os.ReadFile(filepath.Join(root, "note.txt"))
+	if err != nil || string(content) != "hello" {
+		t.Fatalf("content=%q err=%v", content, err)
 	}
 }

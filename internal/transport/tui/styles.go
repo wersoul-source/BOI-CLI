@@ -63,6 +63,16 @@ var (
 
 	timeStampStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
+
+	ApprovalPanelStyle = lipgloss.NewStyle().
+				Border(lipgloss.DoubleBorder()).
+				BorderForeground(boiOrange).
+				Foreground(textPrimary).
+				Padding(0, 1)
+
+	ApprovalTitleStyle = lipgloss.NewStyle().
+				Foreground(boiOrange).
+				Bold(true)
 )
 
 // bubbleStyle holds ASCII box-drawing characters and styled sub-elements.

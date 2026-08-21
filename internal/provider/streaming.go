@@ -10,7 +10,7 @@ func CompleteStream(ctx context.Context, providers []Provider, req CompletionReq
 	for _, p := range providers {
 		ch, err := p.Stream(ctx, req)
 		if err != nil {
-			if isHTTPError(err) {
+			if failoverAllowed(ClassifyError(err)) {
 				lastErr = err
 				continue
 			}

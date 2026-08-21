@@ -63,12 +63,24 @@ ignored.
 
 ## Current TUI safety boundary
 
-The TUI routes model requests through `internal/agent.Service`. Local
-workspace inspection is currently explicit and read-only through
-`/workspace`, `/ls`, and `/read`; model output cannot invoke these operations.
-Write and process execution remain disabled until an approval state is visible
-and testable in the TUI.
+The TUI and `boi ask` route model requests through `internal/agent.Service`.
+Model tool proposals enter a host-owned capability broker. Workspace reads are
+automatic; writes, processes, and registered MCP tools require an exact,
+expiring approval displayed by the TUI. Non-interactive CLI use never approves
+these actions automatically.
 
 The workspace boundary validates lexical and canonical paths, including
 symlink targets. It constrains filesystem paths only and must not be described
 as process, container, or operating-system isolation.
+
+Typed Agent lifecycle, Tool Call, Tool Result, Approval, Usage, and Stop Reason
+contracts are defined in `internal/agent`. The TUI owns presentation of an
+approval request, while authorization and execution policy remain Agent/runtime
+responsibilities. See [AGENT_RUNTIME_CONTRACT.md](AGENT_RUNTIME_CONTRACT.md).
+
+The bounded Agent state machine depends only on runtime ports and is documented
+in [AGENT_LOOP.md](AGENT_LOOP.md). Transports and concrete tools must not be
+imported into the kernel.
+
+The adversarial acceptance boundary and disabled-subagent gate are documented
+in [EVALUATION_GATE.md](EVALUATION_GATE.md).

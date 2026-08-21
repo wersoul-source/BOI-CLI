@@ -31,12 +31,23 @@ type agentResponseMsg struct {
 	tokens   int
 }
 
+type approvalRequestedMsg struct {
+	request   agent.ApprovalRequest
+	decisions chan<- agent.ApprovalDecision
+}
+
+type approvalDecisionSentMsg struct {
+	decision agent.ApprovalDecision
+	err      error
+}
+
 type Model struct {
 	splash          *SplashModel
 	chat            ChatModel
 	input           InputModel
 	status          StatusModel
 	help            HelpModel
+	approval        ApprovalModel
 	width           int
 	height          int
 	mode            string
@@ -46,6 +57,8 @@ type Model struct {
 	workspaceReader *filesystem.Reader
 	agentService    *agent.Service
 	cancelActive    context.CancelFunc
+	approvalSink    chan<- agent.ApprovalDecision
+	runtimeEvents   <-chan agent.RuntimeEvent
 }
 
 func NewApp(runtime *app.Runtime) *Model {
@@ -121,6 +134,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		input:           NewInput(),
 		status:          NewStatus(activePersona, provider, personaNames),
 		help:            NewHelp(),
+		approval:        NewApproval(),
 		mode:            "splash",
 		router:          router,
 		activeP:         activeP,
@@ -146,6 +160,7 @@ func (m *Model) transitionToChat() tea.Cmd {
 	m.mode = "chat"
 	m.status.SetWidth(m.width)
 	m.help.SetWidth(m.width)
+	m.approval.SetWidth(m.width)
 	m.chat.SetSize(m.width, m.chatHeight())
 	m.input.SetWidth(m.width)
 	m.chat.AddMessage("system", "BOI CLI ready. Type /help for commands.")
@@ -155,7 +170,11 @@ func (m *Model) transitionToChat() tea.Cmd {
 // chatHeight computes the chat viewport height from the real layout:
 // total - status bar - input box (grows/shrinks) - help bar - 1 breathing row.
 func (m *Model) chatHeight() int {
-	h := m.height - m.status.Height() - m.input.Height() - m.help.Height() - 1
+	controlHeight := m.input.Height()
+	if m.approval.Active() {
+		controlHeight = m.approval.Height()
+	}
+	h := m.height - m.status.Height() - controlHeight - m.help.Height() - 1
 	if h < 1 {
 		h = 1
 	}
@@ -164,7 +183,7 @@ func (m *Model) chatHeight() int {
 
 func (m *Model) isBusy() bool {
 	status := m.status.Status()
-	return status == "thinking" || status == "working" || status == "cancelling"
+	return status == "thinking" || status == "working" || status == "cancelling" || status == "approval"
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -196,11 +215,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.status.SetWidth(msg.Width)
 		m.help.SetWidth(msg.Width)
+		m.approval.SetWidth(msg.Width)
 		m.chat.SetSize(msg.Width, m.chatHeight())
 		m.input.SetWidth(msg.Width)
 
 	case tickMsg:
 		m.status.Tick()
+		if m.approval.Active() {
+			if decision, expired := m.approval.Decide("", time.Time(msg)); expired {
+				cmds = append(cmds, m.finishApproval(*decision))
+			}
+		}
 		cmds = append(cmds, tickCmd())
 
 	case agentResponseMsg:
@@ -211,13 +236,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleWorkspaceResponse(msg)
 		return m, tea.Batch(cmds...)
 
+	case approvalRequestedMsg:
+		if err := m.openApproval(msg); err != nil {
+			m.chat.AddMessage("error", fmt.Sprintf("Approval request rejected: %v", err))
+			m.status.SetStatus("error")
+		}
+		return m, nil
+
+	case approvalDecisionSentMsg:
+		if msg.err != nil {
+			m.chat.AddMessage("error", fmt.Sprintf("Approval decision was not delivered: %v", msg.err))
+			m.status.SetStatus("error")
+			return m, nil
+		}
+		m.chat.AddMessage("system", approvalDecisionSummary(msg.decision))
+		m.status.SetStatus("thinking")
+		return m, waitAgentEventCmd(m.runtimeEvents)
+
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+q":
+		if msg.String() == "ctrl+q" {
 			if m.cancelActive != nil {
 				m.cancelActive()
 			}
 			return m, tea.Quit
+		}
+		if m.approval.Active() {
+			decision, handled := m.approval.Decide(msg.String(), time.Now())
+			if !handled {
+				return m, nil
+			}
+			return m, m.finishApproval(*decision)
+		}
+		switch msg.String() {
 		case "ctrl+c", "esc":
 			if m.cancelActive != nil {
 				m.cancelActive()
@@ -377,20 +427,32 @@ func (m *Model) switchProviderMsg(name string) string {
 func (m *Model) startAgentCmd(input string) tea.Cmd {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	m.cancelActive = cancel
+	if m.agentService == nil {
+		return func() tea.Msg { return agentResponseMsg{err: fmt.Errorf("agent service is not configured")} }
+	}
+	m.runtimeEvents = m.agentService.Start(ctx, input)
+	return waitAgentEventCmd(m.runtimeEvents)
+}
+
+func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 	return func() tea.Msg {
-		if m.agentService == nil {
-			return agentResponseMsg{err: fmt.Errorf("agent service is not configured")}
+		if events == nil {
+			return agentResponseMsg{err: fmt.Errorf("agent event stream is not configured")}
 		}
-		result, err := m.agentService.Run(ctx, input)
-		if err != nil {
-			return agentResponseMsg{err: err}
+		event, ok := <-events
+		if !ok {
+			return agentResponseMsg{err: fmt.Errorf("agent event stream closed without a result")}
 		}
-		return agentResponseMsg{
-			content:  result.Response,
-			model:    result.Model,
-			provider: result.Provider,
-			tokens:   result.Tokens,
+		if event.Approval != nil {
+			return approvalRequestedMsg{request: event.Approval.Request, decisions: event.Approval.Decisions}
 		}
+		if event.Err != nil {
+			return agentResponseMsg{err: event.Err}
+		}
+		if event.Result == nil {
+			return agentResponseMsg{err: fmt.Errorf("agent event is empty")}
+		}
+		return agentResponseMsg{content: event.Result.Response, model: event.Result.Model, provider: event.Result.Provider, tokens: event.Result.Tokens}
 	}
 }
 
@@ -399,6 +461,7 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 		m.cancelActive()
 		m.cancelActive = nil
 	}
+	m.runtimeEvents = nil
 	if errors.Is(msg.err, context.Canceled) {
 		m.chat.AddMessage("system", "Agent task cancelled.")
 		m.status.SetStatus("idle")
@@ -425,6 +488,52 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 	m.status.SetStatus("idle")
 }
 
+func (m *Model) openApproval(msg approvalRequestedMsg) error {
+	if m.approval.Active() {
+		return fmt.Errorf("another approval request is already active")
+	}
+	if msg.decisions == nil {
+		return fmt.Errorf("approval decision channel is not configured")
+	}
+	if err := m.approval.Open(msg.request, time.Now()); err != nil {
+		return err
+	}
+	m.approvalSink = msg.decisions
+	m.input.Blur()
+	m.status.SetStatus("approval")
+	m.chat.SetSize(m.width, m.chatHeight())
+	return nil
+}
+
+func (m *Model) finishApproval(decision agent.ApprovalDecision) tea.Cmd {
+	sink := m.approvalSink
+	m.approval.Close()
+	m.approvalSink = nil
+	m.input.Focus()
+	m.chat.SetSize(m.width, m.chatHeight())
+	return sendApprovalDecisionCmd(sink, decision)
+}
+
+func sendApprovalDecisionCmd(
+	sink chan<- agent.ApprovalDecision,
+	decision agent.ApprovalDecision,
+) tea.Cmd {
+	return func() tea.Msg {
+		if err := decision.Validate(); err != nil {
+			return approvalDecisionSentMsg{decision: decision, err: err}
+		}
+		if sink == nil {
+			return approvalDecisionSentMsg{decision: decision, err: fmt.Errorf("approval decision channel is not configured")}
+		}
+		select {
+		case sink <- decision:
+			return approvalDecisionSentMsg{decision: decision}
+		default:
+			return approvalDecisionSentMsg{decision: decision, err: fmt.Errorf("approval decision receiver is not ready")}
+		}
+	}
+}
+
 func (m *Model) View() string {
 	if m.mode == "splash" {
 		return m.splash.View()
@@ -432,13 +541,16 @@ func (m *Model) View() string {
 
 	status := m.status.View()
 	chat := m.chat.View()
-	input := m.input.View()
+	control := m.input.View()
+	if m.approval.Active() {
+		control = m.approval.View()
+	}
 	help := m.help.View()
 
 	return lipgloss.JoinVertical(lipgloss.Top,
 		status,
 		chat,
-		input,
+		control,
 		help,
 	)
 }

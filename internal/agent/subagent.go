@@ -2,8 +2,12 @@ package agent
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
+
+var ErrSubagentsDisabled = errors.New("subagents are disabled until the evaluation gate is explicitly accepted")
+
+const SubagentsEnabled = false
 
 type Subagent struct{}
 
@@ -12,8 +16,5 @@ func NewSubagent() *Subagent {
 }
 
 func (s *Subagent) Delegate(ctx context.Context, task string, persona string) (*AgentResult, error) {
-	return &AgentResult{
-		Response: fmt.Sprintf("[Subagent %s] Task delegated: %s (not yet implemented)", persona, task),
-		Steps:    0,
-	}, nil
+	return nil, ErrSubagentsDisabled
 }

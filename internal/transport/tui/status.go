@@ -101,6 +101,8 @@ func (s *StatusModel) View() string {
 	switch s.status {
 	case "thinking", "working", "cancelling":
 		statusIcon = spinnerChars[s.spinIdx]
+	case "approval":
+		statusIcon = "!"
 	case "idle":
 		statusIcon = "✓"
 	case "error":

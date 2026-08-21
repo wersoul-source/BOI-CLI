@@ -128,7 +128,7 @@ func (p *GoogleProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("provider %s: %s: %s", p.name, resp.Status, string(respBody))
+		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
 	}
 
 	var result googleResponse
