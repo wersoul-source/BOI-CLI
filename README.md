@@ -15,6 +15,12 @@
 
 ---
 
+> **Architecture transition:** the owner-approved BOI Agent Suit direction now
+> uses one Core Persona (`boi`), a user-named Agent instance, Provider capability
+> qualification, and six system Blocks. The feature text below describes the
+> current v0.3 implementation and contains known legacy claims. Continue work
+> from [HANDOFF.md](HANDOFF.md).
+
 ## 🚀 Get Started
 
 ### 1. Install

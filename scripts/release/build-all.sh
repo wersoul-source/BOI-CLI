@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PLATFORMS=("windows/amd64" "windows/arm64" "linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64")
+PLATFORMS=("windows/amd64" "windows/arm64" "linux/amd64" "linux/arm64" "android/arm64" "darwin/amd64" "darwin/arm64")
 OUTDIR="bin"
 
 mkdir -p "$OUTDIR"
