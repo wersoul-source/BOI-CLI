@@ -1,5 +1,10 @@
 # BOI Agent Suit Six Blocks
 
+The package skeleton lives under `internal/block`. Every concrete Block exposes
+a declarative Manifest. Concrete Blocks may depend on the shared contract but
+must not import one another directly; `internal/app` will remain the composition
+root as behavior is migrated.
+
 ## 1. Service
 
 A semi-SDK of optional facilities that Core may compose. It detects the environment, resolves dependencies, exposes offline Foundation capabilities, reports Provider/MCP availability, and discovers possible communication routes. It informs Core; it does not decide for Core.

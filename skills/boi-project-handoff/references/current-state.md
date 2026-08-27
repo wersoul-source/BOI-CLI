@@ -2,6 +2,8 @@
 
 ## Confirmed implementation
 
+- The owner-approved six Blocks now have explicit package manifests under `internal/block`.
+- Conformance tests require exactly six unique valid manifests and prevent concrete Blocks from importing one another directly.
 - Repository was restructured around `internal/app`, transports, Agent, Provider, Tool, Memory, Persona, Skill, Workspace, Config, and Platform boundaries.
 - TUI and `boi ask` use `internal/agent.Service`.
 - The bounded Engine implements Observe, Decide, Authorize, Act, Verify, Recover, typed stops, step/tool/token/time budgets, and cancellation.
@@ -26,7 +28,7 @@
 - Add Provider capability tests and an environment qualification profile.
 - Add Local Skill/Tool indexes and registries with an active maximum of 15 each.
 - Add offline Foundation bundle plus BOI MCP/Library routing.
-- Add the six-Block package boundaries.
+- Move existing behavior behind the new six-Block boundaries and composition contracts.
 - Add Agent Folder output/bin tray and artifact manifest.
 - Add gated SubAgent Market workflow.
 
@@ -44,3 +46,10 @@
 - Targeted Agent approval, recovery, untrusted-observation, Provider retry/failover, and disabled-Subagent tests: passed.
 - `GOOS=android GOARCH=arm64 go build ./cmd/boi`: passed on Windows.
 - Physical S25+ runtime: not yet verified.
+
+## Verification after Phase H1 skeleton
+
+- `go test ./internal/block/...`: passed.
+- `go test ./...`: passed.
+- `go vet ./...`: passed.
+- Runtime behavior migration: intentionally not started.

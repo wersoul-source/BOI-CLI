@@ -11,6 +11,9 @@ Do not treat this plan as permission to implement every phase at once. Complete 
 
 Acceptance: the exact commit runs on S25+, `boi version`, `boi doctor`, one TUI query, and one `boi ask` query are observed. No secrets enter Git.
 
+Repository handoff, Android build target, and cross-build are complete. Physical
+S25+ acceptance is owned by the separate mobile path and does not block H1-H5.
+
 ## Phase H1 - Six-Block skeleton
 
 - Introduce package boundaries without changing behavior.
@@ -18,6 +21,9 @@ Acceptance: the exact commit runs on S25+, `boi version`, `boi doctor`, one TUI 
 - Add architecture conformance tests.
 
 Acceptance: no circular ownership, existing tests pass, and TUI/CLI behavior remains compatible.
+
+Status: complete. Six manifests and direct-cross-Block import conformance tests
+exist under `internal/block`. No existing runtime behavior was moved.
 
 ## Phase H2 - Core identity and qualification
 
