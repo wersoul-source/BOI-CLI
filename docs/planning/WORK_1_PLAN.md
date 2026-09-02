@@ -21,7 +21,7 @@ but it is not yet a Work 1 product.
 | Six-Block ownership | Six manifests and conformance tests under `internal/block` | Complete foundation | 100% |
 | One Core Persona | TUI and CLI use embedded Core Persona `boi`; switching is retired | Complete | 100% |
 | User-named Agent | First run persists a versioned identity in `.boi/agent.yaml` | Complete | 100% |
-| Provider conformance | Router retry/failover tests exist; no Model capability qualification | Foundation only | 25% |
+| Provider conformance | Versioned deterministic probe suite, persisted profiles, and fail-closed Router composition | Complete implementation | 100% |
 | Skill registry | Loader and registry exist; no limit, selection policy, or Service wiring | Partial | 35% |
 | Tool registry | Broker registers four local Tools and MCP Tools; no 15-Tool active-set contract | Partial | 45% |
 | Bounded Runtime | Engine, Broker, Approval, typed stops, budgets, cancellation, and tests exist | Strong foundation | 78% |
@@ -30,8 +30,8 @@ but it is not yet a Work 1 product.
 | Automation contract | `boi ask` exists; stable JSON, stream, exit-code, and no-TTY contracts are absent | Early foundation | 20% |
 | Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
 
-Weighted implementation readiness after W1.1 is approximately **54%**.
-Architectural direction alignment is approximately **82%**, because the existing
+Weighted implementation readiness after W1.2 is approximately **64%**.
+Architectural direction alignment is approximately **86%**, because the existing
 Runtime safety model already matches Work 1 and SubAgents remain disabled.
 
 ## Scope boundaries
@@ -106,6 +106,9 @@ Verification:
 
 ### W1.2 - Provider conformance
 
+Status: **Complete implementation**. Live profiles are generated explicitly per
+configured Provider/Model with `boi provider qualify <name>`.
+
 Tasks:
 
 1. Define a versioned Provider Capability Profile.
@@ -121,6 +124,19 @@ Acceptance:
 - A Provider failing Tool Calling receives no Tool Calling environment.
 - Probe failure never grants a capability.
 - Secrets and raw credentials never enter profiles or logs.
+
+Verification:
+
+- Deterministic fake-Provider probes cover completion, reasoning, BOI Tool
+  Calling schema, Skill selection, untrusted Tool observations, authority, and
+  tested Context payload.
+- Repeated unchanged probes produce equivalent profiles while timestamps remain
+  observational metadata.
+- Router candidates without a valid passing completion profile are excluded.
+- Tool and Skill environments are the fail-closed intersection of qualified
+  Router candidates.
+- Native Tool schema is explicitly `unsupported` until Provider transport
+  carries native Tool definitions; it is never inferred from a model name.
 
 ### W1.3 - Active capability registries
 
@@ -222,9 +238,9 @@ Acceptance:
 
 ```text
 W1.0 Architecture baseline [complete]
-  -> W1.1 Core identity
-      -> W1.2 Provider conformance
-          -> W1.3 Active registries
+  -> W1.1 Core identity [complete]
+      -> W1.2 Provider conformance [complete]
+          -> W1.3 Active registries [next]
               -> W1.4 Runtime composition
                   -> W1.5 Agent Folder
                       -> W1.6 Automation contract

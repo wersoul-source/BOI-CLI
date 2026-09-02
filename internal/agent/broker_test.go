@@ -27,6 +27,17 @@ func TestParseDecisionRejectsModelSecurityFields(t *testing.T) {
 	}
 }
 
+func TestBrokerCapabilityProfileCanDisableAllTools(t *testing.T) {
+	b := testBroker(t)
+	b.SetToolCallingAllowed(false)
+	if len(b.CapabilityNames()) != 0 {
+		t.Fatal("disabled Tool Calling must expose no capability names")
+	}
+	if _, err := b.Prepare(ToolCall{ID: "1", Tool: "workspace.read", Purpose: "read", Arguments: map[string]any{"path": "README.md"}}); err == nil {
+		t.Fatal("disabled Tool Calling must reject preparation")
+	}
+}
+
 func TestParseDecisionRejectsTrailingJSON(t *testing.T) {
 	_, err := ParseDecision(`<boi-action>{"id":"1","tool":"workspace.read","purpose":"inspect","arguments":{"path":"a"}} {"extra":true}</boi-action>`)
 	if err == nil {

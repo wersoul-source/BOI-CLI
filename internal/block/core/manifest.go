@@ -15,6 +15,6 @@ func Manifest() block.Manifest {
 			"provider capability testing", "capability profile", "environment composition",
 		},
 		DoesNotOwn: []string{"provider transport", "tool execution", "artifact storage", "ambient SubAgent authority"},
-		Status:     block.StatusSkeleton,
+		Status:     block.StatusPartial,
 	}
 }

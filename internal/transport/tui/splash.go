@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -180,10 +179,6 @@ func (s *SplashModel) View() string {
 		)
 	}
 	return content
-}
-
-func countPSCProviders() int {
-	return llmfactory.CountProvidersFromEnv()
 }
 
 func countMemoryEntries(dir string) int {

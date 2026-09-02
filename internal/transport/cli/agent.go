@@ -40,9 +40,17 @@ var askCmd = &cobra.Command{
 		}
 		p := persona.CorePersona()
 
-		providers, err := llmfactory.LoadProvidersFromEnv()
+		configured, err := llmfactory.LoadConfiguredProvidersFromEnv()
 		if err != nil {
 			return fmt.Errorf("load providers: %w", err)
+		}
+		qualified := app.QualifiedProviders(runtime.BoiDir, configured)
+		providers := make([]llm.Provider, 0, len(qualified))
+		for _, item := range qualified {
+			providers = append(providers, item.Provider)
+		}
+		if len(providers) == 0 {
+			return fmt.Errorf("no qualified providers; run 'boi provider qualify <name>'")
 		}
 
 		dbDir := filepath.Join(runtime.BoiDir, "memory")
@@ -55,6 +63,8 @@ var askCmd = &cobra.Command{
 		}
 
 		service := agent.NewService(p, llm.NewRouter(providers), memHook, runtime.Sandbox)
+		environment := app.ProviderEnvironment(runtime.BoiDir, qualified)
+		service.SetToolCallingAllowed(environment.ToolCalling)
 		limits := agent.DefaultEngineLimits()
 		limits.MaxSteps = agentSteps
 		service.SetLimits(limits)
@@ -65,6 +75,7 @@ var askCmd = &cobra.Command{
 				agentName = identity.Name
 			}
 			fmt.Printf("Agent: %s | Core Persona: %s | Model preference: %s\n", agentName, p.Name, p.Model)
+			fmt.Printf("Qualified environment: completion=%t tools=%t skills=%t context-bytes=%d\n", environment.Completion, environment.ToolCalling, environment.SkillCalling, environment.ContextBytes)
 			fmt.Printf("Steps: max %d\n", limits.MaxSteps)
 			fmt.Println("---")
 		}

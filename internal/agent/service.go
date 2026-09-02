@@ -61,6 +61,10 @@ func (s *Service) SetLimits(limits EngineLimits) {
 	s.mu.Unlock()
 }
 
+func (s *Service) SetToolCallingAllowed(allowed bool) {
+	s.broker.SetToolCallingAllowed(allowed)
+}
+
 func (s *Service) RegisterMCP(server string, tools []string, invoker ExternalInvoker) error {
 	return s.broker.RegisterMCP(server, tools, invoker)
 }

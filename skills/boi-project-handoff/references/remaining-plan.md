@@ -38,7 +38,8 @@ exist under `internal/block`. No existing runtime behavior was moved.
 
 Acceptance: the same Provider profile is reproducible; failed capabilities reduce the environment rather than being silently assumed.
 
-Status: Core identity portion complete; Provider qualification remains W1.2.
+Status: complete through W1.2. Profiles are generated explicitly with
+`boi provider qualify <name>`; unqualified Providers do not enter Agent routing.
 
 ## Phase H3 - Service and capability registries
 

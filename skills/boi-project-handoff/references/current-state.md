@@ -17,6 +17,9 @@
 - First TUI startup creates a versioned, user-named Agent identity at `.boi/agent.yaml`; subsequent starts load it.
 - TUI splash and status distinguish Agent name from Provider metadata and the fixed Core Persona.
 - Legacy Persona files are preserved; switching to other Personas now returns an explicit compatibility error.
+- `boi provider qualify <name>` runs the versioned Provider behavioral probe suite and stores a credential-free profile under `.boi/provider-profiles`.
+- Provider candidates without a passing completion profile are excluded from the Agent Router.
+- Tool and Skill capability exposure is the fail-closed intersection of every qualified failover candidate.
 
 ## Implemented but not connected to the main Agent path
 
@@ -27,7 +30,6 @@
 
 ## Concept changes not implemented
 
-- Add Provider capability tests and an environment qualification profile.
 - Add Local Skill/Tool indexes and registries with an active maximum of 15 each.
 - Add Service health and MCP routing without an offline-operation guarantee.
 - Move existing behavior behind the new six-Block boundaries and composition contracts.
@@ -62,3 +64,9 @@
 - Core Identity round-trip, validation, Thai-name, and restart tests: passed.
 - TUI Agent name/Core Persona contract tests: passed.
 - CLI Persona compatibility smoke: passed; legacy Persona selection is rejected.
+
+## Verification after Work 1 Phase W1.2
+
+- Deterministic Provider qualification, profile round-trip, reproducibility, and fail-closed composition tests: passed.
+- Provider qualification CLI registration smoke: passed.
+- Live third-party Provider qualification was not run automatically because it performs billable/network API calls; users run it explicitly per configured Provider.

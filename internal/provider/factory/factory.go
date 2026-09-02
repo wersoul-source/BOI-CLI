@@ -2,7 +2,9 @@ package factory
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 
 	llm "github.com/boi-family/boi-cli/internal/provider"
 	providers "github.com/boi-family/boi-cli/internal/provider/adapters"
@@ -17,8 +19,27 @@ type ProviderConfig struct {
 
 const maxProviders = 20
 
+type ConfiguredProvider struct {
+	Provider      llm.Provider
+	Name          string
+	Model         string
+	EndpointClass string
+}
+
 func LoadProvidersFromEnv() ([]llm.Provider, error) {
-	var result []llm.Provider
+	configured, err := LoadConfiguredProvidersFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]llm.Provider, 0, len(configured))
+	for _, item := range configured {
+		result = append(result, item.Provider)
+	}
+	return result, nil
+}
+
+func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
+	var result []ConfiguredProvider
 	for i := 1; i <= maxProviders; i++ {
 		prefix := fmt.Sprintf("PSC_%d_", i)
 		cfg := ProviderConfig{
@@ -35,13 +56,28 @@ func LoadProvidersFromEnv() ([]llm.Provider, error) {
 		}
 		p := createProvider(cfg)
 		if p != nil {
-			result = append(result, p)
+			result = append(result, ConfiguredProvider{Provider: p, Name: cfg.Name, Model: cfg.Model, EndpointClass: classifyEndpoint(cfg.Name, cfg.BaseURL)})
 		}
 	}
 	if len(result) == 0 {
 		return nil, fmt.Errorf("no valid providers found in environment (PSC_1..PSC_%d)", maxProviders)
 	}
 	return result, nil
+}
+
+func classifyEndpoint(name, baseURL string) string {
+	if strings.TrimSpace(baseURL) == "" {
+		return "official"
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Hostname() == "" {
+		return "custom"
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return "local"
+	}
+	return "custom"
 }
 
 func CountProvidersFromEnv() int {

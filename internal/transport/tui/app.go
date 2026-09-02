@@ -83,13 +83,22 @@ func NewApp(runtime *app.Runtime) *Model {
 	boiDir := filepath.Join(root, ".boi")
 	memoryCount := countMemoryEntries(filepath.Join(boiDir, "memory"))
 	skillList, skillCount := listSkills(filepath.Join(boiDir, "skills"))
-	providerCount := countPSCProviders()
-
-	splash := NewSplash(root, agentName, coreblock.CorePersonaName, providerCount, memoryCount, skillCount, strings.Join(skillList, ", "), runtime.Version)
+	providerCount := 0
 
 	// Load LLM providers and create router
 	var router *llm.Router
-	llmProviders, llmErr := llmfactory.LoadProvidersFromEnv()
+	configuredProviders, llmErr := llmfactory.LoadConfiguredProvidersFromEnv()
+	qualifiedProviders := app.QualifiedProviders(runtime.BoiDir, configuredProviders)
+	providerCount = len(qualifiedProviders)
+	if providerCount == 0 && len(configuredProviders) > 0 {
+		provider = "unqualified"
+	} else if providerCount > 0 {
+		provider = qualifiedProviders[0].Name + "/" + qualifiedProviders[0].Model
+	}
+	llmProviders := make([]llm.Provider, 0, len(qualifiedProviders))
+	for _, item := range qualifiedProviders {
+		llmProviders = append(llmProviders, item.Provider)
+	}
 	if llmErr == nil && len(llmProviders) > 0 {
 		router = llm.NewRouter(llmProviders)
 		// Update status bar provider
@@ -100,6 +109,7 @@ func NewApp(runtime *app.Runtime) *Model {
 			}
 		}
 	}
+	splash := NewSplash(root, agentName, coreblock.CorePersonaName, providerCount, memoryCount, skillCount, strings.Join(skillList, ", "), runtime.Version)
 
 	// Runtime persona is a Core invariant. The user names the Agent, not the persona.
 	activeP := persona.CorePersona()
@@ -108,6 +118,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
 	}
 	agentService := agent.NewService(activeP, router, memoryHook, runtime.Sandbox)
+	agentService.SetToolCallingAllowed(app.ProviderEnvironment(runtime.BoiDir, qualifiedProviders).ToolCalling)
 
 	m := &Model{
 		splash:          splash,

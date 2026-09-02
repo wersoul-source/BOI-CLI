@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/block/core"
 	"github.com/boi-family/boi-cli/internal/config"
 	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
 	"github.com/boi-family/boi-cli/internal/workspace"
@@ -14,6 +17,46 @@ import (
 var providerCmd = &cobra.Command{
 	Use:   "provider",
 	Short: "Manage LLM providers",
+}
+
+var providerProbeTimeout time.Duration
+
+var providerQualifyCmd = &cobra.Command{
+	Use:   "qualify <name>",
+	Short: "Run the BOI Provider capability probe suite",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		runtime, ok := app.RuntimeFromContext(cmd.Context())
+		if !ok || runtime == nil {
+			return fmt.Errorf("application runtime is not configured")
+		}
+		configured, err := llmfactory.LoadConfiguredProvidersFromEnv()
+		if err != nil {
+			return err
+		}
+		name := strings.ToLower(strings.TrimSpace(args[0]))
+		for _, item := range configured {
+			if strings.ToLower(item.Name) != name {
+				continue
+			}
+			target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
+			profile, err := (coreblock.Qualifier{Timeout: providerProbeTimeout}).Run(cmd.Context(), target, item.Provider)
+			if err != nil {
+				return fmt.Errorf("qualify provider: %w", err)
+			}
+			path := coreblock.CapabilityProfilePath(runtime.BoiDir, target)
+			if err := coreblock.SaveCapabilityProfile(path, profile); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Provider: %s\nModel: %s\nEndpoint class: %s\n", target.Provider, target.Model, target.EndpointClass)
+			for _, result := range profile.Results {
+				fmt.Fprintf(cmd.OutOrStdout(), "  %-20s %s\n", result.Capability, result.Status)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Profile: %s\n", path)
+			return nil
+		}
+		return fmt.Errorf("provider %q is not configured", name)
+	},
 }
 
 var providerListCmd = &cobra.Command{
@@ -99,8 +142,10 @@ func loadOrCreateConfig(path string) *config.Config {
 }
 
 func init() {
+	providerQualifyCmd.Flags().DurationVar(&providerProbeTimeout, "timeout", 30*time.Second, "Timeout for each capability probe")
 	providerCmd.AddCommand(providerListCmd)
 	providerCmd.AddCommand(providerSwitchCmd)
+	providerCmd.AddCommand(providerQualifyCmd)
 	rootCmd.AddCommand(providerCmd)
 	rootCmd.AddCommand(modelCmd)
 }

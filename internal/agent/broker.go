@@ -64,14 +64,15 @@ type Capability struct {
 }
 
 type Broker struct {
-	sandbox      *workspace.Sandbox
-	reader       *filesystem.Reader
-	process      *processtool.Executor
-	capabilities map[string]Capability
-	external     map[string]ExternalCapability
-	executed     map[string]executionRecord
-	registryMu   sync.RWMutex
-	executionMu  sync.Mutex
+	sandbox            *workspace.Sandbox
+	reader             *filesystem.Reader
+	process            *processtool.Executor
+	capabilities       map[string]Capability
+	external           map[string]ExternalCapability
+	executed           map[string]executionRecord
+	registryMu         sync.RWMutex
+	executionMu        sync.Mutex
+	toolCallingAllowed bool
 }
 
 func NewBroker(sandbox *workspace.Sandbox) *Broker {
@@ -92,7 +93,13 @@ func NewBroker(sandbox *workspace.Sandbox) *Broker {
 	for _, capability := range capabilities {
 		registry[capability.Name] = capability
 	}
-	return &Broker{sandbox: sandbox, reader: reader, process: process, capabilities: registry, external: make(map[string]ExternalCapability), executed: make(map[string]executionRecord)}
+	return &Broker{sandbox: sandbox, reader: reader, process: process, capabilities: registry, external: make(map[string]ExternalCapability), executed: make(map[string]executionRecord), toolCallingAllowed: true}
+}
+
+func (b *Broker) SetToolCallingAllowed(allowed bool) {
+	b.registryMu.Lock()
+	b.toolCallingAllowed = allowed
+	b.registryMu.Unlock()
 }
 
 type executionRecord struct {
@@ -131,6 +138,9 @@ func (b *Broker) RegisterMCP(server string, tools []string, invoker ExternalInvo
 func (b *Broker) CapabilityNames() []string {
 	b.registryMu.RLock()
 	defer b.registryMu.RUnlock()
+	if !b.toolCallingAllowed {
+		return nil
+	}
 	names := make([]string, 0, len(b.capabilities))
 	for name := range b.capabilities {
 		names = append(names, name)
@@ -142,6 +152,9 @@ func (b *Broker) CapabilityNames() []string {
 func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 	b.registryMu.RLock()
 	defer b.registryMu.RUnlock()
+	if !b.toolCallingAllowed {
+		return ToolCall{}, fmt.Errorf("Tool Calling is disabled by Provider capability profile")
+	}
 	capability, ok := b.capabilities[proposed.Tool]
 	if !ok {
 		return ToolCall{}, fmt.Errorf("unknown or disabled capability: %s", proposed.Tool)
