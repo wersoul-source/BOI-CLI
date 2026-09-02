@@ -10,13 +10,13 @@ import (
 
 	"github.com/boi-family/boi-cli/internal/agent"
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/block/core"
 	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/boi-family/boi-cli/internal/memory"
 	"github.com/boi-family/boi-cli/internal/persona"
 	llm "github.com/boi-family/boi-cli/internal/provider"
 	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
 	"github.com/boi-family/boi-cli/internal/tool/filesystem"
-	"github.com/boi-family/boi-cli/internal/workspace"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -62,33 +62,22 @@ type Model struct {
 }
 
 func NewApp(runtime *app.Runtime) *Model {
-	var personaNames []string
-	activePersona := "kamkaew"
+	agentName := coreblock.DefaultAgentName
 	provider := "none"
 	root := runtime.WorkspaceRoot
 
 	if root != "" {
-		personaDir := filepath.Join(workspace.GetBoiDir(root), "personas")
-		reg, regErr := persona.Load(personaDir)
-		if regErr == nil {
-			personaNames = reg.List()
-			cfgPath := filepath.Join(workspace.GetBoiDir(root), "config.yaml")
-			cfg, cfgErr := config.LoadFrom(cfgPath)
-			if cfgErr == nil && cfg.Persona != "" {
-				activePersona = cfg.Persona
-			}
-			if cfgErr == nil && cfg.Provider != "" {
-				if cfg.Model != "" {
-					provider = fmt.Sprintf("%s/%s", cfg.Provider, cfg.Model)
-				} else {
-					provider = cfg.Provider
-				}
+		if identity, identityErr := coreblock.LoadIdentity(runtime.IdentityPath); identityErr == nil {
+			agentName = identity.Name
+		}
+		cfg, cfgErr := config.LoadFrom(runtime.ConfigPath)
+		if cfgErr == nil && cfg.Provider != "" {
+			if cfg.Model != "" {
+				provider = fmt.Sprintf("%s/%s", cfg.Provider, cfg.Model)
+			} else {
+				provider = cfg.Provider
 			}
 		}
-	}
-
-	if len(personaNames) == 0 {
-		personaNames = []string{"kamkaew", "kampun", "dang", "don", "kine", "boi"}
 	}
 
 	boiDir := filepath.Join(root, ".boi")
@@ -96,7 +85,7 @@ func NewApp(runtime *app.Runtime) *Model {
 	skillList, skillCount := listSkills(filepath.Join(boiDir, "skills"))
 	providerCount := countPSCProviders()
 
-	splash := NewSplash(root, len(personaNames), strings.Join(personaNames, ", "), providerCount, memoryCount, skillCount, strings.Join(skillList, ", "), runtime.Version)
+	splash := NewSplash(root, agentName, coreblock.CorePersonaName, providerCount, memoryCount, skillCount, strings.Join(skillList, ", "), runtime.Version)
 
 	// Load LLM providers and create router
 	var router *llm.Router
@@ -112,16 +101,8 @@ func NewApp(runtime *app.Runtime) *Model {
 		}
 	}
 
-	// Load active persona for system prompt
-	var activeP *persona.Persona
-	if root != "" {
-		personaDir := filepath.Join(workspace.GetBoiDir(root), "personas")
-		if reg, regErr := persona.Load(personaDir); regErr == nil {
-			if p, pErr := reg.Get(activePersona); pErr == nil {
-				activeP = p
-			}
-		}
-	}
+	// Runtime persona is a Core invariant. The user names the Agent, not the persona.
+	activeP := persona.CorePersona()
 	var memoryHook *memory.MemoryHook
 	if store, storeErr := memory.Open(filepath.Join(runtime.BoiDir, "memory")); storeErr == nil {
 		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
@@ -132,7 +113,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		splash:          splash,
 		chat:            NewChat(),
 		input:           NewInput(),
-		status:          NewStatus(activePersona, provider, personaNames),
+		status:          NewStatus(agentName, provider, nil),
 		help:            NewHelp(),
 		approval:        NewApproval(),
 		mode:            "splash",
@@ -318,25 +299,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.isBusy() {
 				return m, nil
 			}
-			// If in command mode, autocomplete instead of switch persona
+			// Tab is reserved for command completion. Core Persona cannot be switched.
 			if strings.HasPrefix(m.input.Value(), "/") {
 				best := m.help.BestMatch(m.input.Value())
 				if best != "" && best != m.input.Value() {
 					m.input.SetValue(best)
 					m.help.SetSuggestions(best)
-				}
-			} else {
-				newPersona := m.status.SwitchPersona()
-				m.chat.AddMessage("system", fmt.Sprintf("Switched to persona: %s", newPersona))
-				// Reload persona for system prompt
-				if m.root != "" {
-					personaDir := filepath.Join(workspace.GetBoiDir(m.root), "personas")
-					if reg, regErr := persona.Load(personaDir); regErr == nil {
-						if p, pErr := reg.Get(newPersona); pErr == nil {
-							m.activeP = p
-							m.agentService.SetPersona(p)
-						}
-					}
 				}
 			}
 			return m, nil
@@ -371,8 +339,7 @@ func (m *Model) handleSlashCommand(input string) (string, bool) {
 	case lower == "/help":
 		return helpText, false
 	case lower == "/persona":
-		names := m.status.Personas()
-		return fmt.Sprintf("Personas: %s\nTab to cycle", strings.Join(names, ", ")), false
+		return fmt.Sprintf("Core Persona: %s (fixed)\nAgent: %s", coreblock.CorePersonaName, m.status.AgentName()), false
 	case lower == "/providers", lower == "/provider":
 		return m.providerListMsg(), false
 	case strings.HasPrefix(lower, "/provider "):
@@ -557,7 +524,7 @@ func (m *Model) View() string {
 
 var helpText = `Available commands:
   /help      Show this help
-  /persona   List available personas
+  /persona   Show the fixed Core Persona and Agent name
   /clear     Clear chat history
   /quit      Exit BOI CLI
   /provider  Switch LLM provider

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/boi-family/boi-cli/internal/config/envfile"
 	term "github.com/boi-family/boi-cli/internal/platform/terminal"
 )
@@ -43,33 +42,23 @@ func RunFirstRun(runtime *app.Runtime) {
 	}
 
 	needsSetup := !envfile.HasProviders(envPath)
-	needsPersona := true
 
-	cfgPath := filepath.Join(boiDir, "config.yaml")
-	cfg, err := config.LoadFrom(cfgPath)
-	if err == nil && cfg.Persona != "" {
-		needsPersona = false
-	}
-
-	if needsSetup || needsPersona {
+	if needsSetup {
 		fmt.Println()
 		fmt.Println("⚡ Quick Setup — let's get BOI ready:")
 		fmt.Println()
+		fmt.Println("  Step 1: Configure AI Providers")
+		fmt.Println("  (TUI wizard — arrow keys, model picker)")
+		fmt.Println()
+		RunSetupWizard(false)
+		envfile.Load(envPath)
+		fmt.Println()
+	}
 
-		if needsSetup {
-			fmt.Println("  Step 1: Configure AI Providers")
-			fmt.Println("  (TUI wizard — arrow keys, model picker)")
-			fmt.Println()
-			RunSetupWizard(false)
-			envfile.Load(envPath)
-			fmt.Println()
-		}
-
-		if needsPersona {
-			fmt.Println("  Step 2: Choose Your Persona")
-			RunPersonaWizard()
-			fmt.Println()
-		}
+	if _, created, err := EnsureAgentIdentity(runtime, os.Stdin, os.Stdout); err != nil {
+		fmt.Printf("  Warning: Agent identity is unavailable: %v\n", err)
+	} else if created {
+		fmt.Println()
 	}
 
 	fmt.Println()

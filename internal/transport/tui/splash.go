@@ -55,20 +55,20 @@ type SplashModel struct {
 	height        int
 	wd            string
 	version       string
-	personaCount  int
-	personaNames  string
+	agentName     string
+	corePersona   string
 	providerCount int
 	memoryCount   int
 	skillCount    int
 	skillNames    string
 }
 
-func NewSplash(wd string, personaCount int, personaNames string, providerCount, memoryCount, skillCount int, skillNames string, version string) *SplashModel {
+func NewSplash(wd, agentName, corePersona string, providerCount, memoryCount, skillCount int, skillNames string, version string) *SplashModel {
 	return &SplashModel{
 		wd:            wd,
 		version:       version,
-		personaCount:  personaCount,
-		personaNames:  personaNames,
+		agentName:     agentName,
+		corePersona:   corePersona,
 		providerCount: providerCount,
 		memoryCount:   memoryCount,
 		skillCount:    skillCount,
@@ -139,7 +139,8 @@ func (s *SplashModel) View() string {
 	var statusLines []string
 	statusLines = append(statusLines, "")
 	statusLines = append(statusLines, fmt.Sprintf("  %s %s", splashLabelStyle.Render("◈"), splashValueStyle.Render(s.wd)))
-	statusLines = append(statusLines, fmt.Sprintf("  %s %d loaded  %s", splashLabelStyle.Render("⚡"), s.personaCount, splashValueStyle.Render(s.personaNames)))
+	statusLines = append(statusLines, fmt.Sprintf("  %s Agent: %s", splashLabelStyle.Render("⚡"), splashValueStyle.Render(s.agentName)))
+	statusLines = append(statusLines, fmt.Sprintf("  %s Core Persona: %s", splashLabelStyle.Render("◆"), splashValueStyle.Render(s.corePersona)))
 
 	if s.providerCount > 0 {
 		provStatus := fmt.Sprintf("%d configured", s.providerCount)
@@ -162,7 +163,7 @@ func (s *SplashModel) View() string {
 
 	statusLines = append(statusLines, "")
 
-	setupReady := s.providerCount > 0 && s.personaNames != ""
+	setupReady := s.providerCount > 0 && s.agentName != "" && s.corePersona != ""
 	if setupReady {
 		statusLines = append(statusLines, fmt.Sprintf("  %s  %s", splashDimStyle.Render("▶"), splashPromptStyle.Render("Press Enter to start...")))
 	} else {

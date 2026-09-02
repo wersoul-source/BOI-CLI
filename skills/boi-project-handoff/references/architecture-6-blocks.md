@@ -7,7 +7,7 @@ root as behavior is migrated.
 
 ## 1. Service
 
-A semi-SDK of optional facilities that Core may compose. It detects the environment, resolves dependencies, exposes offline Foundation capabilities, reports Provider/MCP availability, and discovers possible communication routes. It informs Core; it does not decide for Core.
+A semi-SDK of optional facilities that Core may compose. It detects the environment, resolves dependencies, reports Provider/MCP availability, and discovers possible communication routes. Local components may be present, but disconnected operation is not guaranteed. It informs Core; it does not decide for Core.
 
 ## 2. Core
 

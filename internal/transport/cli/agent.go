@@ -9,6 +9,7 @@ import (
 
 	"github.com/boi-family/boi-cli/internal/agent"
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/block/core"
 	"github.com/boi-family/boi-cli/internal/memory"
 	"github.com/boi-family/boi-cli/internal/persona"
 	llm "github.com/boi-family/boi-cli/internal/provider"
@@ -25,7 +26,7 @@ var (
 var askCmd = &cobra.Command{
 	Use:   "ask [query]",
 	Short: "Ask the BOI agent",
-	Long:  "Runs the full agent loop with memory, skills, and persona.",
+	Long:  "Runs the bounded BOI Agent loop with memory and the fixed Core Persona boi.",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := strings.Join(args, " ")
@@ -34,17 +35,10 @@ var askCmd = &cobra.Command{
 		if !ok || runtime == nil {
 			return fmt.Errorf("application runtime is not configured")
 		}
-		personaDir := filepath.Join(runtime.BoiDir, "personas")
-		reg := persona.NewRegistry()
-		if loaded, err := persona.LoadDir(personaDir); err == nil {
-			for _, p := range loaded {
-				reg.Register(p)
-			}
+		if !strings.EqualFold(strings.TrimSpace(agentPersona), coreblock.CorePersonaName) {
+			return fmt.Errorf("Persona selection is retired; Core Persona is fixed to %s", coreblock.CorePersonaName)
 		}
-		p, _ := reg.Get(agentPersona)
-		if p == nil {
-			p = persona.DefaultPersona()
-		}
+		p := persona.CorePersona()
 
 		providers, err := llmfactory.LoadProvidersFromEnv()
 		if err != nil {
@@ -66,7 +60,11 @@ var askCmd = &cobra.Command{
 		service.SetLimits(limits)
 
 		if agentVerbose {
-			fmt.Printf("Agent: %s (%s)\n", p.Name, p.Model)
+			agentName := coreblock.DefaultAgentName
+			if identity, loadErr := coreblock.LoadIdentity(runtime.IdentityPath); loadErr == nil {
+				agentName = identity.Name
+			}
+			fmt.Printf("Agent: %s | Core Persona: %s | Model preference: %s\n", agentName, p.Name, p.Model)
 			fmt.Printf("Steps: max %d\n", limits.MaxSteps)
 			fmt.Println("---")
 		}
@@ -95,7 +93,8 @@ var askCmd = &cobra.Command{
 }
 
 func init() {
-	askCmd.Flags().StringVarP(&agentPersona, "persona", "p", "kamkaew", "Persona to use")
+	askCmd.Flags().StringVarP(&agentPersona, "persona", "p", "boi", "Compatibility flag; Core Persona is fixed to boi")
+	_ = askCmd.Flags().MarkDeprecated("persona", "Core Persona is fixed to boi in Work 1")
 	askCmd.Flags().IntVarP(&agentSteps, "steps", "s", 15, "Max agent steps")
 	askCmd.Flags().BoolVarP(&agentVerbose, "verbose", "v", false, "Verbose output")
 	rootCmd.AddCommand(askCmd)

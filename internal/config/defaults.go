@@ -5,6 +5,7 @@ func Default() *Config {
 	return &Config{
 		Provider: "openai",
 		Model:    "gpt-4.1-mini",
+		Persona:  "boi",
 		LogLevel: "info",
 		APIKeys:  make(map[string]string),
 		Sandbox: SandboxConfig{

@@ -46,7 +46,7 @@ Do not paste credentials into shell history, logs, screenshots, commits, or hand
 - Thai input and output render correctly.
 - Ctrl+C/Esc cancellation behaves as documented by the terminal.
 - Workspace read remains inside the selected root.
-- Offline startup reports degraded capability without downloading.
+- Unavailable required services report a clear unavailable state without claiming task completion.
 - Provider request succeeds when network is enabled.
 - `boi ask` behavior and exit status are recorded.
 

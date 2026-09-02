@@ -17,7 +17,9 @@ type Runtime struct {
 	Version       string
 	WorkspaceRoot string
 	BoiDir        string
+	ConfigPath    string
 	EnvPath       string
+	IdentityPath  string
 	Sandbox       *workspace.Sandbox
 }
 
@@ -37,7 +39,9 @@ func NewRuntime(version string) (*Runtime, error) {
 		Version:       version,
 		WorkspaceRoot: root,
 		BoiDir:        boiDir,
+		ConfigPath:    filepath.Join(boiDir, "config.yaml"),
 		EnvPath:       filepath.Join(root, ".env"),
+		IdentityPath:  filepath.Join(boiDir, "agent.yaml"),
 		Sandbox:       sandbox,
 	}, nil
 }

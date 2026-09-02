@@ -44,7 +44,7 @@ func TestAskCommandDefaults(t *testing.T) {
 		name string
 		want string
 	}{
-		{name: "persona", want: "kamkaew"},
+		{name: "persona", want: "boi"},
 		{name: "steps", want: "15"},
 		{name: "verbose", want: "false"},
 	}

@@ -13,6 +13,10 @@
 - TUI has an interactive approval panel. Non-interactive CLI rejects calls requiring approval.
 - Workspace Sandbox rejects traversal and symlink escape. It is not OS isolation.
 - Adversarial tests cover untrusted Tool observations, approval enforcement, idempotency, and disabled Subagents.
+- Runtime Persona is fixed to the embedded Core Persona `boi` in TUI and `boi ask`.
+- First TUI startup creates a versioned, user-named Agent identity at `.boi/agent.yaml`; subsequent starts load it.
+- TUI splash and status distinguish Agent name from Provider metadata and the fixed Core Persona.
+- Legacy Persona files are preserved; switching to other Personas now returns an explicit compatibility error.
 
 ## Implemented but not connected to the main Agent path
 
@@ -23,11 +27,9 @@
 
 ## Concept changes not implemented
 
-- Replace six selectable Personas with one Core Persona, `boi`.
-- Add first-run Agent naming for TUI/GUI and persist Agent instance identity.
 - Add Provider capability tests and an environment qualification profile.
 - Add Local Skill/Tool indexes and registries with an active maximum of 15 each.
-- Add offline Foundation bundle plus BOI MCP/Library routing.
+- Add Service health and MCP routing without an offline-operation guarantee.
 - Move existing behavior behind the new six-Block boundaries and composition contracts.
 - Add Agent Folder output/bin tray and artifact manifest.
 - Add gated SubAgent Market workflow.
@@ -53,3 +55,10 @@
 - `go test ./...`: passed.
 - `go vet ./...`: passed.
 - Runtime behavior migration: intentionally not started.
+
+## Verification after Work 1 Phase W1.1
+
+- `go test ./...`: passed.
+- Core Identity round-trip, validation, Thai-name, and restart tests: passed.
+- TUI Agent name/Core Persona contract tests: passed.
+- CLI Persona compatibility smoke: passed; legacy Persona selection is rejected.

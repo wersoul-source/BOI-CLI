@@ -86,7 +86,7 @@ func (h *HelpModel) View() string {
 		}
 	} else {
 		// Normal help bar
-		content = "Enter:send  Tab:persona  Ctrl+Q:quit  /:commands  Ctrl+L:clear"
+		content = "Enter:send  Tab:complete  Ctrl+Q:quit  /:commands  Ctrl+L:clear"
 	}
 
 	if h.width > 0 {

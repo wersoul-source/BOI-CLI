@@ -16,7 +16,8 @@ type Config struct {
 	// Model is the default model to use
 	Model string `yaml:"model"`
 
-	// Persona is the active BOI Family persona name
+	// Persona is retained for workspace compatibility. Work 1 Runtime always
+	// uses the Core Persona "boi".
 	Persona string `yaml:"persona"`
 
 	// LogLevel controls logging verbosity (debug, info, warn, error)

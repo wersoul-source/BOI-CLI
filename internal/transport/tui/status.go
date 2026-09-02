@@ -10,37 +10,25 @@ import (
 var spinnerChars = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 type StatusModel struct {
-	level      string
-	persona    string
-	provider   string
-	status     string
-	usagePct   int
-	spinIdx    int
-	personas   []string
-	personaIdx int
-	width      int
+	level     string
+	agentName string
+	provider  string
+	status    string
+	usagePct  int
+	spinIdx   int
+	width     int
 }
 
-func NewStatus(personaName, provider string, personaNames []string) StatusModel {
-	idx := 0
-	for i, name := range personaNames {
-		if name == personaName {
-			idx = i
-			break
-		}
-	}
-
+func NewStatus(agentName, provider string, _ []string) StatusModel {
 	if provider == "" {
 		provider = "none"
 	}
 
 	return StatusModel{
-		level:      "Mid",
-		persona:    personaName,
-		provider:   provider,
-		status:     "idle",
-		personas:   personaNames,
-		personaIdx: idx,
+		level:     "Mid",
+		agentName: agentName,
+		provider:  provider,
+		status:    "idle",
 	}
 }
 
@@ -52,8 +40,8 @@ func (s *StatusModel) Status() string {
 	return s.status
 }
 
-func (s *StatusModel) SetPersona(name string) {
-	s.persona = name
+func (s *StatusModel) SetAgentName(name string) {
+	s.agentName = name
 }
 
 func (s *StatusModel) SetProvider(provider string) {
@@ -73,21 +61,8 @@ func (s *StatusModel) Height() int {
 	return 1
 }
 
-func (s *StatusModel) SwitchPersona() string {
-	if len(s.personas) == 0 {
-		return s.persona
-	}
-	s.personaIdx = (s.personaIdx + 1) % len(s.personas)
-	s.persona = s.personas[s.personaIdx]
-	return s.persona
-}
-
-func (s *StatusModel) CurrentPersona() string {
-	return s.persona
-}
-
-func (s *StatusModel) Personas() []string {
-	return s.personas
+func (s *StatusModel) AgentName() string {
+	return s.agentName
 }
 
 func (s *StatusModel) Tick() {
@@ -110,7 +85,7 @@ func (s *StatusModel) View() string {
 	}
 
 	left := fmt.Sprintf(" BOI CLI  [%s] ", s.level)
-	mid := fmt.Sprintf(" Persona: %s ", s.persona)
+	mid := fmt.Sprintf(" Agent: %s ", s.agentName)
 
 	// Provider usage bar
 	provStr := s.provider
