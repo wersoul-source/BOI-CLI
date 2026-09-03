@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/boi-family/boi-cli/internal/skill"
+	"github.com/boi-family/boi-cli/internal/app"
+	"github.com/boi-family/boi-cli/internal/capability"
 	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -20,22 +22,14 @@ var skillListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all loaded skills",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		reg := skill.NewRegistry()
-
 		root, _ := workspace.DetectRoot()
-		skillDir := filepath.Join(workspace.GetBoiDir(root), "skills")
-
-		skills, err := skill.LoadDir(skillDir)
+		boiDir := workspace.GetBoiDir(root)
+		skillDir := filepath.Join(boiDir, "skills")
+		index, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindSkill), capability.KindSkill)
 		if err != nil {
-			return fmt.Errorf("load skills: %w", err)
+			return fmt.Errorf("load Skill index: %w", err)
 		}
-
-		for _, s := range skills {
-			reg.Register(s)
-		}
-
-		all := reg.All()
-		if len(all) == 0 {
+		if len(index.Entries) == 0 {
 			fmt.Println("No skills loaded.")
 			fmt.Println("")
 			fmt.Println("Add skills to: " + skillDir)
@@ -45,8 +39,8 @@ var skillListCmd = &cobra.Command{
 
 		fmt.Println("BOI Skills")
 		fmt.Println("----------")
-		for _, s := range all {
-			desc := s.Description
+		for _, s := range index.Entries {
+			desc := s.Summary
 			if len(desc) > 40 {
 				desc = desc[:37] + "..."
 			}
@@ -54,7 +48,7 @@ var skillListCmd = &cobra.Command{
 		}
 		fmt.Println("")
 		fmt.Printf("Skills dir: %s\n", skillDir)
-		fmt.Printf("Total: %d skills\n", len(all))
+		fmt.Printf("Total registered: %d skills\n", len(index.Entries))
 		return nil
 	},
 }
@@ -106,6 +100,19 @@ var skillInitCmd = &cobra.Command{
 			}
 			fmt.Printf("  created: %s.skill.md\n", name)
 		}
+		registrations := []capability.Entry{
+			{Name: "git-helper", Source: "git.skill.md", Summary: "Git operations assistant", Enabled: true, Priority: 50, Tags: []string{"git"}, Requires: []string{"process.run"}, ContextCost: 256},
+			{Name: "web-search", Source: "web.skill.md", Summary: "Web search and fetch", Enabled: true, Priority: 40, Tags: []string{"web", "search"}, Requires: []string{"process.run"}, ContextCost: 192},
+		}
+		if err := app.EnsureCapabilityIndexes(workspace.GetBoiDir(root)); err != nil {
+			return err
+		}
+		for _, entry := range registrations {
+			err := capability.AddEntry(capability.IndexPath(workspace.GetBoiDir(root), capability.KindSkill), capability.KindSkill, entry)
+			if err != nil && !errors.Is(err, capability.ErrAlreadyRegistered) {
+				return err
+			}
+		}
 
 		fmt.Println("Skills initialized!")
 		return nil
@@ -117,19 +124,8 @@ var skillShowCmd = &cobra.Command{
 	Short: "Show skill details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		reg := skill.NewRegistry()
 		root, _ := workspace.DetectRoot()
-		skillDir := filepath.Join(workspace.GetBoiDir(root), "skills")
-
-		skills, err := skill.LoadDir(skillDir)
-		if err != nil {
-			return err
-		}
-		for _, s := range skills {
-			reg.Register(s)
-		}
-
-		s, err := reg.Get(args[0])
+		s, err := app.LoadRegisteredSkill(workspace.GetBoiDir(root), args[0])
 		if err != nil {
 			return err
 		}

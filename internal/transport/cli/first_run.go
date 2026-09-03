@@ -40,6 +40,9 @@ func RunFirstRun(runtime *app.Runtime) {
 			fmt.Println("  ✅ Thai font installed (Noto Sans Thai)")
 		}
 	}
+	if err := app.EnsureCapabilityIndexes(boiDir); err != nil {
+		fmt.Printf("  Warning: capability indexes unavailable: %v\n", err)
+	}
 
 	needsSetup := !envfile.HasProviders(envPath)
 

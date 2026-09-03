@@ -43,11 +43,14 @@ Status: complete through W1.2. Profiles are generated explicitly with
 
 ## Phase H3 - Service and capability registries
 
-- Add Local Skill and Tool indexes.
-- Enforce active maximums of 15 each.
+- Add Local Skill and Tool indexes. **Complete in W1.3.**
+- Enforce active maximums of 15 each. **Complete in W1.3.**
 - Add dependency reporting, Provider/MCP health, MCP discovery, and Library routing.
 
 Acceptance: unavailable required services produce a typed unavailable state; registry selection is deterministic and explainable.
+
+Status: Local Registry and selection are complete. Service health, dependency
+reporting, MCP discovery, and Library routing remain outside W1.3.
 
 ## Phase H4 - Runtime composition
 

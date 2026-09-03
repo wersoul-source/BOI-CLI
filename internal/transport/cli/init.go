@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/boi-family/boi-cli/internal/app"
 	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -53,6 +54,9 @@ func RunInit(force bool) error {
 
 	memoryDir := filepath.Join(boiDir, "memory")
 	os.MkdirAll(memoryDir, 0755)
+	if err := app.EnsureCapabilityIndexes(boiDir); err != nil {
+		return fmt.Errorf("initialize capability indexes: %w", err)
+	}
 
 	return nil
 }

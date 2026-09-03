@@ -20,6 +20,10 @@
 - `boi provider qualify <name>` runs the versioned Provider behavioral probe suite and stores a credential-free profile under `.boi/provider-profiles`.
 - Provider candidates without a passing completion profile are excluded from the Agent Router.
 - Tool and Skill capability exposure is the fail-closed intersection of every qualified failover candidate.
+- `.boi/registry/skills.json` and `tools.json` are the only Local Registry entrypoints; loose files are not exposed.
+- Deterministic selection records installed, eligible, selected, active, disabled, and rejected states with reasons.
+- Runtime active sets are capped at 15 Skills and 15 Tools; Broker rejects inactive Tools even when registered.
+- Agent Service receives selected Skill summaries only; full instructions are restricted to the task's active Skill set.
 
 ## Implemented but not connected to the main Agent path
 
@@ -30,7 +34,6 @@
 
 ## Concept changes not implemented
 
-- Add Local Skill/Tool indexes and registries with an active maximum of 15 each.
 - Add Service health and MCP routing without an offline-operation guarantee.
 - Move existing behavior behind the new six-Block boundaries and composition contracts.
 - Add Agent Folder output/bin tray and artifact manifest.
@@ -70,3 +73,10 @@
 - Deterministic Provider qualification, profile round-trip, reproducibility, and fail-closed composition tests: passed.
 - Provider qualification CLI registration smoke: passed.
 - Live third-party Provider qualification was not run automatically because it performs billable/network API calls; users run it explicitly per configured Provider.
+
+## Verification after Work 1 Phase W1.3
+
+- Registry schema, round-trip, state, deterministic selection, Context budget, and 15/15 limit tests: passed.
+- Loose-Skill isolation and active-only full-instruction tests: passed.
+- Broker inactive Tool and registered-but-inactive MCP Tool tests: passed.
+- CLI `registry init/list/add` commands implemented; parser and repository test suite pass.

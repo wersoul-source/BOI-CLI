@@ -34,7 +34,9 @@ named Agent identity in `.boi/agent.yaml`, displays that name in TUI, and keeps
 legacy Persona commands as non-destructive compatibility paths. W1.2 adds
 versioned Provider probes and profiles; unqualified Provider candidates cannot
 enter the Agent Router, and Tool/Skill environments compose fail-closed.
-Continue with W1.3 Active Capability Registries.
+W1.3 adds versioned explicit Skill/Tool indexes, deterministic task selection,
+15/15 active limits, selected Skill summaries, and Broker-enforced active Tools.
+Continue with W1.4 Runtime Composition.
 
 The owner is pursuing S25+ through a separate path. Keep physical mobile results
 as external acceptance evidence and do not block the main six-Block sequence on

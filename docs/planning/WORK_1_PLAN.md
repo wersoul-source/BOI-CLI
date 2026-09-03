@@ -22,16 +22,16 @@ but it is not yet a Work 1 product.
 | One Core Persona | TUI and CLI use embedded Core Persona `boi`; switching is retired | Complete | 100% |
 | User-named Agent | First run persists a versioned identity in `.boi/agent.yaml` | Complete | 100% |
 | Provider conformance | Versioned deterministic probe suite, persisted profiles, and fail-closed Router composition | Complete implementation | 100% |
-| Skill registry | Loader and registry exist; no limit, selection policy, or Service wiring | Partial | 35% |
-| Tool registry | Broker registers four local Tools and MCP Tools; no 15-Tool active-set contract | Partial | 45% |
+| Skill registry | Versioned explicit index, deterministic task selection, Context/dependency policy, and 15-active limit | Complete implementation | 100% |
+| Tool registry | Versioned explicit index, Provider-gated active set, Broker enforcement, and 15-active limit | Complete implementation | 100% |
 | Bounded Runtime | Engine, Broker, Approval, typed stops, budgets, cancellation, and tests exist | Strong foundation | 78% |
 | Planning/verification/recovery | Ports and placeholder Planner/Reviewer exist; Service does not compose them | Partial | 35% |
 | Agent Folder | No task output tray or manifest contract | Missing | 0% |
 | Automation contract | `boi ask` exists; stable JSON, stream, exit-code, and no-TTY contracts are absent | Early foundation | 20% |
 | Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
 
-Weighted implementation readiness after W1.2 is approximately **64%**.
-Architectural direction alignment is approximately **86%**, because the existing
+Weighted implementation readiness after W1.3 is approximately **74%**.
+Architectural direction alignment is approximately **90%**, because the existing
 Runtime safety model already matches Work 1 and SubAgents remain disabled.
 
 ## Scope boundaries
@@ -140,6 +140,9 @@ Verification:
 
 ### W1.3 - Active capability registries
 
+Status: **Complete implementation**. Workspace indexes live under
+`.boi/registry`; loose files are not runtime capabilities.
+
 Tasks:
 
 1. Define versioned Skill and Tool index entries.
@@ -156,6 +159,18 @@ Acceptance:
 - Unindexed files are never exposed automatically.
 - A Skill cannot grant Tool authority.
 - Selection is explainable and stable for the same inputs.
+
+Verification:
+
+- Both indexes require schema version, kind, unique names, source, summary, and
+  explicit enabled policy.
+- Selection decisions expose installed, eligible, selected, active, disabled,
+  rejected, score, and reason fields.
+- Tests prove deterministic rejection of the sixteenth Skill and Tool.
+- Loose Skill files remain invisible until explicitly indexed.
+- Broker rejects registered-but-inactive Tools, including MCP Tools.
+- Agent Service receives only active Tool names and selected Skill summaries;
+  full Skill instructions are retrievable only from the task's active set.
 
 ### W1.4 - Runtime composition
 
@@ -240,8 +255,8 @@ Acceptance:
 W1.0 Architecture baseline [complete]
   -> W1.1 Core identity [complete]
       -> W1.2 Provider conformance [complete]
-          -> W1.3 Active registries [next]
-              -> W1.4 Runtime composition
+          -> W1.3 Active registries [complete]
+              -> W1.4 Runtime composition [next]
                   -> W1.5 Agent Folder
                       -> W1.6 Automation contract
                           -> W1.7 Product acceptance

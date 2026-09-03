@@ -65,6 +65,14 @@ var askCmd = &cobra.Command{
 		service := agent.NewService(p, llm.NewRouter(providers), memHook, runtime.Sandbox)
 		environment := app.ProviderEnvironment(runtime.BoiDir, qualified)
 		service.SetToolCallingAllowed(environment.ToolCalling)
+		capabilities, err := app.SelectCapabilities(runtime.BoiDir, query, environment)
+		if err != nil {
+			return fmt.Errorf("select capability registry: %w (run 'boi registry init')", err)
+		}
+		if err := service.SetActiveTools(capabilities.Tools.Active); err != nil {
+			return err
+		}
+		service.SetSkillSummaries(capabilities.SkillSummaryPrompt())
 		limits := agent.DefaultEngineLimits()
 		limits.MaxSteps = agentSteps
 		service.SetLimits(limits)
@@ -76,6 +84,7 @@ var askCmd = &cobra.Command{
 			}
 			fmt.Printf("Agent: %s | Core Persona: %s | Model preference: %s\n", agentName, p.Name, p.Model)
 			fmt.Printf("Qualified environment: completion=%t tools=%t skills=%t context-bytes=%d\n", environment.Completion, environment.ToolCalling, environment.SkillCalling, environment.ContextBytes)
+			fmt.Printf("Active registry: tools=%v skills=%v\n", capabilities.Tools.Active, capabilities.Skills.Active)
 			fmt.Printf("Steps: max %d\n", limits.MaxSteps)
 			fmt.Println("---")
 		}

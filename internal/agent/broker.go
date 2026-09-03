@@ -73,6 +73,7 @@ type Broker struct {
 	registryMu         sync.RWMutex
 	executionMu        sync.Mutex
 	toolCallingAllowed bool
+	activeCapabilities map[string]bool
 }
 
 func NewBroker(sandbox *workspace.Sandbox) *Broker {
@@ -93,13 +94,34 @@ func NewBroker(sandbox *workspace.Sandbox) *Broker {
 	for _, capability := range capabilities {
 		registry[capability.Name] = capability
 	}
-	return &Broker{sandbox: sandbox, reader: reader, process: process, capabilities: registry, external: make(map[string]ExternalCapability), executed: make(map[string]executionRecord), toolCallingAllowed: true}
+	active := make(map[string]bool, len(registry))
+	for name := range registry {
+		active[name] = true
+	}
+	return &Broker{sandbox: sandbox, reader: reader, process: process, capabilities: registry, external: make(map[string]ExternalCapability), executed: make(map[string]executionRecord), toolCallingAllowed: true, activeCapabilities: active}
 }
 
 func (b *Broker) SetToolCallingAllowed(allowed bool) {
 	b.registryMu.Lock()
 	b.toolCallingAllowed = allowed
 	b.registryMu.Unlock()
+}
+
+func (b *Broker) SetActiveCapabilities(names []string) error {
+	if len(names) > 15 {
+		return fmt.Errorf("active Tool limit is 15")
+	}
+	b.registryMu.Lock()
+	defer b.registryMu.Unlock()
+	active := make(map[string]bool, len(names))
+	for _, name := range names {
+		if _, exists := b.capabilities[name]; !exists {
+			return fmt.Errorf("cannot activate unregistered Tool: %s", name)
+		}
+		active[name] = true
+	}
+	b.activeCapabilities = active
+	return nil
 }
 
 type executionRecord struct {
@@ -143,7 +165,9 @@ func (b *Broker) CapabilityNames() []string {
 	}
 	names := make([]string, 0, len(b.capabilities))
 	for name := range b.capabilities {
-		names = append(names, name)
+		if b.activeCapabilities[name] {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	return names
@@ -154,6 +178,9 @@ func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 	defer b.registryMu.RUnlock()
 	if !b.toolCallingAllowed {
 		return ToolCall{}, fmt.Errorf("Tool Calling is disabled by Provider capability profile")
+	}
+	if !b.activeCapabilities[proposed.Tool] {
+		return ToolCall{}, fmt.Errorf("Tool is not in the active registry: %s", proposed.Tool)
 	}
 	capability, ok := b.capabilities[proposed.Tool]
 	if !ok {

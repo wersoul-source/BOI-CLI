@@ -11,6 +11,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/agent"
 	"github.com/boi-family/boi-cli/internal/app"
 	coreblock "github.com/boi-family/boi-cli/internal/block/core"
+	"github.com/boi-family/boi-cli/internal/capability"
 	"github.com/boi-family/boi-cli/internal/config"
 	"github.com/boi-family/boi-cli/internal/memory"
 	"github.com/boi-family/boi-cli/internal/persona"
@@ -59,6 +60,8 @@ type Model struct {
 	cancelActive    context.CancelFunc
 	approvalSink    chan<- agent.ApprovalDecision
 	runtimeEvents   <-chan agent.RuntimeEvent
+	boiDir          string
+	environment     coreblock.AgentEnvironment
 }
 
 func NewApp(runtime *app.Runtime) *Model {
@@ -82,7 +85,7 @@ func NewApp(runtime *app.Runtime) *Model {
 
 	boiDir := filepath.Join(root, ".boi")
 	memoryCount := countMemoryEntries(filepath.Join(boiDir, "memory"))
-	skillList, skillCount := listSkills(filepath.Join(boiDir, "skills"))
+	skillList, skillCount := indexedSkillNames(boiDir)
 	providerCount := 0
 
 	// Load LLM providers and create router
@@ -118,7 +121,8 @@ func NewApp(runtime *app.Runtime) *Model {
 		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
 	}
 	agentService := agent.NewService(activeP, router, memoryHook, runtime.Sandbox)
-	agentService.SetToolCallingAllowed(app.ProviderEnvironment(runtime.BoiDir, qualifiedProviders).ToolCalling)
+	environment := app.ProviderEnvironment(runtime.BoiDir, qualifiedProviders)
+	agentService.SetToolCallingAllowed(environment.ToolCalling)
 
 	m := &Model{
 		splash:          splash,
@@ -133,6 +137,8 @@ func NewApp(runtime *app.Runtime) *Model {
 		root:            root,
 		workspaceReader: filesystem.NewReader(runtime.Sandbox),
 		agentService:    agentService,
+		boiDir:          runtime.BoiDir,
+		environment:     environment,
 	}
 
 	return m
@@ -408,8 +414,30 @@ func (m *Model) startAgentCmd(input string) tea.Cmd {
 	if m.agentService == nil {
 		return func() tea.Msg { return agentResponseMsg{err: fmt.Errorf("agent service is not configured")} }
 	}
+	capabilities, err := app.SelectCapabilities(m.boiDir, input, m.environment)
+	if err != nil {
+		return func() tea.Msg { return agentResponseMsg{err: fmt.Errorf("select capability registry: %w", err)} }
+	}
+	if err := m.agentService.SetActiveTools(capabilities.Tools.Active); err != nil {
+		return func() tea.Msg { return agentResponseMsg{err: err} }
+	}
+	m.agentService.SetSkillSummaries(capabilities.SkillSummaryPrompt())
 	m.runtimeEvents = m.agentService.Start(ctx, input)
 	return waitAgentEventCmd(m.runtimeEvents)
+}
+
+func indexedSkillNames(boiDir string) ([]string, int) {
+	index, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindSkill), capability.KindSkill)
+	if err != nil {
+		return nil, 0
+	}
+	var names []string
+	for _, entry := range index.Entries {
+		if entry.Enabled {
+			names = append(names, entry.Name)
+		}
+	}
+	return names, len(names)
 }
 
 func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,18 @@ func TestBrokerCapabilityProfileCanDisableAllTools(t *testing.T) {
 	}
 	if _, err := b.Prepare(ToolCall{ID: "1", Tool: "workspace.read", Purpose: "read", Arguments: map[string]any{"path": "README.md"}}); err == nil {
 		t.Fatal("disabled Tool Calling must reject preparation")
+	}
+}
+
+func TestBrokerRejectsSixteenthActiveTool(t *testing.T) {
+	b := testBroker(t)
+	names := make([]string, 16)
+	for index := range names {
+		names[index] = fmt.Sprintf("tool-%02d", index)
+		b.capabilities[names[index]] = Capability{Name: names[index]}
+	}
+	if err := b.SetActiveCapabilities(names); err == nil {
+		t.Fatal("expected active Tool limit rejection")
 	}
 }
 
@@ -129,6 +142,12 @@ func TestMCPToolIsExternalAndApprovalGated(t *testing.T) {
 	b := testBroker(t)
 	invoker := &fakeExternalInvoker{}
 	if err := b.RegisterMCP("docs", []string{"search"}, invoker); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Prepare(ToolCall{ID: "m0", Tool: "mcp.docs.search", Purpose: "probe", Arguments: map[string]any{"query": "agent"}}); err == nil {
+		t.Fatal("registered MCP Tool became active without registry selection")
+	}
+	if err := b.SetActiveCapabilities([]string{"mcp.docs.search"}); err != nil {
 		t.Fatal(err)
 	}
 	call, err := b.Prepare(ToolCall{ID: "m1", Tool: "mcp.docs.search", Purpose: "look up documentation", Arguments: map[string]any{"query": "agent"}})

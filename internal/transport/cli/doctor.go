@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"strings"
 
+	coreblock "github.com/boi-family/boi-cli/internal/block/core"
+	"github.com/boi-family/boi-cli/internal/capability"
 	"github.com/boi-family/boi-cli/internal/config"
-	"github.com/boi-family/boi-cli/internal/persona"
-	"github.com/boi-family/boi-cli/internal/skill"
 	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -59,28 +59,28 @@ var doctorCmd = &cobra.Command{
 		configPath := filepath.Join(workspace.GetBoiDir(root), "config.yaml")
 		_, err = config.LoadFrom(configPath)
 		cfgOK := err == nil
-		personaCount := 0
-		if reg, personasErr := persona.Load(filepath.Join(workspace.GetBoiDir(root), "personas")); personasErr == nil && reg != nil {
-			personaCount = reg.Count()
+		identity, identityErr := coreblock.LoadIdentity(filepath.Join(workspace.GetBoiDir(root), coreblock.IdentityFilename))
+		agentDetail := "Agent identity missing"
+		if identityErr == nil {
+			agentDetail = "Agent " + identity.Name
 		}
 		total++
 		if cfgOK {
 			passed++
 		}
-		checks = append(checks, checkResult{label: "Config", ok: cfgOK, detail: fmt.Sprintf("%d personas", personaCount)})
+		checks = append(checks, checkResult{label: "Config", ok: cfgOK, detail: agentDetail})
 
-		skillDir := filepath.Join(workspace.GetBoiDir(root), "skills")
-		skills, skillErr := skill.LoadDir(skillDir)
+		skills, skillErr := capability.LoadIndex(capability.IndexPath(workspace.GetBoiDir(root), capability.KindSkill), capability.KindSkill)
 		skillCount := 0
 		if skillErr == nil {
-			skillCount = len(skills)
+			skillCount = len(skills.Entries)
 		}
 		skillOK := skillErr == nil
 		total++
 		if skillOK {
 			passed++
 		}
-		checks = append(checks, checkResult{label: "Skills", ok: skillOK, detail: fmt.Sprintf("%d loaded", skillCount)})
+		checks = append(checks, checkResult{label: "Skills", ok: skillOK, detail: fmt.Sprintf("%d registered", skillCount)})
 
 		dbDir := filepath.Join(workspace.GetBoiDir(root), "memory")
 		memOK := true

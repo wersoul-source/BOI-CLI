@@ -15,6 +15,6 @@ func Manifest() block.Manifest {
 			"Commands", "Planner", "Status", "TUI and GUI onboarding equipment",
 		},
 		DoesNotOwn: []string{"equipment selection policy", "approval", "execution lifecycle", "Core Persona"},
-		Status:     block.StatusSkeleton,
+		Status:     block.StatusPartial,
 	}
 }
