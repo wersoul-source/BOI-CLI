@@ -27,6 +27,7 @@ venv/
 
 # ── Generated output ──
 *_output/
+/agent-folder/bin/
 8art_*.txt
 banner*.txt
 *.ansi.txt

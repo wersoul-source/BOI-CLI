@@ -39,6 +39,14 @@ func TestNewRuntimeResolvesWorkspacePaths(t *testing.T) {
 	if runtime.EnvPath != filepath.Join(root, ".env") {
 		t.Fatalf("EnvPath = %q", runtime.EnvPath)
 	}
+	if runtime.AgentFolderRoot != filepath.Join(root, "agent-folder") || runtime.AgentFolder == nil {
+		t.Fatalf("Agent Folder = (%q, %#v)", runtime.AgentFolderRoot, runtime.AgentFolder)
+	}
+	for _, tray := range []string{"bin", "output"} {
+		if info, statErr := os.Stat(filepath.Join(runtime.AgentFolderRoot, tray)); statErr != nil || !info.IsDir() {
+			t.Fatalf("Agent Folder tray %s missing: %v", tray, statErr)
+		}
+	}
 	if runtime.Version != "test-version" {
 		t.Fatalf("Version = %q", runtime.Version)
 	}

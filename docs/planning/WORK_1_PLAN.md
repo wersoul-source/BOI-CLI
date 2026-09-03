@@ -26,13 +26,13 @@ but it is not yet a Work 1 product.
 | Tool registry | Versioned explicit index, Provider-gated active set, Broker enforcement, and 15-active limit | Complete implementation | 100% |
 | Bounded Runtime | Active single Service/Engine path with Plan, Broker, Approval, typed stops, budgets, events, and cancellation | Complete Work 1 runtime | 100% |
 | Planning/verification/recovery | Versioned Plan, host-observation Verifier, bounded Recoverer, re-plan revisions, and trace evidence | Complete implementation | 100% |
-| Agent Folder | No task output tray or manifest contract | Missing | 0% |
+| Agent Folder | Workspace-visible `bin`/`output` trays, task scopes, checkpoints, artifact hashes, manifests, and explicit bin cleanup | Complete implementation | 100% |
 | Automation contract | `boi ask` exists; stable JSON, stream, exit-code, and no-TTY contracts are absent | Early foundation | 20% |
 | Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
 
-Weighted implementation readiness after W1.4 is approximately **84%**.
-Architectural direction alignment is approximately **94%**, because the existing
-Runtime safety model already matches Work 1 and SubAgents remain disabled.
+Weighted implementation readiness after W1.5 is approximately **91%**.
+Architectural direction alignment is approximately **97%**, because Runtime and
+Agent Folder now follow the six-Block contract while SubAgents remain disabled.
 
 ## Scope boundaries
 
@@ -213,6 +213,9 @@ Verification:
 
 ### W1.5 - Agent Folder
 
+Status: **Complete implementation**. `internal/app` composes one workspace-level
+Agent Folder into the shared TUI/CLI Agent Service.
+
 Tasks:
 
 1. Define one Agent Folder root with only `bin` and `output` as primary trays.
@@ -230,6 +233,22 @@ Acceptance:
 - The manifest identifies every deliverable without repository-wide search.
 - Temporary material never appears as a completed deliverable.
 - Logs and manifests contain no secrets.
+
+Verification:
+
+- Fresh initialization creates only `agent-folder/bin` and
+  `agent-folder/output` as primary trays.
+- Each Agent run receives one collision-safe Task ID and task-scoped bin/output
+  paths before the first Provider decision.
+- Runtime lifecycle events update a credential-free checkpoint under bin.
+- Completed tasks write `output/<task-id>/manifest.json`; failed and cancelled
+  tasks remain diagnostic material under bin and cannot appear as completed
+  output.
+- Manifests contain outcome, Stop Reason, timestamps, usage, exact Provider
+  profile reference, artifact paths, sizes, SHA-256 hashes, and bounded host
+  evidence without prompts or model responses.
+- Bin cleanup supports dry-run and explicit apply modes and has no API path to
+  delete output automatically.
 
 ### W1.6 - Automation contract
 
@@ -278,14 +297,14 @@ W1.0 Architecture baseline [complete]
       -> W1.2 Provider conformance [complete]
           -> W1.3 Active registries [complete]
               -> W1.4 Runtime composition [complete]
-                  -> W1.5 Agent Folder [next]
-                      -> W1.6 Automation contract
+                  -> W1.5 Agent Folder [complete]
+                      -> W1.6 Automation contract [next]
                           -> W1.7 Product acceptance
 ```
 
-W1.5 schema design may begin while W1.4 is being implemented, but Runtime must
-own the final Task Result contract. W1.6 must consume the Agent Folder manifest
-rather than inventing a second result format.
+W1.6 must consume the stable Task ID, manifest path, and artifact references
+from W1.5 rather than inventing a second result format or bypassing Broker
+authorization.
 
 ## Work 1 success target
 

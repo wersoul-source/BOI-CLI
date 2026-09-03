@@ -70,6 +70,10 @@ the sole Tool execution path. Continue with Agent Folder.
 
 Acceptance: a user can find every deliverable from one manifest without repository-wide search.
 
+Status: complete in W1.5. TUI and CLI compose the same workspace-level Agent
+Folder; completed manifests live under output, diagnostic state lives under
+bin, and cleanup cannot automatically delete output.
+
 ## Phase H6 - Automation contract
 
 - Finalize stdin/argv contracts, stdout/stderr separation, exit codes, `--json`, no-TTY behavior, idempotency, and non-interactive approval policy.

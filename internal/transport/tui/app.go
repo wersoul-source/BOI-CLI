@@ -30,6 +30,8 @@ type agentResponseMsg struct {
 	provider string
 	model    string
 	tokens   int
+	taskID   string
+	manifest string
 }
 
 type approvalRequestedMsg struct {
@@ -123,6 +125,8 @@ func NewApp(runtime *app.Runtime) *Model {
 		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
 	}
 	agentService := agent.NewService(activeP, router, memoryHook, runtime.Sandbox)
+	agentService.SetTaskRecorder(runtime.AgentFolder)
+	app.ConfigureProviderProfileReferences(agentService, runtime.WorkspaceRoot, runtime.BoiDir, qualifiedProviders)
 	environment := app.ProviderEnvironment(runtime.BoiDir, qualifiedProviders)
 	agentService.SetToolCallingAllowed(environment.ToolCalling)
 
@@ -473,7 +477,7 @@ func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 		if event.Result == nil {
 			return agentResponseMsg{err: fmt.Errorf("agent event is empty")}
 		}
-		return agentResponseMsg{content: event.Result.Response, model: event.Result.Model, provider: event.Result.Provider, tokens: event.Result.Tokens}
+		return agentResponseMsg{content: event.Result.Response, model: event.Result.Model, provider: event.Result.Provider, tokens: event.Result.Tokens, taskID: event.Result.TaskID, manifest: event.Result.Manifest}
 	}
 }
 
@@ -496,6 +500,9 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 		}
 	} else {
 		m.chat.AddAgentMessage(msg.content, msg.provider, msg.model, msg.tokens)
+		if msg.manifest != "" {
+			m.chat.AddMessage("system", fmt.Sprintf("Task %s · Manifest: %s", msg.taskID, msg.manifest))
+		}
 		if msg.provider != "" {
 			m.status.SetProvider(msg.provider + "/" + msg.model)
 		}

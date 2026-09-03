@@ -19,15 +19,17 @@ var ErrNoProvider = errors.New("no AI providers configured")
 
 // Service is the shared single-agent entry point used by CLI and TUI.
 type Service struct {
-	mu             sync.RWMutex
-	persona        *persona.Persona
-	router         *llm.Router
-	memory         *memory.MemoryHook
-	sandbox        *workspace.Sandbox
-	broker         *Broker
-	limits         EngineLimits
-	skillSummaries string
-	activeSkills   map[string]*skill.Skill
+	mu               sync.RWMutex
+	persona          *persona.Persona
+	router           *llm.Router
+	memory           *memory.MemoryHook
+	sandbox          *workspace.Sandbox
+	broker           *Broker
+	limits           EngineLimits
+	skillSummaries   string
+	activeSkills     map[string]*skill.Skill
+	taskRecorder     TaskRecorder
+	providerProfiles map[string]string
 }
 
 func NewService(
@@ -40,14 +42,27 @@ func NewService(
 		activePersona = persona.DefaultPersona()
 	}
 	return &Service{
-		persona:      activePersona,
-		router:       router,
-		memory:       memoryHook,
-		sandbox:      sandbox,
-		broker:       NewBroker(sandbox),
-		limits:       DefaultEngineLimits(),
-		activeSkills: make(map[string]*skill.Skill),
+		persona:          activePersona,
+		router:           router,
+		memory:           memoryHook,
+		sandbox:          sandbox,
+		broker:           NewBroker(sandbox),
+		limits:           DefaultEngineLimits(),
+		activeSkills:     make(map[string]*skill.Skill),
+		providerProfiles: make(map[string]string),
 	}
+}
+
+func (s *Service) SetTaskRecorder(recorder TaskRecorder) {
+	s.mu.Lock()
+	s.taskRecorder = recorder
+	s.mu.Unlock()
+}
+
+func (s *Service) SetProviderProfileReference(provider, model, reference string) {
+	s.mu.Lock()
+	s.providerProfiles[providerProfileKey(provider, model)] = strings.TrimSpace(reference)
+	s.mu.Unlock()
 }
 
 func (s *Service) SetPersona(activePersona *persona.Persona) {
@@ -157,6 +172,11 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 	for name, item := range s.activeSkills {
 		activeSkills[name] = item
 	}
+	taskRecorder := s.taskRecorder
+	providerProfiles := make(map[string]string, len(s.providerProfiles))
+	for key, reference := range s.providerProfiles {
+		providerProfiles[key] = reference
+	}
 	s.mu.RUnlock()
 
 	systemPrompt := buildServicePrompt(&activePersona, s.sandbox)
@@ -169,6 +189,28 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 		}
 	}
 	plan := NewPlanner().Plan(query)
+	var taskSession *TaskSession
+	if taskRecorder != nil {
+		var err error
+		taskSession, err = taskRecorder.Begin(query, plan)
+		if err != nil {
+			return nil, fmt.Errorf("create Agent Folder task scope: %w", err)
+		}
+		binPath, outputPath := taskSession.BinDir, taskSession.OutputDir
+		if s.sandbox != nil {
+			if resolved, resolveErr := s.sandbox.ResolveForWrite(binPath); resolveErr == nil {
+				if relative, relativeErr := s.sandbox.RelativePath(resolved); relativeErr == nil {
+					binPath = relative
+				}
+			}
+			if resolved, resolveErr := s.sandbox.ResolveForWrite(outputPath); resolveErr == nil {
+				if relative, relativeErr := s.sandbox.RelativePath(resolved); relativeErr == nil {
+					outputPath = relative
+				}
+			}
+		}
+		systemPrompt += fmt.Sprintf("\n\n# Agent Folder task scope\nTemporary, draft, log, checkpoint, failed, and recovery material belongs under %q.\nStandalone user deliverables belong under %q.\nDo not treat these paths as additional filesystem authority.", binPath, outputPath)
+	}
 
 	maxTokens := activePersona.MaxTokens
 	if maxTokens <= 0 {
@@ -223,21 +265,44 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 		}
 		return item.Prompt, nil
 	})
-	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Sandbox: s.sandbox}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: onEngine, SkillLoader: loader}
+	var recordErr error
+	emit := func(event EngineEvent) {
+		if taskRecorder != nil && recordErr == nil {
+			recordErr = taskRecorder.RecordEvent(taskSession, event)
+		}
+		if onEngine != nil {
+			onEngine(event)
+		}
+	}
+	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Sandbox: s.sandbox}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader}
+	if taskSession != nil {
+		engine.TaskID = taskSession.ID
+	}
 	result, err := engine.Run(ctx, query)
 	if err != nil {
 		return nil, err
 	}
+	result.ProviderProfileRef = providerProfiles[providerProfileKey(result.Provider, result.Model)]
+	if recordErr == nil && taskRecorder != nil {
+		recordErr = taskRecorder.Finalize(taskSession, result)
+	}
+	if recordErr != nil {
+		return result, fmt.Errorf("record Agent Folder task: %w", recordErr)
+	}
 	if result.StopReason != StopCompleted {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return result, ctx.Err()
 		}
-		return nil, fmt.Errorf("agent stopped (%s): %s", result.StopReason, result.Error)
+		return result, fmt.Errorf("agent stopped (%s): %s", result.StopReason, result.Error)
 	}
 	if s.memory != nil {
 		s.memory.AfterTurn(query, result.Response)
 	}
 	return result, nil
+}
+
+func providerProfileKey(provider, model string) string {
+	return strings.ToLower(strings.TrimSpace(provider)) + "\x00" + strings.ToLower(strings.TrimSpace(model))
 }
 
 type decisionFunc func(context.Context, DecisionInput) (Decision, error)

@@ -63,6 +63,8 @@ var askCmd = &cobra.Command{
 		}
 
 		service := agent.NewService(p, llm.NewRouter(providers), memHook, runtime.Sandbox)
+		service.SetTaskRecorder(runtime.AgentFolder)
+		app.ConfigureProviderProfileReferences(service, runtime.WorkspaceRoot, runtime.BoiDir, qualified)
 		environment := app.ProviderEnvironment(runtime.BoiDir, qualified)
 		service.SetToolCallingAllowed(environment.ToolCalling)
 		capabilities, err := app.SelectCapabilities(runtime.BoiDir, query, environment)
@@ -103,6 +105,7 @@ var askCmd = &cobra.Command{
 			fmt.Println("---")
 			fmt.Printf("Steps: %d | Tokens: %d | Time: %v\n",
 				result.Steps, result.Tokens, time.Since(start))
+			fmt.Printf("Task: %s | Manifest: %s\n", result.TaskID, result.Manifest)
 			if len(result.Memory) > 0 {
 				fmt.Printf("Memories saved: %v\n", result.Memory)
 			}

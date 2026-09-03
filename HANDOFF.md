@@ -39,7 +39,10 @@ W1.3 adds versioned explicit Skill/Tool indexes, deterministic task selection,
 W1.4 composes the versioned Task Plan, host-observation Verifier, bounded
 Recoverer/re-plan revisions, trace evidence, and lifecycle event stream into the
 single shared Service/Engine path. Legacy simulated/direct execution paths were
-removed. Continue with W1.5 Agent Folder.
+removed. W1.5 adds the workspace-visible `agent-folder/bin` and `output` trays,
+task-scoped checkpoints, versioned artifact manifests, SHA-256 references,
+Provider profile references, and bin-only explicit cleanup. Continue with W1.6
+Automation contract.
 
 The owner is pursuing S25+ through a separate path. Keep physical mobile results
 as external acceptance evidence and do not block the main six-Block sequence on

@@ -61,16 +61,20 @@ type PlannedStep struct {
 }
 
 type AgentResult struct {
-	Response   string
-	Steps      int
-	Tokens     int
-	Duration   time.Duration
-	Memory     []string
-	Provider   string
-	Model      string
-	StopReason StopReason
-	Usage      Usage
-	Error      string
-	Plan       *TaskPlan
-	Trace      []AgentStep
+	TaskID             string
+	Response           string
+	Steps              int
+	Tokens             int
+	Duration           time.Duration
+	Memory             []string
+	Provider           string
+	Model              string
+	StopReason         StopReason
+	Usage              Usage
+	Error              string
+	Plan               *TaskPlan
+	Trace              []AgentStep
+	Manifest           string
+	Artifacts          []ArtifactReference
+	ProviderProfileRef string
 }

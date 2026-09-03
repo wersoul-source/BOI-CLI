@@ -169,6 +169,7 @@ type Engine struct {
 	OnEvent     func(EngineEvent)
 	Plan        *TaskPlan
 	SkillLoader SkillLoader
+	TaskID      string
 }
 
 func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
@@ -193,8 +194,12 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	}
 	plan.Status = PlanRunning
 	setPlanPhase(plan, PhaseObserve, PlanCompleted)
+	taskID := strings.TrimSpace(e.TaskID)
+	if taskID == "" {
+		taskID = fmt.Sprintf("agent_%d", started.UnixNano())
+	}
 	state := &AgentState{
-		ID:        fmt.Sprintf("agent_%d", started.UnixNano()),
+		ID:        taskID,
 		Phase:     PhaseObserve,
 		Task:      task,
 		StartedAt: started,
@@ -445,7 +450,7 @@ func (e *Engine) stop(state *AgentState, started time.Time, usage Usage, provide
 		state.Plan.Status = PlanFailed
 	}
 	e.emit(EngineEvent{Kind: "stop", Phase: PhaseStopped, Step: len(state.Steps), StopReason: reason, Plan: state.Plan})
-	return &AgentResult{Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message, Plan: state.Plan, Trace: append([]AgentStep(nil), state.Steps...)}
+	return &AgentResult{TaskID: state.ID, Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message, Plan: state.Plan, Trace: append([]AgentStep(nil), state.Steps...)}
 }
 
 func setPlanPhase(plan *TaskPlan, phase AgentPhase, status PlanStatus) {

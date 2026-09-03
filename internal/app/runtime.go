@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/boi-family/boi-cli/internal/block/agentfolder"
 	"github.com/boi-family/boi-cli/internal/workspace"
 )
 
@@ -14,13 +15,15 @@ type runtimeContextKey struct{}
 // transports. Runtime services will be added here as the agent engine is
 // consolidated in Phase 2.
 type Runtime struct {
-	Version       string
-	WorkspaceRoot string
-	BoiDir        string
-	ConfigPath    string
-	EnvPath       string
-	IdentityPath  string
-	Sandbox       *workspace.Sandbox
+	Version         string
+	WorkspaceRoot   string
+	BoiDir          string
+	ConfigPath      string
+	EnvPath         string
+	IdentityPath    string
+	AgentFolderRoot string
+	AgentFolder     *agentfolder.Store
+	Sandbox         *workspace.Sandbox
 }
 
 // NewRuntime resolves workspace-scoped paths once at process startup.
@@ -35,14 +38,21 @@ func NewRuntime(version string) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create workspace sandbox: %w", err)
 	}
+	agentFolderRoot := filepath.Join(root, "agent-folder")
+	agentFolder, err := agentfolder.NewStore(agentFolderRoot)
+	if err != nil {
+		return nil, fmt.Errorf("create Agent Folder: %w", err)
+	}
 	return &Runtime{
-		Version:       version,
-		WorkspaceRoot: root,
-		BoiDir:        boiDir,
-		ConfigPath:    filepath.Join(boiDir, "config.yaml"),
-		EnvPath:       filepath.Join(root, ".env"),
-		IdentityPath:  filepath.Join(boiDir, "agent.yaml"),
-		Sandbox:       sandbox,
+		Version:         version,
+		WorkspaceRoot:   root,
+		BoiDir:          boiDir,
+		ConfigPath:      filepath.Join(boiDir, "config.yaml"),
+		EnvPath:         filepath.Join(root, ".env"),
+		IdentityPath:    filepath.Join(boiDir, "agent.yaml"),
+		AgentFolderRoot: agentFolderRoot,
+		AgentFolder:     agentFolder,
+		Sandbox:         sandbox,
 	}, nil
 }
 

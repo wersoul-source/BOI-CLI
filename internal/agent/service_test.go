@@ -18,6 +18,27 @@ type captureProvider struct {
 	request llm.CompletionRequest
 }
 
+type captureTaskRecorder struct {
+	session   *TaskSession
+	events    []EngineEvent
+	finalized *AgentResult
+}
+
+func (r *captureTaskRecorder) Begin(_ string, _ *TaskPlan) (*TaskSession, error) {
+	return r.session, nil
+}
+
+func (r *captureTaskRecorder) RecordEvent(_ *TaskSession, event EngineEvent) error {
+	r.events = append(r.events, event)
+	return nil
+}
+
+func (r *captureTaskRecorder) Finalize(_ *TaskSession, result *AgentResult) error {
+	r.finalized = result
+	result.Manifest = "agent-folder/output/task-test/manifest.json"
+	return nil
+}
+
 func (p *captureProvider) Name() string { return "capture" }
 
 func (p *captureProvider) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
@@ -79,6 +100,36 @@ func TestServiceRequiresProvider(t *testing.T) {
 	service := NewService(persona.DefaultPersona(), nil, nil, nil)
 	if _, err := service.Run(context.Background(), "hello"); err != ErrNoProvider {
 		t.Fatalf("Run() error = %v, want ErrNoProvider", err)
+	}
+}
+
+func TestServiceComposesAgentFolderScopeAndProviderProfile(t *testing.T) {
+	root := t.TempDir()
+	provider := &captureProvider{}
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &captureTaskRecorder{session: &TaskSession{
+		ID: "task-test", BinDir: filepath.Join(root, "agent-folder", "bin", "task-test"),
+		OutputDir: filepath.Join(root, "agent-folder", "output", "task-test"), StartedAt: time.Now(),
+	}}
+	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	service.SetTaskRecorder(recorder)
+	service.SetProviderProfileReference("capture", "test-model", ".boi/provider-profiles/test.json")
+	result, err := service.Run(context.Background(), "produce a report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.TaskID != "task-test" || result.Manifest == "" || result.ProviderProfileRef != ".boi/provider-profiles/test.json" || recorder.finalized != result {
+		t.Fatalf("Agent Folder result = %#v", result)
+	}
+	if len(recorder.events) == 0 {
+		t.Fatal("runtime events were not checkpointed")
+	}
+	prompt := provider.request.Messages[0].Content
+	if !strings.Contains(prompt, "agent-folder/bin/task-test") || !strings.Contains(prompt, "agent-folder/output/task-test") || !strings.Contains(prompt, "additional filesystem authority") {
+		t.Fatalf("Agent Folder scope missing from prompt: %q", prompt)
 	}
 }
 

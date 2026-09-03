@@ -14,6 +14,6 @@ func Manifest() block.Manifest {
 			"bin tray", "output tray", "task directories", "artifact manifests", "retention metadata",
 		},
 		DoesNotOwn: []string{"tool verification decisions", "Library routing", "workspace-wide file ownership", "secret storage"},
-		Status:     block.StatusSkeleton,
+		Status:     block.StatusActive,
 	}
 }

@@ -28,6 +28,10 @@
 - Recovery creates a Plan revision before re-deciding and remains bounded by recovery, step, Tool, token, and time limits.
 - Runtime emits task, phase, Tool, approval, Tool Result, verification, and stop events; TUI consumes this stream.
 - Legacy simulated Loop, direct shell/file Executor, and placeholder Reviewer were removed; Broker is the only Tool execution path.
+- `agent-folder/bin` and `agent-folder/output` are the single workspace-level task trays composed into both TUI and CLI.
+- Every Agent run receives a collision-safe Task ID, credential-free lifecycle checkpoint, and final versioned manifest.
+- Completed manifests catalog deliverables with size and SHA-256 evidence under output; failed/cancelled manifests remain under bin.
+- Cleanup is dry-run by default, explicit when applied, and structurally restricted to bin; output has no automatic deletion path.
 
 ## Implemented but not connected to the main Agent path
 
@@ -36,7 +40,6 @@
 ## Concept changes not implemented
 
 - Add Service health and MCP routing without an offline-operation guarantee.
-- Add Agent Folder output/bin tray and artifact manifest.
 - Add gated SubAgent Market workflow.
 
 ## Known documentation drift
@@ -86,3 +89,9 @@
 - Shared Service approval/write loop proves Plan -> Authorize -> Act -> Verify -> Complete and lifecycle event emission.
 - Full repository tests, vet, native build, and Android ARM64 cross-build: passed.
 - Go race detector was unavailable in the current Windows toolchain because CGO is disabled; Engine events clone mutable Plan/Result/Evidence data before delivery.
+
+## Verification after Work 1 Phase W1.5
+
+- Primary-tray, task-ID collision, checkpoint, completed/failed routing, artifact hash, secret-exclusion, and bin-only cleanup tests: passed.
+- Agent Service composition test proves task paths reach the Provider as workspace-relative data and lifecycle events/final results reach the recorder.
+- Full repository tests, vet, native build, and Android ARM64 cross-build: passed.
