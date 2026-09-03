@@ -84,5 +84,5 @@
 - Plan validation/determinism, recovery revision, read-back verification, and safe recovery classification tests: passed.
 - First-class Skill Call tests prove full instructions load only from the active task set and do not grant Tool authority.
 - Shared Service approval/write loop proves Plan -> Authorize -> Act -> Verify -> Complete and lifecycle event emission.
-- Full repository tests, vet, build, and Android ARM64 cross-build: required phase gate.
+- Full repository tests, vet, native build, and Android ARM64 cross-build: passed.
 - Go race detector was unavailable in the current Windows toolchain because CGO is disabled; Engine events clone mutable Plan/Result/Evidence data before delivery.
