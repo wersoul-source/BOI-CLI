@@ -133,6 +133,26 @@ func TestServiceComposesAgentFolderScopeAndProviderProfile(t *testing.T) {
 	}
 }
 
+func TestAutomationMutationIsDeniedWithoutWaitingOrWriting(t *testing.T) {
+	root := t.TempDir()
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &sequenceProvider{responses: []string{`<boi-action>{"id":"write-automation","tool":"workspace.write","purpose":"save","arguments":{"path":"blocked.txt","content":"no"}}</boi-action>`}}
+	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	result, err := service.RunAutomation(context.Background(), "write a file", "automation-001")
+	if err == nil || result == nil || result.StopReason != StopNeedsApproval {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if result.IdempotencyKeyHash != automationKeyHash("automation-001") {
+		t.Fatalf("idempotency hash=%q", result.IdempotencyKeyHash)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "blocked.txt")); !os.IsNotExist(statErr) {
+		t.Fatalf("non-interactive mutation executed: %v", statErr)
+	}
+}
+
 func TestServiceInteractiveApprovalCompletesWriteLoop(t *testing.T) {
 	root := t.TempDir()
 	sandbox, err := workspace.NewSandbox(root)

@@ -226,12 +226,16 @@ func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 	case "workspace.write":
 		content, _ := stringArgument(call.Arguments, "content")
 		call.Preview = content
-		call.IdempotencyKey = call.ID
+		if call.IdempotencyKey == "" {
+			call.IdempotencyKey = call.ID
+		}
 	case "process.run":
 		command, _ := stringArgument(call.Arguments, "command")
 		call.Target = b.sandbox.Root()
 		call.Preview = command
-		call.IdempotencyKey = call.ID
+		if call.IdempotencyKey == "" {
+			call.IdempotencyKey = call.ID
+		}
 	}
 	if err := call.Validate(); err != nil {
 		return ToolCall{}, err

@@ -81,6 +81,11 @@ bin, and cleanup cannot automatically delete output.
 
 Acceptance: read-only Automation is deterministic; side effects cannot run without an explicit machine-safe authorization contract.
 
+Status: complete for Work 1 read-only Automation. JSON schema v1, argv/stdin,
+streams, exits, cancellation, artifact references, and hashed idempotency keys
+are implemented. Mutation remains denied and cross-process replay is not
+claimed.
+
 ## Phase H7 - SubAgent gate
 
 - Implement SubAgent Skill, Index, packages, delegation contracts, isolated budgets, and evaluation.

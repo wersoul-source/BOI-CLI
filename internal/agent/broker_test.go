@@ -82,6 +82,17 @@ func TestBrokerAssignsHostRiskAndApproval(t *testing.T) {
 	}
 }
 
+func TestBrokerPreservesHostIdempotencyNamespace(t *testing.T) {
+	b := testBroker(t)
+	call, err := b.Prepare(ToolCall{ID: "write-1", Tool: "workspace.write", Purpose: "save", Arguments: map[string]any{"path": "note.txt", "content": "hello"}, IdempotencyKey: "automation:host-owned"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if call.IdempotencyKey != "automation:host-owned" {
+		t.Fatalf("idempotency key=%q", call.IdempotencyKey)
+	}
+}
+
 func TestBrokerDisablesLocalCapabilitiesWithoutWorkspace(t *testing.T) {
 	b := NewBroker(nil)
 	if _, err := b.Prepare(ToolCall{ID: "1", Tool: "process.run", Purpose: "run", Arguments: map[string]any{"command": "echo unsafe"}}); err == nil {

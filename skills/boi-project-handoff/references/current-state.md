@@ -32,6 +32,10 @@
 - Every Agent run receives a collision-safe Task ID, credential-free lifecycle checkpoint, and final versioned manifest.
 - Completed manifests catalog deliverables with size and SHA-256 evidence under output; failed/cancelled manifests remain under bin.
 - Cleanup is dry-run by default, explicit when applied, and structurally restricted to bin; output has no automatic deletion path.
+- `boi ask --json` emits one schema-v1 result object with stable Task/manifest/artifact references and stable exit-code classes.
+- Automation accepts argv or bounded piped UTF-8 stdin, never prompts for missing input, and keeps verbose diagnostics on stderr.
+- Automation idempotency keys are host-hashed and namespaced; raw keys are not persisted.
+- Work 1 Automation is read-only: approval-required mutation is deterministically denied without waiting or execution, and no cross-process replay-cache claim is made.
 
 ## Implemented but not connected to the main Agent path
 
@@ -94,4 +98,11 @@
 
 - Primary-tray, task-ID collision, checkpoint, completed/failed routing, artifact hash, secret-exclusion, and bin-only cleanup tests: passed.
 - Agent Service composition test proves task paths reach the Provider as workspace-relative data and lifecycle events/final results reach the recorder.
+- Full repository tests, vet, native build, and Android ARM64 cross-build: passed.
+
+## Verification after Work 1 Phase W1.6
+
+- argv/stdin, UTF-8, input limit, idempotency-key validation, JSON schema, single-object output, exit mapping, and reported-error tests: passed.
+- Non-interactive mutation test proves `needs_approval`, hashed key propagation, no wait, and no filesystem side effect.
+- Built-binary smoke proves empty piped stdin emits one `invalid_input` JSON object, no stderr, and process exit code 2.
 - Full repository tests, vet, native build, and Android ARM64 cross-build: passed.

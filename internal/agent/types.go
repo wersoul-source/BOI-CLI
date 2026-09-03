@@ -77,4 +77,5 @@ type AgentResult struct {
 	Manifest           string
 	Artifacts          []ArtifactReference
 	ProviderProfileRef string
+	IdempotencyKeyHash string
 }

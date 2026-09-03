@@ -63,7 +63,7 @@ func TestCompletedTaskProducesDiscoverableSecretFreeManifest(t *testing.T) {
 	result := &agent.AgentResult{
 		TaskID: session.ID, Response: "model response SECRET-VALUE", Steps: 2,
 		StopReason: agent.StopCompleted, Provider: "provider", Model: "model",
-		ProviderProfileRef: ".boi/provider-profiles/profile.json", Plan: plan,
+		ProviderProfileRef: ".boi/provider-profiles/profile.json", IdempotencyKeyHash: "sha256:test", Plan: plan,
 		Usage: agent.Usage{InputTokens: 3, OutputTokens: 4, ProviderCalls: 1, ToolCalls: 1},
 		Trace: []agent.AgentStep{{ToolCall: &agent.ToolCall{Tool: "workspace.write"}, ToolResult: &agent.ToolResult{CallID: "call-1", Status: agent.ToolSucceeded}}},
 	}
@@ -82,7 +82,7 @@ func TestCompletedTaskProducesDiscoverableSecretFreeManifest(t *testing.T) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Outcome != "completed" || manifest.ProviderProfileRef == "" || len(manifest.Artifacts) != 1 || len(manifest.Evidence) != 2 {
+	if manifest.Outcome != "completed" || manifest.ProviderProfileRef == "" || manifest.IdempotencyKeyHash != "sha256:test" || len(manifest.Artifacts) != 1 || len(manifest.Evidence) != 2 {
 		t.Fatalf("manifest = %#v", manifest)
 	}
 	if result.Manifest != filepath.ToSlash(filepath.Join("agent-folder", "output", session.ID, "manifest.json")) || len(result.Artifacts) != 1 {
@@ -126,6 +126,13 @@ func TestBinCleanupNeverTouchesOutput(t *testing.T) {
 	if err := os.Chtimes(session.BinDir, old, old); err != nil {
 		t.Fatal(err)
 	}
+	indexDir := filepath.Join(store.BinRoot(), "idempotency-index")
+	if err := os.Mkdir(indexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(indexDir, old, old); err != nil {
+		t.Fatal(err)
+	}
 	candidates, err := store.CleanupBinBefore(time.Now().Add(-24*time.Hour), false)
 	if err != nil || len(candidates) != 1 {
 		t.Fatalf("dry-run candidates=%v err=%v", candidates, err)
@@ -141,5 +148,8 @@ func TestBinCleanupNeverTouchesOutput(t *testing.T) {
 	}
 	if _, err := os.Stat(session.OutputDir); err != nil {
 		t.Fatalf("output was touched by bin cleanup: %v", err)
+	}
+	if _, err := os.Stat(indexDir); err != nil {
+		t.Fatalf("non-task bin metadata was touched by cleanup: %v", err)
 	}
 }

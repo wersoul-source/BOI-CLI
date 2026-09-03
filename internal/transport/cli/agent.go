@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -18,31 +17,49 @@ import (
 )
 
 var (
-	agentPersona string
-	agentSteps   int
-	agentVerbose bool
+	agentPersona        string
+	agentSteps          int
+	agentVerbose        bool
+	agentJSON           bool
+	agentIdempotencyKey string
 )
 
 var askCmd = &cobra.Command{
-	Use:   "ask [query]",
+	Use:   "ask [query...]",
 	Short: "Ask the BOI agent",
-	Long:  "Runs the bounded BOI Agent loop with memory and the fixed Core Persona boi.",
-	Args:  cobra.MinimumNArgs(1),
+	Long: `Runs the bounded BOI Agent loop with memory and the fixed Core Persona boi.
+
+Query input comes from argv when present, otherwise from piped UTF-8 stdin.
+The command never prompts for a missing query. --json writes exactly one
+versioned result object to stdout and keeps mutation non-interactive/denied.`,
+	Example: "  boi ask explain this repository\n  Get-Content task.txt | boi ask --json --idempotency-key build-001",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		query := strings.Join(args, " ")
+		query, err := resolveAskQuery(args, cmd.InOrStdin())
+		if err != nil {
+			return finishAsk(cmd, nil, err)
+		}
+		if err := validateIdempotencyKey(agentIdempotencyKey); err != nil {
+			return finishAsk(cmd, nil, err)
+		}
+		if agentIdempotencyKey != "" && !agentJSON {
+			return finishAsk(cmd, nil, invalidInput("--idempotency-key requires --json"))
+		}
+		if agentSteps <= 0 {
+			return finishAsk(cmd, nil, invalidInput("--steps must be greater than zero"))
+		}
 
 		runtime, ok := app.RuntimeFromContext(cmd.Context())
 		if !ok || runtime == nil {
-			return fmt.Errorf("application runtime is not configured")
+			return finishAsk(cmd, nil, &CommandError{Code: ExitInternal, Class: "internal", Message: "application runtime is not configured"})
 		}
 		if !strings.EqualFold(strings.TrimSpace(agentPersona), coreblock.CorePersonaName) {
-			return fmt.Errorf("Persona selection is retired; Core Persona is fixed to %s", coreblock.CorePersonaName)
+			return finishAsk(cmd, nil, invalidInput(fmt.Sprintf("Persona selection is retired; Core Persona is fixed to %s", coreblock.CorePersonaName)))
 		}
 		p := persona.CorePersona()
 
 		configured, err := llmfactory.LoadConfiguredProvidersFromEnv()
 		if err != nil {
-			return fmt.Errorf("load providers: %w", err)
+			return finishAsk(cmd, nil, unavailable("load providers", err))
 		}
 		qualified := app.QualifiedProviders(runtime.BoiDir, configured)
 		providers := make([]llm.Provider, 0, len(qualified))
@@ -50,7 +67,7 @@ var askCmd = &cobra.Command{
 			providers = append(providers, item.Provider)
 		}
 		if len(providers) == 0 {
-			return fmt.Errorf("no qualified providers; run 'boi provider qualify <name>'")
+			return finishAsk(cmd, nil, unavailable("no qualified providers; run 'boi provider qualify <name>'", nil))
 		}
 
 		dbDir := filepath.Join(runtime.BoiDir, "memory")
@@ -69,10 +86,10 @@ var askCmd = &cobra.Command{
 		service.SetToolCallingAllowed(environment.ToolCalling)
 		capabilities, err := app.SelectCapabilities(runtime.BoiDir, query, environment)
 		if err != nil {
-			return fmt.Errorf("select capability registry: %w (run 'boi registry init')", err)
+			return finishAsk(cmd, nil, unavailable("select capability registry; run 'boi registry init'", err))
 		}
 		if err := service.SetActiveTools(capabilities.Tools.Active); err != nil {
-			return err
+			return finishAsk(cmd, nil, &CommandError{Code: ExitInternal, Class: "internal", Message: "activate Tool registry", Cause: err})
 		}
 		service.SetSkills(capabilities.LoadedSkills)
 		limits := agent.DefaultEngineLimits()
@@ -84,30 +101,37 @@ var askCmd = &cobra.Command{
 			if identity, loadErr := coreblock.LoadIdentity(runtime.IdentityPath); loadErr == nil {
 				agentName = identity.Name
 			}
-			fmt.Printf("Agent: %s | Core Persona: %s | Model preference: %s\n", agentName, p.Name, p.Model)
-			fmt.Printf("Qualified environment: completion=%t tools=%t skills=%t context-bytes=%d\n", environment.Completion, environment.ToolCalling, environment.SkillCalling, environment.ContextBytes)
-			fmt.Printf("Active registry: tools=%v skills=%v\n", capabilities.Tools.Active, capabilities.Skills.Active)
-			fmt.Printf("Steps: max %d\n", limits.MaxSteps)
-			fmt.Println("---")
+			fmt.Fprintf(cmd.ErrOrStderr(), "Agent: %s | Core Persona: %s | Model preference: %s\n", agentName, p.Name, p.Model)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Qualified environment: completion=%t tools=%t skills=%t context-bytes=%d\n", environment.Completion, environment.ToolCalling, environment.SkillCalling, environment.ContextBytes)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Active registry: tools=%v skills=%v\n", capabilities.Tools.Active, capabilities.Skills.Active)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Steps: max %d\n---\n", limits.MaxSteps)
 		}
 
-		ctx := context.Background()
+		ctx := cmd.Context()
 		start := time.Now()
 
-		result, err := service.Run(ctx, query)
+		var result *agent.AgentResult
+		if agentJSON {
+			result, err = service.RunAutomation(ctx, query, agentIdempotencyKey)
+		} else {
+			result, err = service.Run(ctx, query)
+		}
+		if agentJSON {
+			return writeAutomationResult(cmd.OutOrStdout(), result, err)
+		}
 		if err != nil {
-			return fmt.Errorf("agent error: %w", err)
+			return finishAsk(cmd, result, err)
 		}
 
-		fmt.Println(result.Response)
+		fmt.Fprintln(cmd.OutOrStdout(), result.Response)
 
 		if agentVerbose {
-			fmt.Println("---")
-			fmt.Printf("Steps: %d | Tokens: %d | Time: %v\n",
+			fmt.Fprintln(cmd.ErrOrStderr(), "---")
+			fmt.Fprintf(cmd.ErrOrStderr(), "Steps: %d | Tokens: %d | Time: %v\n",
 				result.Steps, result.Tokens, time.Since(start))
-			fmt.Printf("Task: %s | Manifest: %s\n", result.TaskID, result.Manifest)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Task: %s | Manifest: %s\n", result.TaskID, result.Manifest)
 			if len(result.Memory) > 0 {
-				fmt.Printf("Memories saved: %v\n", result.Memory)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Memories saved: %v\n", result.Memory)
 			}
 		}
 
@@ -120,5 +144,26 @@ func init() {
 	_ = askCmd.Flags().MarkDeprecated("persona", "Core Persona is fixed to boi in Work 1")
 	askCmd.Flags().IntVarP(&agentSteps, "steps", "s", 15, "Max agent steps")
 	askCmd.Flags().BoolVarP(&agentVerbose, "verbose", "v", false, "Verbose output")
+	askCmd.Flags().BoolVar(&agentJSON, "json", false, "Write one versioned JSON result to stdout")
+	askCmd.Flags().StringVar(&agentIdempotencyKey, "idempotency-key", "", "Automation key (1-128 safe characters; requires --json)")
 	rootCmd.AddCommand(askCmd)
+}
+
+func finishAsk(cmd *cobra.Command, result *agent.AgentResult, err error) error {
+	if agentJSON {
+		return writeAutomationResult(cmd.OutOrStdout(), result, err)
+	}
+	code, class := classifyAutomationFailure(result, err)
+	if code == ExitCompleted {
+		return nil
+	}
+	message := "command failed"
+	if err != nil {
+		message = err.Error()
+	}
+	return &CommandError{Code: code, Class: class, Message: message, Cause: err}
+}
+
+func unavailable(message string, cause error) error {
+	return &CommandError{Code: ExitUnavailable, Class: "unavailable", Message: message, Cause: cause}
 }

@@ -27,12 +27,13 @@ but it is not yet a Work 1 product.
 | Bounded Runtime | Active single Service/Engine path with Plan, Broker, Approval, typed stops, budgets, events, and cancellation | Complete Work 1 runtime | 100% |
 | Planning/verification/recovery | Versioned Plan, host-observation Verifier, bounded Recoverer, re-plan revisions, and trace evidence | Complete implementation | 100% |
 | Agent Folder | Workspace-visible `bin`/`output` trays, task scopes, checkpoints, artifact hashes, manifests, and explicit bin cleanup | Complete implementation | 100% |
-| Automation contract | `boi ask` exists; stable JSON, stream, exit-code, and no-TTY contracts are absent | Early foundation | 20% |
+| Automation contract | JSON schema v1, argv/stdin contract, stream separation, stable exit codes, cancellation, idempotency hashing, and deterministic mutation denial | Complete read-only implementation | 100% |
 | Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
 
-Weighted implementation readiness after W1.5 is approximately **91%**.
-Architectural direction alignment is approximately **97%**, because Runtime and
-Agent Folder now follow the six-Block contract while SubAgents remain disabled.
+Weighted implementation readiness after W1.6 is approximately **96%**.
+Architectural direction alignment is approximately **99%**, because Runtime,
+Agent Folder, and read-only Automation now share one contract while SubAgents
+remain disabled.
 
 ## Scope boundaries
 
@@ -252,6 +253,10 @@ Verification:
 
 ### W1.6 - Automation contract
 
+Status: **Complete for Work 1 read-only automation**. Side-effecting automation
+remains disabled until a future persistent replay and scoped authorization
+contract is accepted.
+
 Tasks:
 
 1. Finalize argv/stdin inputs and stdout/stderr separation.
@@ -268,6 +273,23 @@ Acceptance:
 - Repeating an idempotent request does not duplicate side effects.
 - Non-interactive execution never hangs waiting for approval.
 - Mutation without a valid authorization contract does not execute.
+
+Verification:
+
+- argv is authoritative when present; otherwise bounded non-TTY UTF-8 stdin is
+  accepted without prompting.
+- `--json` emits exactly one schema-v1 object to stdout on both success and
+  failure; verbose diagnostics remain on stderr.
+- Stable exits are `0` completed, `1` internal, `2` invalid input, `3` denied,
+  `4` cancelled, `5` unavailable, and `6` verification failed.
+- Task ID, manifest, artifact references, usage, Stop Reason, and the hashed
+  idempotency key are exposed without duplicating the Agent Folder catalog.
+- Host-owned idempotency namespaces survive Broker preparation; raw keys are
+  not persisted in task manifests.
+- Non-interactive mutation tests prove approval-required actions return denied
+  without waiting and without creating the requested file.
+- The v1 contract makes no cross-process replay-cache claim; repeated requests
+  cannot duplicate side effects because side-effecting automation is disabled.
 
 ### W1.7 - Product acceptance
 
@@ -298,8 +320,8 @@ W1.0 Architecture baseline [complete]
           -> W1.3 Active registries [complete]
               -> W1.4 Runtime composition [complete]
                   -> W1.5 Agent Folder [complete]
-                      -> W1.6 Automation contract [next]
-                          -> W1.7 Product acceptance
+                      -> W1.6 Automation contract [complete]
+                          -> W1.7 Product acceptance [next]
 ```
 
 W1.6 must consume the stable Task ID, manifest path, and artifact references

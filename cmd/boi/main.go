@@ -30,7 +30,9 @@ func main() {
 	envfile.Load(runtime.EnvPath)
 
 	if err := cli.Execute(runtime); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		if !cli.ErrorReported(err) {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
+		os.Exit(cli.ExitCode(err))
 	}
 }

@@ -34,6 +34,7 @@ type TaskManifest struct {
 	Provider           string                    `json:"provider,omitempty"`
 	Model              string                    `json:"model,omitempty"`
 	ProviderProfileRef string                    `json:"provider_profile_ref,omitempty"`
+	IdempotencyKeyHash string                    `json:"idempotency_key_hash,omitempty"`
 	Usage              ManifestUsage             `json:"usage"`
 	Artifacts          []agent.ArtifactReference `json:"artifacts"`
 	Evidence           []ManifestEvidence        `json:"evidence"`
@@ -169,7 +170,7 @@ func (s *Store) Finalize(session *agent.TaskSession, result *agent.AgentResult) 
 	manifest := TaskManifest{
 		SchemaVersion: ManifestSchemaVersion, TaskID: session.ID, PlanID: result.Plan.ID,
 		Outcome: outcome, StopReason: result.StopReason, StartedAt: session.StartedAt, FinishedAt: s.now(),
-		Provider: result.Provider, Model: result.Model, ProviderProfileRef: result.ProviderProfileRef,
+		Provider: result.Provider, Model: result.Model, ProviderProfileRef: result.ProviderProfileRef, IdempotencyKeyHash: result.IdempotencyKeyHash,
 		Usage:     ManifestUsage{Steps: result.Steps, InputTokens: result.Usage.InputTokens, OutputTokens: result.Usage.OutputTokens, ProviderCalls: result.Usage.ProviderCalls, ToolCalls: result.Usage.ToolCalls},
 		Artifacts: artifacts, Evidence: manifestEvidence(result, artifacts), Retention: retention,
 	}
@@ -192,7 +193,7 @@ func (s *Store) CleanupBinBefore(before time.Time, apply bool) ([]string, error)
 	}
 	var candidates []string
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.HasPrefix(entry.Name(), "task-") {
 			continue
 		}
 		info, err := entry.Info()

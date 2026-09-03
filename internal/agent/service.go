@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -137,7 +138,7 @@ func (s *Service) Start(ctx context.Context, query string) <-chan RuntimeEvent {
 			case events <- RuntimeEvent{Engine: &event}:
 			case <-ctx.Done():
 			}
-		})
+		}, "")
 		final := RuntimeEvent{Result: result, Err: err}
 		select {
 		case events <- final:
@@ -152,10 +153,16 @@ func (s *Service) Start(ctx context.Context, query string) <-chan RuntimeEvent {
 }
 
 func (s *Service) Run(ctx context.Context, query string) (*AgentResult, error) {
-	return s.run(ctx, query, RejectingAuthorizer{}, nil)
+	return s.run(ctx, query, RejectingAuthorizer{}, nil, "")
 }
 
-func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent)) (*AgentResult, error) {
+// RunAutomation executes the non-interactive contract. Mutation Tools remain
+// subject to RejectingAuthorizer and therefore cannot wait for or infer consent.
+func (s *Service) RunAutomation(ctx context.Context, query, idempotencyKey string) (*AgentResult, error) {
+	return s.run(ctx, query, RejectingAuthorizer{}, nil, strings.TrimSpace(idempotencyKey))
+}
+
+func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string) (*AgentResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
@@ -247,6 +254,9 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 			if err != nil {
 				return Decision{}, err
 			}
+			if idempotencyKey != "" && prepared.IdempotencyKey != "" {
+				prepared.IdempotencyKey = automationToolKey(idempotencyKey, prepared.ID)
+			}
 			decision.ToolCall = &prepared
 		}
 		decision.Provider = response.Provider
@@ -283,6 +293,9 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 		return nil, err
 	}
 	result.ProviderProfileRef = providerProfiles[providerProfileKey(result.Provider, result.Model)]
+	if idempotencyKey != "" {
+		result.IdempotencyKeyHash = automationKeyHash(idempotencyKey)
+	}
 	if recordErr == nil && taskRecorder != nil {
 		recordErr = taskRecorder.Finalize(taskSession, result)
 	}
@@ -303,6 +316,16 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 
 func providerProfileKey(provider, model string) string {
 	return strings.ToLower(strings.TrimSpace(provider)) + "\x00" + strings.ToLower(strings.TrimSpace(model))
+}
+
+func automationKeyHash(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("sha256:%x", sum[:])
+}
+
+func automationToolKey(key, callID string) string {
+	sum := sha256.Sum256([]byte(key + "\x00" + callID))
+	return fmt.Sprintf("automation:%x", sum[:])
 }
 
 type decisionFunc func(context.Context, DecisionInput) (Decision, error)

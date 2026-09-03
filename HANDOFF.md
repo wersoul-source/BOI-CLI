@@ -41,8 +41,11 @@ Recoverer/re-plan revisions, trace evidence, and lifecycle event stream into the
 single shared Service/Engine path. Legacy simulated/direct execution paths were
 removed. W1.5 adds the workspace-visible `agent-folder/bin` and `output` trays,
 task-scoped checkpoints, versioned artifact manifests, SHA-256 references,
-Provider profile references, and bin-only explicit cleanup. Continue with W1.6
-Automation contract.
+Provider profile references, and bin-only explicit cleanup. W1.6 provides JSON
+schema v1, bounded argv/stdin input,
+stdout/stderr separation, stable exit codes, signal cancellation, hashed
+idempotency keys, and deterministic non-interactive mutation denial. Continue
+with W1.7 Product acceptance; do not enable side-effecting Automation.
 
 The owner is pursuing S25+ through a separate path. Keep physical mobile results
 as external acceptance evidence and do not block the main six-Block sequence on
