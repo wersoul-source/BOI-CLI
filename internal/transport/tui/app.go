@@ -42,6 +42,8 @@ type approvalDecisionSentMsg struct {
 	err      error
 }
 
+type runtimeProgressMsg struct{ event agent.EngineEvent }
+
 type Model struct {
 	splash          *SplashModel
 	chat            ChatModel
@@ -251,6 +253,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status.SetStatus("thinking")
 		return m, waitAgentEventCmd(m.runtimeEvents)
 
+	case runtimeProgressMsg:
+		switch msg.event.Phase {
+		case agent.PhaseAct:
+			m.status.SetStatus("working")
+		case agent.PhaseStopped:
+		default:
+			m.status.SetStatus("thinking")
+		}
+		return m, waitAgentEventCmd(m.runtimeEvents)
+
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+q" {
 			if m.cancelActive != nil {
@@ -421,7 +433,7 @@ func (m *Model) startAgentCmd(input string) tea.Cmd {
 	if err := m.agentService.SetActiveTools(capabilities.Tools.Active); err != nil {
 		return func() tea.Msg { return agentResponseMsg{err: err} }
 	}
-	m.agentService.SetSkillSummaries(capabilities.SkillSummaryPrompt())
+	m.agentService.SetSkills(capabilities.LoadedSkills)
 	m.runtimeEvents = m.agentService.Start(ctx, input)
 	return waitAgentEventCmd(m.runtimeEvents)
 }
@@ -451,6 +463,9 @@ func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 		}
 		if event.Approval != nil {
 			return approvalRequestedMsg{request: event.Approval.Request, decisions: event.Approval.Decisions}
+		}
+		if event.Engine != nil {
+			return runtimeProgressMsg{event: *event.Engine}
 		}
 		if event.Err != nil {
 			return agentResponseMsg{err: event.Err}

@@ -19,6 +19,8 @@ import (
 const (
 	actionOpen  = "<boi-action>"
 	actionClose = "</boi-action>"
+	skillOpen   = "<boi-skill>"
+	skillClose  = "</boi-skill>"
 )
 
 type proposedAction struct {
@@ -28,10 +30,34 @@ type proposedAction struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
+type proposedSkill struct {
+	Name string `json:"name"`
+}
+
 // ParseDecision treats model output as either plain text or one strictly
 // delimited tool proposal. Security fields are deliberately absent from the
 // model-controlled schema and are assigned by Broker.Prepare.
 func ParseDecision(content string) (Decision, error) {
+	if strings.Contains(content, skillOpen) || strings.Contains(content, skillClose) {
+		if strings.Contains(content, actionOpen) || strings.Contains(content, actionClose) {
+			return Decision{}, fmt.Errorf("response cannot request a Skill and Tool together")
+		}
+		start, end := strings.Index(content, skillOpen), strings.Index(content, skillClose)
+		if start < 0 || end < start || strings.Count(content, skillOpen) != 1 || strings.Count(content, skillClose) != 1 || strings.TrimSpace(content[:start]) != "" || strings.TrimSpace(content[end+len(skillClose):]) != "" {
+			return Decision{}, fmt.Errorf("invalid BOI Skill envelope")
+		}
+		decoder := json.NewDecoder(strings.NewReader(content[start+len(skillOpen) : end]))
+		decoder.DisallowUnknownFields()
+		var proposal proposedSkill
+		if err := decoder.Decode(&proposal); err != nil {
+			return Decision{}, fmt.Errorf("decode BOI Skill: %w", err)
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return Decision{}, fmt.Errorf("BOI Skill contains trailing JSON")
+		}
+		return Decision{Kind: DecisionUseSkill, SkillName: strings.TrimSpace(proposal.Name)}, nil
+	}
 	start := strings.Index(content, actionOpen)
 	end := strings.Index(content, actionClose)
 	if start < 0 && end < 0 {

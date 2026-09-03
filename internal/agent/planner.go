@@ -1,6 +1,9 @@
 package agent
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type Planner struct{}
 
@@ -9,35 +12,50 @@ func NewPlanner() *Planner {
 }
 
 func (p *Planner) Plan(query string) *TaskPlan {
-	plan := &TaskPlan{Goal: query}
+	goal := strings.TrimSpace(query)
+	return &TaskPlan{SchemaVersion: 1, ID: fmt.Sprintf("plan_%x", stableTaskID(goal)), Revision: 1, Goal: goal, Status: PlanPending, Steps: []PlannedStep{
+		{Number: 1, Description: "Observe task and trusted runtime context", Phase: PhaseObserve, Status: PlanPending},
+		{Number: 2, Description: "Decide the next bounded action", Phase: PhaseDecide, DependsOn: []int{1}, Status: PlanPending},
+		{Number: 3, Description: "Authorize and execute any required host action", Phase: PhaseAct, DependsOn: []int{2}, Status: PlanPending},
+		{Number: 4, Description: "Verify observable results", Phase: PhaseVerify, DependsOn: []int{2}, Status: PlanPending},
+		{Number: 5, Description: "Return the verified outcome", Phase: PhaseStopped, DependsOn: []int{4}, Status: PlanPending},
+	}}
+}
 
-	lower := strings.ToLower(query)
-
-	if strings.Contains(lower, "read") || strings.Contains(lower, "show") || strings.Contains(lower, "list") {
-		plan.Steps = append(plan.Steps, PlannedStep{
-			Number: 1, Description: "Scan for relevant files", Tool: "glob",
-		})
-		plan.Steps = append(plan.Steps, PlannedStep{
-			Number: 2, Description: "Read and analyze files", Tool: "read",
-			DependsOn: 1,
-		})
+func stableTaskID(value string) uint64 {
+	var hash uint64 = 1469598103934665603
+	for _, b := range []byte(value) {
+		hash ^= uint64(b)
+		hash *= 1099511628211
 	}
+	return hash
+}
 
-	if strings.Contains(lower, "fix") || strings.Contains(lower, "edit") || strings.Contains(lower, "change") {
-		plan.Steps = append(plan.Steps, PlannedStep{
-			Number: 3, Description: "Identify the source of the issue", Tool: "search",
-		})
-		plan.Steps = append(plan.Steps, PlannedStep{
-			Number: 4, Description: "Apply the fix", Tool: "edit",
-			DependsOn: 3,
-		})
+func (p *TaskPlan) Validate() error {
+	if p == nil || p.SchemaVersion != 1 || p.Revision <= 0 || strings.TrimSpace(p.ID) == "" || strings.TrimSpace(p.Goal) == "" || len(p.Steps) == 0 {
+		return fmt.Errorf("invalid Task Plan identity or steps")
 	}
-
-	if len(plan.Steps) == 0 {
-		plan.Steps = append(plan.Steps, PlannedStep{
-			Number: 1, Description: "Analyze and respond", Tool: "think",
-		})
+	seen := map[int]bool{}
+	for _, step := range p.Steps {
+		if step.Number <= 0 || seen[step.Number] || strings.TrimSpace(step.Description) == "" {
+			return fmt.Errorf("invalid or duplicate Plan step %d", step.Number)
+		}
+		for _, dependency := range step.DependsOn {
+			if !seen[dependency] {
+				return fmt.Errorf("Plan step %d has unresolved dependency %d", step.Number, dependency)
+			}
+		}
+		seen[step.Number] = true
 	}
+	return nil
+}
 
-	return plan
+func (p *TaskPlan) Revise(phase AgentPhase) {
+	if p == nil {
+		return
+	}
+	p.Revision++
+	p.Revisions = append(p.Revisions, PlanRevision{Number: p.Revision, Phase: phase, Reason: "bounded recovery requested a new decision"})
+	p.Status = PlanRunning
+	setPlanPhase(p, PhaseDecide, PlanPending)
 }

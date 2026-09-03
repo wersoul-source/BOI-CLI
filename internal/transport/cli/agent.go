@@ -72,7 +72,7 @@ var askCmd = &cobra.Command{
 		if err := service.SetActiveTools(capabilities.Tools.Active); err != nil {
 			return err
 		}
-		service.SetSkillSummaries(capabilities.SkillSummaryPrompt())
+		service.SetSkills(capabilities.LoadedSkills)
 		limits := agent.DefaultEngineLimits()
 		limits.MaxSteps = agentSteps
 		service.SetLimits(limits)

@@ -11,8 +11,9 @@ import (
 type DecisionKind string
 
 const (
-	DecisionRespond DecisionKind = "respond"
-	DecisionUseTool DecisionKind = "use_tool"
+	DecisionRespond  DecisionKind = "respond"
+	DecisionUseTool  DecisionKind = "use_tool"
+	DecisionUseSkill DecisionKind = "use_skill"
 )
 
 type DecisionInput struct {
@@ -20,15 +21,18 @@ type DecisionInput struct {
 	Step       int
 	Steps      []AgentStep
 	LastResult *ToolResult
+	LastSkill  *SkillObservation
+	Plan       *TaskPlan
 }
 
 type Decision struct {
-	Kind     DecisionKind
-	Response string
-	ToolCall *ToolCall
-	Usage    Usage
-	Provider string
-	Model    string
+	Kind      DecisionKind
+	Response  string
+	ToolCall  *ToolCall
+	SkillName string
+	Usage     Usage
+	Provider  string
+	Model     string
 }
 
 func (d Decision) Validate() error {
@@ -40,12 +44,22 @@ func (d Decision) Validate() error {
 		if d.ToolCall != nil {
 			return errors.New("response decision must not contain a tool call")
 		}
+		if d.SkillName != "" {
+			return errors.New("response decision must not contain a Skill")
+		}
 	case DecisionUseTool:
 		if d.ToolCall == nil {
 			return errors.New("tool decision is missing a tool call")
 		}
 		if err := d.ToolCall.Validate(); err != nil {
 			return fmt.Errorf("tool decision: %w", err)
+		}
+		if d.SkillName != "" {
+			return errors.New("Tool decision must not contain a Skill")
+		}
+	case DecisionUseSkill:
+		if strings.TrimSpace(d.SkillName) == "" || d.ToolCall != nil {
+			return errors.New("Skill decision requires only a Skill name")
 		}
 	default:
 		return fmt.Errorf("invalid decision kind: %q", d.Kind)
@@ -108,18 +122,28 @@ type Recoverer interface {
 	Recover(context.Context, Failure) Recovery
 }
 
+type SkillLoader interface{ LoadSkill(string) (string, error) }
+type SkillObservation struct {
+	Name         string
+	Instructions string
+}
+
 type EngineEvent struct {
-	Phase      AgentPhase
-	Step       int
-	ToolCall   *ToolCall
-	ToolResult *ToolResult
-	StopReason StopReason
+	Kind         string
+	Phase        AgentPhase
+	Step         int
+	ToolCall     *ToolCall
+	ToolResult   *ToolResult
+	StopReason   StopReason
+	Verification *Verification
+	Plan         *TaskPlan
 }
 
 type EngineLimits struct {
 	MaxSteps      int
 	MaxToolCalls  int
 	MaxRecoveries int
+	MaxSkillCalls int
 	MaxTokens     int
 	Timeout       time.Duration
 }
@@ -129,19 +153,22 @@ func DefaultEngineLimits() EngineLimits {
 		MaxSteps:      12,
 		MaxToolCalls:  8,
 		MaxRecoveries: 2,
+		MaxSkillCalls: 4,
 		MaxTokens:     64_000,
 		Timeout:       2 * time.Minute,
 	}
 }
 
 type Engine struct {
-	Decider    Decider
-	Authorizer Authorizer
-	Actor      Actor
-	Verifier   Verifier
-	Recoverer  Recoverer
-	Limits     EngineLimits
-	OnEvent    func(EngineEvent)
+	Decider     Decider
+	Authorizer  Authorizer
+	Actor       Actor
+	Verifier    Verifier
+	Recoverer   Recoverer
+	Limits      EngineLimits
+	OnEvent     func(EngineEvent)
+	Plan        *TaskPlan
+	SkillLoader SkillLoader
 }
 
 func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
@@ -157,20 +184,32 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	defer cancel()
 
 	started := time.Now()
+	plan := e.Plan
+	if plan == nil {
+		plan = NewPlanner().Plan(task)
+	}
+	if err := plan.Validate(); err != nil {
+		return nil, fmt.Errorf("validate Task Plan: %w", err)
+	}
+	plan.Status = PlanRunning
+	setPlanPhase(plan, PhaseObserve, PlanCompleted)
 	state := &AgentState{
 		ID:        fmt.Sprintf("agent_%d", started.UnixNano()),
 		Phase:     PhaseObserve,
 		Task:      task,
 		StartedAt: started,
+		Plan:      plan,
 	}
-	e.emit(EngineEvent{Phase: PhaseObserve})
+	e.emit(EngineEvent{Kind: "task", Phase: PhaseObserve, Plan: plan})
 	if err := e.transition(state, PhaseDecide, 0); err != nil {
 		return e.invalidStateResult(state, started, err), nil
 	}
 
 	var usage Usage
 	var lastResult *ToolResult
+	var lastSkill *SkillObservation
 	toolCalls := 0
+	skillCalls := 0
 	recoveries := 0
 	provider, model := "", ""
 
@@ -178,11 +217,14 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		if reason, err := contextStop(runCtx); err != nil {
 			return e.stop(state, started, usage, provider, model, reason, err.Error()), nil
 		}
+		setPlanPhase(plan, PhaseDecide, PlanRunning)
 		decision, err := e.Decider.Decide(runCtx, DecisionInput{
 			Task:       task,
 			Step:       step,
 			Steps:      append([]AgentStep(nil), state.Steps...),
 			LastResult: lastResult,
+			LastSkill:  lastSkill,
+			Plan:       plan,
 		})
 		usage = addUsage(usage, decision.Usage)
 		provider, model = preferNonEmpty(decision.Provider, provider), preferNonEmpty(decision.Model, model)
@@ -201,12 +243,41 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			}
 			continue
 		}
+		setPlanPhase(plan, PhaseDecide, PlanCompleted)
+		if decision.Kind == DecisionUseSkill {
+			if skillCalls >= limits.MaxSkillCalls {
+				return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "Skill-call budget exhausted"), nil
+			}
+			if e.SkillLoader == nil {
+				return e.stop(state, started, usage, provider, model, StopSafetyBlocked, "Skill loader is not configured"), nil
+			}
+			instructions, loadErr := e.SkillLoader.LoadSkill(decision.SkillName)
+			if loadErr != nil {
+				return e.stop(state, started, usage, provider, model, StopSafetyBlocked, loadErr.Error()), nil
+			}
+			skillCalls++
+			lastSkill = &SkillObservation{Name: decision.SkillName, Instructions: instructions}
+			lastResult = nil
+			state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseObserve, Action: "skill:" + decision.SkillName, Result: "active Skill instructions loaded as untrusted context", Success: true, Duration: time.Since(started)})
+			if err := e.transition(state, PhaseObserve, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
+			}
+			setPlanPhase(plan, PhaseObserve, PlanCompleted)
+			if err := e.transition(state, PhaseDecide, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
+			}
+			continue
+		}
 
 		if decision.Kind == DecisionRespond {
+			if toolCalls == 0 {
+				setPlanPhase(plan, PhaseAct, PlanSkipped)
+			}
 			if err := e.transition(state, PhaseVerify, step); err != nil {
 				return e.invalidStateResult(state, started, err), nil
 			}
 			verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, Response: decision.Response})
+			e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &verification})
 			if verifyErr != nil || !verification.Passed {
 				err := verifyErr
 				if err == nil {
@@ -217,7 +288,10 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 				}
 				continue
 			}
+			setPlanPhase(plan, PhaseVerify, PlanCompleted)
 			state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseVerify, Action: "respond", Result: decision.Response, Success: true, Duration: time.Since(started)})
+			plan.Status = PlanCompleted
+			setPlanPhase(plan, PhaseStopped, PlanCompleted)
 			result := e.stop(state, started, usage, provider, model, StopCompleted, "")
 			result.Response = decision.Response
 			return result, nil
@@ -229,10 +303,13 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		toolCalls++
 		usage.ToolCalls = toolCalls
 		call := decision.ToolCall
+		setPlanPhase(plan, PhaseAct, PlanRunning)
+		e.emit(EngineEvent{Kind: "tool", Phase: PhaseAuthorize, Step: step, ToolCall: call})
 		if err := e.transition(state, PhaseAuthorize, step); err != nil {
 			return e.invalidStateResult(state, started, err), nil
 		}
 		authorization, err := e.authorize(runCtx, *call)
+		e.emit(EngineEvent{Kind: "approval", Phase: PhaseAuthorize, Step: step, ToolCall: call})
 		if err != nil {
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAuthorize, Err: err, ToolCall: call, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				return e.stop(state, started, usage, provider, model, StopSafetyBlocked, err.Error()), nil
@@ -251,6 +328,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		}
 		actCtx, actCancel := context.WithTimeout(runCtx, call.Timeout)
 		toolResult, actErr := e.Actor.Act(actCtx, *call, authorization)
+		e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
 		actContextErr := actCtx.Err()
 		actCancel()
 		if actErr != nil || actContextErr != nil {
@@ -279,6 +357,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			return e.invalidStateResult(state, started, err), nil
 		}
 		verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, ToolCall: call, ToolResult: &toolResult})
+		e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, ToolCall: call, ToolResult: &toolResult, Verification: &verification})
 		if verifyErr != nil || !verification.Passed {
 			err := verifyErr
 			if err == nil {
@@ -290,8 +369,12 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			lastResult = &toolResult
 			continue
 		}
+		toolResult.Evidence = append(toolResult.Evidence, verification.Evidence...)
 		state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseVerify, Action: call.Tool, Result: toolResult.Output, ToolCall: call, ToolResult: &toolResult, Success: true, Duration: time.Since(started)})
+		setPlanPhase(plan, PhaseAct, PlanCompleted)
+		setPlanPhase(plan, PhaseVerify, PlanCompleted)
 		lastResult = &toolResult
+		lastSkill = nil
 		recoveries = 0
 		if err := e.transition(state, PhaseDecide, step); err != nil {
 			return e.invalidStateResult(state, started, err), nil
@@ -332,6 +415,7 @@ func (e *Engine) tryRecover(ctx context.Context, state *AgentState, failure Fail
 		return false
 	}
 	*recoveries++
+	state.Plan.Revise(failure.Phase)
 	if err := e.transition(state, PhaseRecover, step); err != nil {
 		return false
 	}
@@ -343,7 +427,8 @@ func (e *Engine) transition(state *AgentState, next AgentPhase, step int) error 
 		return fmt.Errorf("invalid Agent phase transition: %s -> %s", state.Phase, next)
 	}
 	state.Phase = next
-	e.emit(EngineEvent{Phase: next, Step: step})
+	setPlanPhase(state.Plan, next, PlanRunning)
+	e.emit(EngineEvent{Kind: "phase", Phase: next, Step: step, Plan: state.Plan})
 	return nil
 }
 
@@ -356,8 +441,22 @@ func (e *Engine) stop(state *AgentState, started time.Time, usage Usage, provide
 	}
 	state.StopReason = reason
 	usage.Elapsed = time.Since(started)
-	e.emit(EngineEvent{Phase: PhaseStopped, Step: len(state.Steps), StopReason: reason})
-	return &AgentResult{Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message}
+	if reason != StopCompleted {
+		state.Plan.Status = PlanFailed
+	}
+	e.emit(EngineEvent{Kind: "stop", Phase: PhaseStopped, Step: len(state.Steps), StopReason: reason, Plan: state.Plan})
+	return &AgentResult{Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message, Plan: state.Plan, Trace: append([]AgentStep(nil), state.Steps...)}
+}
+
+func setPlanPhase(plan *TaskPlan, phase AgentPhase, status PlanStatus) {
+	if plan == nil {
+		return
+	}
+	for index := range plan.Steps {
+		if plan.Steps[index].Phase == phase {
+			plan.Steps[index].Status = status
+		}
+	}
 }
 
 func (e *Engine) invalidStateResult(state *AgentState, started time.Time, err error) *AgentResult {
@@ -366,8 +465,36 @@ func (e *Engine) invalidStateResult(state *AgentState, started time.Time, err er
 
 func (e *Engine) emit(event EngineEvent) {
 	if e.OnEvent != nil {
-		e.OnEvent(event)
+		e.OnEvent(cloneEngineEvent(event))
 	}
+}
+
+func cloneEngineEvent(event EngineEvent) EngineEvent {
+	if event.Plan != nil {
+		plan := *event.Plan
+		plan.Steps = append([]PlannedStep(nil), event.Plan.Steps...)
+		for index := range plan.Steps {
+			plan.Steps[index].DependsOn = append([]int(nil), plan.Steps[index].DependsOn...)
+		}
+		plan.Revisions = append([]PlanRevision(nil), event.Plan.Revisions...)
+		event.Plan = &plan
+	}
+	if event.ToolCall != nil {
+		call := *event.ToolCall
+		event.ToolCall = &call
+	}
+	if event.ToolResult != nil {
+		result := *event.ToolResult
+		result.ChangedPaths = append([]string(nil), result.ChangedPaths...)
+		result.Evidence = append([]Evidence(nil), result.Evidence...)
+		event.ToolResult = &result
+	}
+	if event.Verification != nil {
+		verification := *event.Verification
+		verification.Evidence = append([]Evidence(nil), event.Verification.Evidence...)
+		event.Verification = &verification
+	}
+	return event
 }
 
 func normalizeEngineLimits(limits EngineLimits) EngineLimits {
@@ -380,6 +507,9 @@ func normalizeEngineLimits(limits EngineLimits) EngineLimits {
 	}
 	if limits.MaxRecoveries < 0 {
 		limits.MaxRecoveries = defaults.MaxRecoveries
+	}
+	if limits.MaxSkillCalls <= 0 {
+		limits.MaxSkillCalls = defaults.MaxSkillCalls
 	}
 	if limits.MaxTokens <= 0 {
 		limits.MaxTokens = defaults.MaxTokens

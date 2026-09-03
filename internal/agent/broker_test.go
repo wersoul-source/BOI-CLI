@@ -28,6 +28,19 @@ func TestParseDecisionRejectsModelSecurityFields(t *testing.T) {
 	}
 }
 
+func TestParseDecisionAcceptsStrictSkillEnvelope(t *testing.T) {
+	decision, err := ParseDecision(`<boi-skill>{"name":"git-helper"}</boi-skill>`)
+	if err != nil || decision.Kind != DecisionUseSkill || decision.SkillName != "git-helper" {
+		t.Fatalf("decision=%#v err=%v", decision, err)
+	}
+	if _, err := ParseDecision(`text <boi-skill>{"name":"git-helper"}</boi-skill>`); err == nil {
+		t.Fatal("accepted mixed Skill envelope")
+	}
+	if _, err := ParseDecision(`<boi-skill>{"name":"git-helper"}</boi-skill><boi-action>{}</boi-action>`); err == nil {
+		t.Fatal("accepted Skill and Tool together")
+	}
+}
+
 func TestBrokerCapabilityProfileCanDisableAllTools(t *testing.T) {
 	b := testBroker(t)
 	b.SetToolCallingAllowed(false)

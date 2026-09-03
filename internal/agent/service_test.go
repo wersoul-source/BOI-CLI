@@ -93,17 +93,42 @@ func TestServiceInteractiveApprovalCompletesWriteLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	events := service.Start(ctx, "save note")
-	approval := <-events
+	var approval RuntimeEvent
+	kinds := map[string]bool{}
+	for event := range events {
+		if event.Engine != nil {
+			kinds[event.Engine.Kind] = true
+		}
+		if event.Approval != nil {
+			kinds["approval_request"] = true
+			approval = event
+			break
+		}
+	}
 	if approval.Approval == nil {
 		t.Fatalf("expected approval, got %#v", approval)
 	}
 	approval.Approval.Decisions <- ApprovalDecision{RequestID: approval.Approval.Request.ID, State: ApprovalApproved, DecidedAt: time.Now()}
-	completed := <-events
+	var completed RuntimeEvent
+	for event := range events {
+		if event.Engine != nil {
+			kinds[event.Engine.Kind] = true
+		}
+		if event.Result != nil || event.Err != nil {
+			completed = event
+			break
+		}
+	}
 	if completed.Err != nil || completed.Result == nil || completed.Result.Response != "saved" {
 		t.Fatalf("unexpected completion: %#v", completed)
 	}
 	content, err := os.ReadFile(filepath.Join(root, "note.txt"))
 	if err != nil || string(content) != "hello" {
 		t.Fatalf("content=%q err=%v", content, err)
+	}
+	for _, kind := range []string{"task", "tool", "approval_request", "approval", "tool_result", "verification", "stop"} {
+		if !kinds[kind] {
+			t.Fatalf("missing runtime event %q: %#v", kind, kinds)
+		}
 	}
 }

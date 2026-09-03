@@ -65,8 +65,12 @@ func TestEngineCompletesDirectResponse(t *testing.T) {
 			Kind: DecisionRespond, Response: "done", Provider: "test", Model: "model",
 			Usage: Usage{InputTokens: 2, OutputTokens: 3, ProviderCalls: 1},
 		}}},
-		Limits:  DefaultEngineLimits(),
-		OnEvent: func(event EngineEvent) { phases = append(phases, event.Phase) },
+		Limits: DefaultEngineLimits(),
+		OnEvent: func(event EngineEvent) {
+			if event.Kind == "task" || event.Kind == "phase" || event.Kind == "stop" {
+				phases = append(phases, event.Phase)
+			}
+		},
 	}
 	result, err := engine.Run(context.Background(), "answer this")
 	if err != nil {
@@ -74,6 +78,9 @@ func TestEngineCompletesDirectResponse(t *testing.T) {
 	}
 	if result.StopReason != StopCompleted || result.Response != "done" || result.Tokens != 5 {
 		t.Fatalf("unexpected result: %#v", result)
+	}
+	if result.Plan == nil || result.Plan.Status != PlanCompleted {
+		t.Fatalf("Task Plan not completed: %#v", result.Plan)
 	}
 	want := []AgentPhase{PhaseObserve, PhaseDecide, PhaseVerify, PhaseStopped}
 	if !reflect.DeepEqual(phases, want) {
@@ -155,6 +162,9 @@ func TestEngineRecoversFromToolFailure(t *testing.T) {
 	}
 	if result.StopReason != StopCompleted || actorCalls != 2 {
 		t.Fatalf("result=%#v actorCalls=%d", result, actorCalls)
+	}
+	if result.Plan == nil || result.Plan.Revision != 2 {
+		t.Fatalf("recovery did not revise Plan: %#v", result.Plan)
 	}
 }
 

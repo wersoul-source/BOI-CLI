@@ -11,6 +11,7 @@ type AgentState struct {
 	Steps       []AgentStep
 	StartedAt   time.Time
 	MemoryUsed  int
+	Plan        *TaskPlan
 }
 
 type AgentStep struct {
@@ -25,17 +26,38 @@ type AgentStep struct {
 	Duration   time.Duration
 }
 
+type PlanStatus string
+
+const (
+	PlanPending   PlanStatus = "pending"
+	PlanRunning   PlanStatus = "running"
+	PlanCompleted PlanStatus = "completed"
+	PlanFailed    PlanStatus = "failed"
+	PlanSkipped   PlanStatus = "skipped"
+)
+
 type TaskPlan struct {
-	Goal  string
-	Steps []PlannedStep
+	SchemaVersion int            `json:"schema_version"`
+	ID            string         `json:"id"`
+	Revision      int            `json:"revision"`
+	Goal          string         `json:"goal"`
+	Status        PlanStatus     `json:"status"`
+	Steps         []PlannedStep  `json:"steps"`
+	Revisions     []PlanRevision `json:"revisions,omitempty"`
+}
+
+type PlanRevision struct {
+	Number int        `json:"number"`
+	Phase  AgentPhase `json:"phase"`
+	Reason string     `json:"reason"`
 }
 
 type PlannedStep struct {
-	Number      int
-	Description string
-	Tool        string
-	Args        string
-	DependsOn   int
+	Number      int        `json:"number"`
+	Description string     `json:"description"`
+	Phase       AgentPhase `json:"phase"`
+	DependsOn   []int      `json:"depends_on,omitempty"`
+	Status      PlanStatus `json:"status"`
 }
 
 type AgentResult struct {
@@ -49,4 +71,6 @@ type AgentResult struct {
 	StopReason StopReason
 	Usage      Usage
 	Error      string
+	Plan       *TaskPlan
+	Trace      []AgentStep
 }

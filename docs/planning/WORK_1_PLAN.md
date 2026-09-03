@@ -24,14 +24,14 @@ but it is not yet a Work 1 product.
 | Provider conformance | Versioned deterministic probe suite, persisted profiles, and fail-closed Router composition | Complete implementation | 100% |
 | Skill registry | Versioned explicit index, deterministic task selection, Context/dependency policy, and 15-active limit | Complete implementation | 100% |
 | Tool registry | Versioned explicit index, Provider-gated active set, Broker enforcement, and 15-active limit | Complete implementation | 100% |
-| Bounded Runtime | Engine, Broker, Approval, typed stops, budgets, cancellation, and tests exist | Strong foundation | 78% |
-| Planning/verification/recovery | Ports and placeholder Planner/Reviewer exist; Service does not compose them | Partial | 35% |
+| Bounded Runtime | Active single Service/Engine path with Plan, Broker, Approval, typed stops, budgets, events, and cancellation | Complete Work 1 runtime | 100% |
+| Planning/verification/recovery | Versioned Plan, host-observation Verifier, bounded Recoverer, re-plan revisions, and trace evidence | Complete implementation | 100% |
 | Agent Folder | No task output tray or manifest contract | Missing | 0% |
 | Automation contract | `boi ask` exists; stable JSON, stream, exit-code, and no-TTY contracts are absent | Early foundation | 20% |
 | Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
 
-Weighted implementation readiness after W1.3 is approximately **74%**.
-Architectural direction alignment is approximately **90%**, because the existing
+Weighted implementation readiness after W1.4 is approximately **84%**.
+Architectural direction alignment is approximately **94%**, because the existing
 Runtime safety model already matches Work 1 and SubAgents remain disabled.
 
 ## Scope boundaries
@@ -174,6 +174,9 @@ Verification:
 
 ### W1.4 - Runtime composition
 
+Status: **Complete implementation**. TUI and CLI execute the same composed
+`agent.Service` and `agent.Engine` path.
+
 Tasks:
 
 1. Add an explicit Task Plan contract with dependencies and status.
@@ -189,6 +192,24 @@ Acceptance:
 - Verification cannot be satisfied by Model claims alone.
 - Recovery respects retry, Tool, time, token, and step budgets.
 - TUI and CLI use the same composition root and policy.
+
+Verification:
+
+- Task Plans have schema version, stable ID, revision, dependencies, phase, and
+  step/overall status validation.
+- Every decision receives the current host Plan; bounded recovery increments
+  the Plan revision before re-deciding.
+- Runtime Verifier read-backs `workspace.write` output and attaches host
+  evidence to the execution trace.
+- Bounded Recoverer retries transient decisions, idempotent reads, and failed
+  verification, but not authorization failure or mutation execution failure.
+- Service emits task, phase, Tool, approval, Tool Result, verification, and
+  typed stop events; TUI consumes the same stream for progress state.
+- A strict first-class Skill Call loads full instructions only from the active
+  task set; Skill content remains untrusted context and cannot grant Tool
+  authority.
+- Legacy simulated Loop, direct Executor, and placeholder Reviewer were removed
+  so Tool execution cannot bypass Broker.
 
 ### W1.5 - Agent Folder
 
@@ -256,8 +277,8 @@ W1.0 Architecture baseline [complete]
   -> W1.1 Core identity [complete]
       -> W1.2 Provider conformance [complete]
           -> W1.3 Active registries [complete]
-              -> W1.4 Runtime composition [next]
-                  -> W1.5 Agent Folder
+              -> W1.4 Runtime composition [complete]
+                  -> W1.5 Agent Folder [next]
                       -> W1.6 Automation contract
                           -> W1.7 Product acceptance
 ```

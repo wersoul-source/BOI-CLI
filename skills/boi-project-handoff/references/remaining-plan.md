@@ -54,10 +54,13 @@ reporting, MCP discovery, and Library routing remain outside W1.3.
 
 ## Phase H4 - Runtime composition
 
-- Compose Planner, real Verifier, bounded Recoverer, Skill calls, Tool calls, Context policy, and status events.
-- Preserve host-owned authority and typed stops.
+- Compose Planner, real Verifier, bounded Recoverer, Skill calls, Tool calls, Context policy, and status events. **Complete for Work 1.**
+- Preserve host-owned authority and typed stops. **Complete for Work 1.**
 
 Acceptance: task-level evaluations prove Plan -> Act -> Verify -> Re-plan and no Tool bypass.
+
+Status: complete in W1.4. Legacy direct execution paths were removed; Broker is
+the sole Tool execution path. Continue with Agent Folder.
 
 ## Phase H5 - Agent Folder
 

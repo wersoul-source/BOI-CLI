@@ -49,7 +49,7 @@ func CanTransition(from, to AgentPhase) bool {
 	case PhaseObserve:
 		return to == PhaseDecide
 	case PhaseDecide:
-		return to == PhaseAuthorize || to == PhaseVerify
+		return to == PhaseObserve || to == PhaseAuthorize || to == PhaseVerify
 	case PhaseAuthorize:
 		return to == PhaseAct || to == PhaseRecover
 	case PhaseAct:

@@ -24,18 +24,18 @@
 - Deterministic selection records installed, eligible, selected, active, disabled, and rejected states with reasons.
 - Runtime active sets are capped at 15 Skills and 15 Tools; Broker rejects inactive Tools even when registered.
 - Agent Service receives selected Skill summaries only; full instructions are restricted to the task's active Skill set.
+- Agent Service composes a stable versioned Task Plan, deterministic host Verifier, bounded Recoverer, and trace evidence into Engine.
+- Recovery creates a Plan revision before re-deciding and remains bounded by recovery, step, Tool, token, and time limits.
+- Runtime emits task, phase, Tool, approval, Tool Result, verification, and stop events; TUI consumes this stream.
+- Legacy simulated Loop, direct shell/file Executor, and placeholder Reviewer were removed; Broker is the only Tool execution path.
 
 ## Implemented but not connected to the main Agent path
 
-- Skill loading and prompt helpers exist, but Agent Service does not select or inject Skills.
-- Planner and Reviewer types exist, but the main Service does not compose them.
 - MCP client and Broker registration exist, but no complete discovery/Library workflow is connected.
-- Legacy `agent.Loop` has simulated no-provider behavior; the active Service returns `ErrNoProvider` instead.
 
 ## Concept changes not implemented
 
 - Add Service health and MCP routing without an offline-operation guarantee.
-- Move existing behavior behind the new six-Block boundaries and composition contracts.
 - Add Agent Folder output/bin tray and artifact manifest.
 - Add gated SubAgent Market workflow.
 
@@ -43,8 +43,6 @@
 
 - README still advertises six Personas and simulated mode without API keys.
 - Archived and lifecycle documents may describe earlier architecture as complete.
-- `Verify` currently defaults to basic Tool status validation unless a Verifier is injected.
-- Engine supports Recoverer, but Agent Service does not currently inject one.
 
 ## Verification at handoff preparation
 
@@ -80,3 +78,11 @@
 - Loose-Skill isolation and active-only full-instruction tests: passed.
 - Broker inactive Tool and registered-but-inactive MCP Tool tests: passed.
 - CLI `registry init/list/add` commands implemented; parser and repository test suite pass.
+
+## Verification after Work 1 Phase W1.4
+
+- Plan validation/determinism, recovery revision, read-back verification, and safe recovery classification tests: passed.
+- First-class Skill Call tests prove full instructions load only from the active task set and do not grant Tool authority.
+- Shared Service approval/write loop proves Plan -> Authorize -> Act -> Verify -> Complete and lifecycle event emission.
+- Full repository tests, vet, build, and Android ARM64 cross-build: required phase gate.
+- Go race detector was unavailable in the current Windows toolchain because CGO is disabled; Engine events clone mutable Plan/Result/Evidence data before delivery.

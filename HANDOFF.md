@@ -36,7 +36,10 @@ versioned Provider probes and profiles; unqualified Provider candidates cannot
 enter the Agent Router, and Tool/Skill environments compose fail-closed.
 W1.3 adds versioned explicit Skill/Tool indexes, deterministic task selection,
 15/15 active limits, selected Skill summaries, and Broker-enforced active Tools.
-Continue with W1.4 Runtime Composition.
+W1.4 composes the versioned Task Plan, host-observation Verifier, bounded
+Recoverer/re-plan revisions, trace evidence, and lifecycle event stream into the
+single shared Service/Engine path. Legacy simulated/direct execution paths were
+removed. Continue with W1.5 Agent Folder.
 
 The owner is pursuing S25+ through a separate path. Keep physical mobile results
 as external acceptance evidence and do not block the main six-Block sequence on

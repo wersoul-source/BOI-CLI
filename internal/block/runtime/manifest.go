@@ -15,6 +15,6 @@ func Manifest() block.Manifest {
 			"budgets", "cancellation", "events", "checkpoints", "shutdown and resume",
 		},
 		DoesNotOwn: []string{"Core Persona", "Agent naming", "capability catalog content", "user deliverable classification"},
-		Status:     block.StatusPartial,
+		Status:     block.StatusActive,
 	}
 }
