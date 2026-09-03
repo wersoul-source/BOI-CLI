@@ -1,152 +1,125 @@
-﻿<p align="center">
-  <img src="https://img.shields.io/badge/BOI_CLI-0.3.0-6C63FF?style=for-the-badge" alt="BOI CLI">
-  <br>
-  <img src="https://img.shields.io/github/v/release/wersoul-source/BOI-CLI?color=6C63FF" alt="Release">
-  <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go">
-  <img src="https://img.shields.io/badge/Platform-Win%20|%20Mac%20|%20Linux-lightgrey?style=flat" alt="Platform">
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="License">
-</p>
+# BOI CLI
 
-<p align="center">
-  <img src="assets/boi-logo.svg" alt="BOI CLI" width="550">
-</p>
+BOI CLI is a bounded, tool-using Agent runtime for terminal workspaces. It has
+one Core Persona, `boi`, while each user gives their Agent instance its own name
+on the first TUI launch.
 
-<h3 align="center">An AI team of 6 personas in your terminal. One binary. No server.</h3>
+The product is organized into six Blocks: Service, Core, Various Equipment,
+Runtime, Agent Folder, and SubAgent. Work 1 connects the first five into one
+controlled TUI/CLI execution path; SubAgent execution remains disabled.
 
----
+## Work 1 capabilities
 
-> **Architecture transition:** the owner-approved BOI Agent Suit direction now
-> uses one Core Persona (`boi`), a user-named Agent instance, Provider capability
-> qualification, and six system Blocks. The feature text below describes the
-> current v0.3 implementation and contains known legacy claims. Continue work
-> from [HANDOFF.md](HANDOFF.md).
+- One shared Agent Service and Engine for TUI and `boi ask`.
+- Observe → Decide → Authorize → Act → Verify → Recover lifecycle with bounded
+  steps, tools, tokens, time, and recovery.
+- Explicit Provider qualification before a Provider can enter Agent routing.
+- Fail-closed Local Registry with at most 15 active Skills and 15 active Tools.
+- Capability Broker for risk classification, approval, timeout, and execution.
+- Workspace Sandbox path boundary plus an interactive TUI approval panel.
+- One `agent-folder` tray: diagnostics in `bin`, deliverables and manifests in
+  `output`.
+- Schema-v1 JSON output, stable exits, stdin/argv input, and deterministic
+  read-only Automation.
 
-## 🚀 Get Started
+BOI CLI does not fall back to a simulated AI response. A configured Provider
+must pass `boi provider qualify` before Agent tasks can use it.
 
-### 1. Install
-```bash
-# Download from GitHub Releases → extract → add to PATH
-# Or: go install github.com/boi-family/boi-cli/cmd/boi@latest
-```
+## Requirements
 
-### 2. Setup
-```bash
+- Go 1.24.2 or a compatible later toolchain
+- A supported Provider configured through environment or setup
+- A terminal capable of running the TUI
+
+## Build and start
+
+```text
+go build -o boi ./cmd/boi
+boi init
 boi setup
-```
-TUI wizard — asks how many providers, then arrow-key pick from 10 providers,
-enter API key, select model from curated list. Add 2+ for auto-fallback with rotation.
-
-### 3. Pick Persona
-```bash
-boi persona wizard
-```
-6 personalities — each says hi. Pick your thinking style.
-
-### 4. Launch
-```bash
-boi                        # Splash → Enter → Chat
-boi ask "hello" --verbose  # Or CLI mode
+boi provider qualify <provider-name>
+boi registry init
+boi
 ```
 
-> First run auto-detects and walks you through setup. No API keys? Runs in simulated mode.
+`boi registry init` is safe and non-overwriting. Normal runtime initialization
+also creates missing indexes so migrated workspaces continue without exposing
+loose, unindexed capability files.
 
----
+The first TUI start asks for the Agent instance name and stores it in
+`.boi/agent.yaml`. This name is not a Persona or a Provider identity.
 
-## ✨ Features
+## Non-interactive use
 
-| | |
+```text
+boi ask explain this repository
+Get-Content task.txt | boi ask --json --idempotency-key task-001
+```
+
+Work 1 Automation is read-only. A Tool call requiring approval is denied in
+non-interactive mode; the process never waits for an approval prompt. JSON goes
+to stdout as one object and verbose diagnostics go to stderr. See the
+[Automation contract](docs/operations/AUTOMATION_CONTRACT.md).
+
+## Command groups
+
+| Command | Purpose |
 |---|---|
-| 🔌 **PSC Rotation** | 10+ providers with auto-fallback + `████░░` usage bar — rotate before exhaustion |
-| 🎭 **6 Personas** | Switch between specialized AI profiles — each with unique system prompt & provider binding |
-| 🎨 **TUI Wizard** | Bubbletea setup wizard — arrow keys, model picker, endpoint registry (70+ models) |
-| 💾 **Phantom DB** | File-based memory with weight engine — remembers what matters across sessions |
-| ⌨️ **Command Palette** | Type `/` for commands, Tab to autocomplete — `/provider` `/model` `/clear` |
-| 🖥️ **TUI + CLI** | Full-screen terminal UI with bubble chat or direct CLI — your choice |
+| `boi` | Start the TUI |
+| `boi ask` | Run the bounded Agent non-interactively |
+| `boi setup` | Configure Providers interactively |
+| `boi provider list/switch/qualify` | Manage and qualify Provider candidates |
+| `boi registry init/list/add` | Manage explicit Skill and Tool indexes |
+| `boi config` / `boi model` | Inspect or change runtime configuration |
+| `boi doctor` | Run local health checks |
+| `boi skill` / `boi memory` | Manage installed Skills and local memory |
+| `boi persona` | Show the fixed Core Persona compatibility contract |
+| `boi version` / `boi upgrade` | Inspect or update the binary |
 
----
+Use `boi <command> --help` for the live flag contract. The legacy `boi run`
+shell helper is not part of the Agent Tool authority path.
 
-## 🧩 Personas
+## Workspace layout
 
-| Persona | Role | Model | Temp |
-|---------|------|-------|------|
-| **kamkaew** | Runtime Orchestration *(default)* | gpt-4.1-mini | 0.5 |
-| **boi** | Architecture & System Design | claude-sonnet-5 | 0.4 |
-| **kampun** | Knowledge Mining & Pattern Analysis | claude-sonnet-5 | 0.3 |
-| **dang** | Debug & Code Specialist | gpt-4.1-mini | 0.2 |
-| **don** | Research & Documentation | gpt-4.1-nano | 0.5 |
-| **kine** | Creative Design & Imagination | gpt-4o | 0.8 |
-
-```bash
-boi persona list              # View all
-boi persona switch dang       # Switch persona
-boi ask "debug this" -p dang  # Use for one query
+```text
+workspace/
+├── .boi/
+│   ├── agent.yaml
+│   ├── config.yaml
+│   ├── provider-profiles/
+│   ├── registry/
+│   │   ├── skills.json
+│   │   └── tools.json
+│   ├── skills/
+│   └── memory/
+└── agent-folder/
+    ├── bin/
+    └── output/
 ```
 
----
+Completed task manifests live under `agent-folder/output/<task-id>/`. Failed or
+cancelled task diagnostics remain under `agent-folder/bin/<task-id>/`. Cleanup
+is bin-only and dry-run by default.
 
-## 📖 Commands
+## Safety and current limits
 
-| Command | Description |
-|---------|-------------|
-| `boi` | Launch TUI (full-screen terminal) |
-| `boi setup` | TUI wizard — configure providers with arrow keys |
-| `boi ask "..."` | AI agent query (ReAct loop) |
-| `boi persona list/switch/wizard` | Manage personas |
-| `boi provider list/switch` | Manage LLM providers |
-| `boi model <name>` | Set default model |
-| `boi config` | View configuration |
-| `boi upgrade` | Self-update to latest |
-| `boi version` | Show version |
+- The Workspace Sandbox enforces path boundaries; it is not OS or container
+  isolation.
+- Mutating Tools require exact interactive approval. Side-effecting Automation
+  remains disabled.
+- MCP primitives exist, but full discovery and Library routing are not yet on
+  the main Agent path.
+- SubAgent execution is disabled until its separate authority and evaluation
+  gate is accepted.
+- BOI CLI is network-capable and is not designed as offline-first.
+- Android ARM64 cross-build is verified; physical S25+ runtime acceptance is a
+  separate, still-required validation path.
 
----
+## Architecture and release status
 
-## 📸 Screenshot
+- [Work 1 plan](docs/planning/WORK_1_PLAN.md)
+- [CLI command reference](docs/reference/CLI_COMMANDS.md)
+- [Work 1 release and rollback notes](docs/operations/WORK_1_RELEASE.md)
+- [Project handoff](HANDOFF.md)
 
-```
-┌─ BOI CLI  [Mid] ─── Persona: kampun ── openai ████░░  idle ✓ ──────┐
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│ ╭─ ▶ You                                            15:04 ──────────╮│
-│ │                                                                   ││
-│ │  login bug เกิดจากอะไร                                             ││
-│ │                                                                   ││
-│ ╰───────────────────────────────────────────────────────────────────╯│
-│                                                                      │
-│ ╭─ ◆ BOI · openai/gpt-4.1-mini · 450 tok            15:04 ─────────╮│
-│ │                                                                   ││
-│ │  Root cause: special characters in password                       ││
-│ │  Fixed by URL-encoding in auth.js line 45                         ││
-│ │                                                                   ││
-│ ╰───────────────────────────────────────────────────────────────────╯│
-│                                                                      │
-├──────────────────────────────────────────────────────────────────────┤
-│ > login bug มันเกิดจากอะไรครับ                                        │
-├──────────────────────────────────────────────────────────────────────┤
-│ ▸ /help  /persona  /clear  /provider  /model                        │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## ❓ FAQ
-
-**Do I need a server or database?** No. Single Go binary (15 MB). Everything lives in `.boi/`.
-
-**Does it work without an API key?** Yes — simulated mode. Run `boi setup` for real AI.
-
-**How many providers can I chain?** Up to 20. Auto-rotate when near limit — status bar shows `████░░`.
-
-**How is this different from Claude Code / Codex CLI?** 6 specialized personas, TUI setup wizard with model picker, auto-fallback rotation with usage %, chat bubbles with metadata — all as a single binary.
-
----
-
-<p align="center">
-  <a href="https://github.com/wersoul-source/BOI-CLI">
-    <img src="https://img.shields.io/github/stars/wersoul-source/BOI-CLI?style=social" alt="Stars">
-  </a>
-</p>
-
-<p align="center">
-  <b>BOI CLI</b> — Built by <b>Kampun (คำปัน)</b> &amp; the <b>BOI Family</b><br>
-  <sub>MIT License · July 2026</sub>
-</p>
+License: MIT

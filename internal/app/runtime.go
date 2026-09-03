@@ -43,6 +43,9 @@ func NewRuntime(version string) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create Agent Folder: %w", err)
 	}
+	if err := EnsureCapabilityIndexes(boiDir); err != nil {
+		return nil, fmt.Errorf("migrate capability indexes: %w", err)
+	}
 	return &Runtime{
 		Version:         version,
 		WorkspaceRoot:   root,

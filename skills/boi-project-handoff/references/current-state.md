@@ -36,6 +36,9 @@
 - Automation accepts argv or bounded piped UTF-8 stdin, never prompts for missing input, and keeps verbose diagnostics on stderr.
 - Automation idempotency keys are host-hashed and namespaced; raw keys are not persisted.
 - Work 1 Automation is read-only: approval-required mutation is deterministically denied without waiting or execution, and no cross-process replay-cache claim is made.
+- Work 1 task fixtures cover explanation, repository inspection, report creation, approved write, rejection, cancellation, Provider failure, and bounded recovery.
+- Migrated workspaces receive only missing registry indexes; existing config and legacy Persona files are preserved and loose Skills remain unexposed.
+- README, command reference, and release/rollback notes describe the one-Persona, qualified-Provider product contract.
 
 ## Implemented but not connected to the main Agent path
 
@@ -46,10 +49,10 @@
 - Add Service health and MCP routing without an offline-operation guarantee.
 - Add gated SubAgent Market workflow.
 
-## Known documentation drift
+## Documentation boundary
 
-- README still advertises six Personas and simulated mode without API keys.
-- Archived and lifecycle documents may describe earlier architecture as complete.
+- README and the CLI command reference match Work 1.
+- Archived and lifecycle documents may still describe historical architecture and must not override the live executable or Work 1 plan.
 
 ## Verification at handoff preparation
 
@@ -106,3 +109,10 @@
 - Non-interactive mutation test proves `needs_approval`, hashed key propagation, no wait, and no filesystem side effect.
 - Built-binary smoke proves empty piped stdin emits one `invalid_input` JSON object, no stderr, and process exit code 2.
 - Full repository tests, vet, native build, and Android ARM64 cross-build: passed.
+
+## Verification after Work 1 Phase W1.7
+
+- Deterministic Work 1 end-to-end and migrated-workspace compatibility fixtures: passed.
+- Headless TUI state/render and built CLI contract smokes: passed.
+- Full repository tests, vet, native build, and cross-build targets: passed.
+- Physical S25+ runtime and live billable Provider qualification: not verified by the host path.

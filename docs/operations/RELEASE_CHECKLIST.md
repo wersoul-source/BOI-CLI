@@ -150,7 +150,7 @@
 - [ ] Run `boi --version` → correct version
 - [ ] Run `boi init` → creates `.boi/` workspace
 - [ ] Run `boi` → TUI launches without error
-- [ ] Run `boi ask "hello"` → response (simulated OK if no API key)
+- [ ] Qualify a configured Provider, then run `boi ask "hello"` → real response
 - [ ] Check `boi --help` shows all commands
 - [ ] Update `PROGRESS.md` with release notes
 - [ ] Update `LEARNING_JOURNAL.md` with session notes (if applicable)

@@ -6,6 +6,10 @@ The authoritative plan for the 90% target is
 [`docs/planning/WORK_1_PLAN.md`](../../../docs/planning/WORK_1_PLAN.md). The
 historical H-phase mapping below remains only for traceability.
 
+Work 1 W1.0-W1.7 is complete on the host release path. The remaining work below
+is either separate physical-mobile acceptance or gated Work 2 scope; it is not
+permission to enable SubAgents, side-effecting Automation, or MCP discovery.
+
 ## Phase H0 - Handoff and mobile baseline
 
 - Publish the handoff Skill and knowledge package.

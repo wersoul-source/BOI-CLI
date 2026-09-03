@@ -13,8 +13,9 @@ components may exist, but disconnected operation is not a Work 1 guarantee.
 
 ## Current direction assessment
 
-The current repository is aligned with Work 1 at the Runtime-foundation level,
-but it is not yet a Work 1 product.
+The current repository implements the Work 1 product contract and has completed
+host-level product acceptance. Physical S25+ acceptance and live third-party
+Provider qualification remain external validation gates.
 
 | Work 1 capability | Current evidence | Status | Readiness |
 |---|---|---|---:|
@@ -28,12 +29,14 @@ but it is not yet a Work 1 product.
 | Planning/verification/recovery | Versioned Plan, host-observation Verifier, bounded Recoverer, re-plan revisions, and trace evidence | Complete implementation | 100% |
 | Agent Folder | Workspace-visible `bin`/`output` trays, task scopes, checkpoints, artifact hashes, manifests, and explicit bin cleanup | Complete implementation | 100% |
 | Automation contract | JSON schema v1, argv/stdin contract, stream separation, stable exit codes, cancellation, idempotency hashing, and deterministic mutation denial | Complete read-only implementation | 100% |
-| Acceptance/evaluation | Unit and adversarial tests exist; no complete Work 1 task suite | Partial | 55% |
+| Acceptance/evaluation | Deterministic end-to-end task fixtures, migrated-workspace compatibility, CLI smoke, and headless TUI smoke | Complete on host; physical mobile pending | 100% host |
 
-Weighted implementation readiness after W1.6 is approximately **96%**.
-Architectural direction alignment is approximately **99%**, because Runtime,
-Agent Folder, and read-only Automation now share one contract while SubAgents
-remain disabled.
+Weighted Work 1 implementation readiness after W1.7 is **100%** for the defined
+repository scope. Product confidence remains the planned **90-92%** until the
+same commit passes physical S25+ and explicitly requested live-Provider checks.
+Architectural direction alignment remains approximately **99%** because Runtime,
+Agent Folder, and read-only Automation share one contract while SubAgents stay
+disabled by design.
 
 ## Scope boundaries
 
@@ -293,6 +296,9 @@ Verification:
 
 ### W1.7 - Product acceptance
 
+Status: **Complete on the host release path**. Physical S25+ acceptance remains
+a separate evidence gate and is not inferred from cross-compilation.
+
 Tasks:
 
 1. Add end-to-end task fixtures covering explanation, repository inspection,
@@ -311,6 +317,18 @@ Acceptance:
 - SubAgent remains disabled.
 - Observed behavior matches the published contracts.
 
+Verification:
+
+- End-to-end fixtures cover explanation, repository inspection, report
+  creation, approved write, rejection, cancellation, Provider failure, and
+  bounded recovery.
+- Migrated-workspace initialization preserves legacy config and Persona bytes,
+  creates only missing registries, and does not expose loose Skills.
+- Built CLI help and JSON error behavior, headless TUI state/render flow, full
+  tests, vet, native build, and cross-build targets pass.
+- Physical S25+ TUI/runtime behavior and billable live Provider calls are not
+  claimed by this gate.
+
 ## Dependency map
 
 ```text
@@ -321,7 +339,7 @@ W1.0 Architecture baseline [complete]
               -> W1.4 Runtime composition [complete]
                   -> W1.5 Agent Folder [complete]
                       -> W1.6 Automation contract [complete]
-                          -> W1.7 Product acceptance [next]
+                          -> W1.7 Product acceptance [complete on host]
 ```
 
 W1.6 must consume the stable Task ID, manifest path, and artifact references

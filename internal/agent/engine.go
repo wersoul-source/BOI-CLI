@@ -237,6 +237,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "token budget exhausted"), nil
 		}
 		if err != nil {
+			if reason, contextErr := contextStop(runCtx); contextErr != nil {
+				return e.stop(state, started, usage, provider, model, reason, contextErr.Error()), nil
+			}
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseDecide, Err: err, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				return e.stop(state, started, usage, provider, model, StopProviderFailed, err.Error()), nil
 			}
@@ -340,6 +343,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			err := actErr
 			if actContextErr != nil {
 				err = actContextErr
+			}
+			if reason, contextErr := contextStop(runCtx); contextErr != nil {
+				return e.stop(state, started, usage, provider, model, reason, contextErr.Error()), nil
 			}
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				reason := StopToolFailed

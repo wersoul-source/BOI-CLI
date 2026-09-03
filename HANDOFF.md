@@ -6,7 +6,8 @@ This is the entry point for Kampun or any Agent continuing BOI CLI.
 
 - Remote: `https://github.com/wersoul-source/BOI-CLI.git`
 - Primary branch: `master`
-- Published handoff baseline: `f5c0934`
+- Historical architecture baseline: `f5c0934`
+- Pre-W1.7 rollback baseline: `f3db72b`
 - Product version in source: `0.3.0`
 - Language: Go `1.24.2` or later compatible toolchain
 - Main interfaces: TUI (`boi`) and non-interactive CLI (`boi ask`)
@@ -44,12 +45,15 @@ task-scoped checkpoints, versioned artifact manifests, SHA-256 references,
 Provider profile references, and bin-only explicit cleanup. W1.6 provides JSON
 schema v1, bounded argv/stdin input,
 stdout/stderr separation, stable exit codes, signal cancellation, hashed
-idempotency keys, and deterministic non-interactive mutation denial. Continue
-with W1.7 Product acceptance; do not enable side-effecting Automation.
+idempotency keys, and deterministic non-interactive mutation denial. W1.7 adds
+the complete deterministic task fixture suite, migrated-workspace compatibility,
+headless TUI/CLI smoke, corrected product documentation, and release/rollback
+notes. Work 1 is complete on the host release path; do not enable side-effecting
+Automation or SubAgent execution as an implied next step.
 
-The owner is pursuing S25+ through a separate path. Keep physical mobile results
-as external acceptance evidence and do not block the main six-Block sequence on
-that work.
+The owner is pursuing S25+ through a separate path. Cross-build is not physical
+acceptance: keep mobile TUI, Thai input/rendering, filesystem, cancellation,
+Provider networking, and battery/thermal results as external evidence.
 
 Automation with side effects remains gated until non-interactive approval,
 stable machine-readable output, exit codes, and artifact manifests are defined

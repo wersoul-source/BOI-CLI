@@ -6,6 +6,7 @@ func TestAgentPhaseTransitions(t *testing.T) {
 	valid := [][2]AgentPhase{
 		{PhaseObserve, PhaseDecide},
 		{PhaseDecide, PhaseAuthorize},
+		{PhaseDecide, PhaseRecover},
 		{PhaseAuthorize, PhaseAct},
 		{PhaseAct, PhaseVerify},
 		{PhaseVerify, PhaseDecide},
