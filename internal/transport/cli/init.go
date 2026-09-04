@@ -7,6 +7,7 @@ import (
 
 	"github.com/boi-family/boi-cli/internal/app"
 	"github.com/boi-family/boi-cli/internal/config"
+	"github.com/boi-family/boi-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,15 @@ var initCmd = &cobra.Command{
 }
 
 func RunInit(force bool) error {
-	boiDir := ".boi"
+	root, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolve current directory: %w", err)
+	}
+	return RunInitAt(root, force)
+}
+
+func RunInitAt(root string, force bool) error {
+	boiDir := filepath.Join(root, ".boi")
 	configPath := filepath.Join(boiDir, "config.yaml")
 
 	if !force {
@@ -46,14 +55,23 @@ func RunInit(force bool) error {
 		return fmt.Errorf("save config failed: %w", err)
 	}
 
-	gitignore := ".boi/\n"
-	os.WriteFile(filepath.Join(boiDir, ".gitignore"), []byte(gitignore), 0644)
+	gitignore := "*\n!.gitignore\n"
+	if err := os.WriteFile(filepath.Join(boiDir, ".gitignore"), []byte(gitignore), 0o644); err != nil {
+		return fmt.Errorf("protect BOI workspace data: %w", err)
+	}
+	if err := workspace.EnsureLocalGitExcludes(root, ".boi/", ".env", ".env.boi-backup-*"); err != nil {
+		return fmt.Errorf("protect local BOI data from Git: %w", err)
+	}
 
 	skillsDir := filepath.Join(boiDir, "skills")
-	os.MkdirAll(skillsDir, 0755)
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		return fmt.Errorf("create Skill directory: %w", err)
+	}
 
 	memoryDir := filepath.Join(boiDir, "memory")
-	os.MkdirAll(memoryDir, 0755)
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		return fmt.Errorf("create memory directory: %w", err)
+	}
 	if err := app.EnsureCapabilityIndexes(boiDir); err != nil {
 		return fmt.Errorf("initialize capability indexes: %w", err)
 	}

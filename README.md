@@ -25,6 +25,20 @@ controlled TUI/CLI execution path; SubAgent execution remains disabled.
 BOI CLI does not fall back to a simulated AI response. A configured Provider
 must pass `boi provider qualify` before Agent tasks can use it.
 
+## Work 1 status
+
+Work 1 is complete for the single-Agent host path. The Core Persona, qualified
+Provider Router, bounded Registry, Broker, Sandbox, Agent Folder, TUI approval,
+and read-only Automation all use one Agent Service contract. SubAgent and
+side-effecting Automation remain deliberately disabled for Work 2.
+
+Built-binary acceptance runs on Windows and Linux. The shared simulation covers
+Unicode and spaced paths, nested and large folders, approval denial, traversal,
+binary and missing inputs, corrupt registries, and unqualified Providers. The
+Linux suite additionally verifies symlink escape. Linux ARM64 and Android ARM64
+cross-builds are release gates; this establishes the owner-approved Termux/S25+
+compatibility baseline without claiming that a physical handset was exercised.
+
 ## Requirements
 
 - Go 1.24.2 or a compatible later toolchain
@@ -45,6 +59,11 @@ boi
 `boi registry init` is safe and non-overwriting. Normal runtime initialization
 also creates missing indexes so migrated workspaces continue without exposing
 loose, unindexed capability files.
+
+`boi setup` preserves unrelated `.env` values, replaces only its managed
+Provider section, keeps a timestamped backup, uses private file permissions on
+Unix-like systems, and adds local Git excludes for BOI secrets. Setup does not
+qualify a Provider; qualification remains an explicit behavioral test.
 
 The first TUI start asks for the Agent instance name and stores it in
 `.boi/agent.yaml`. This name is not a Persona or a Provider identity.
@@ -78,6 +97,8 @@ to stdout as one object and verbose diagnostics go to stderr. See the
 
 Use `boi <command> --help` for the live flag contract. The legacy `boi run`
 shell helper is not part of the Agent Tool authority path.
+Informational commands such as `--help` and `version` resolve the workspace
+without creating `.boi` or `agent-folder` state.
 
 ## Workspace layout
 
@@ -113,7 +134,24 @@ is bin-only and dry-run by default.
   gate is accepted.
 - BOI CLI is network-capable and is not designed as offline-first.
 - Android ARM64 cross-build is verified; physical S25+ runtime acceptance is a
-  separate, still-required validation path.
+  recommended device check rather than a Work 1 host-release blocker. Linux
+  runtime parity is the accepted Termux/S25+ simulation baseline.
+- `boi upgrade` downloads only from the canonical release repository and
+  verifies the published SHA-256 checksum before replacing the binary.
+
+## Verification
+
+```text
+go test -count=1 ./...
+go vet ./...
+go build ./...
+```
+
+CI runs these gates on Windows and Linux and cross-builds Android ARM64. Manual
+WSL parity can be exercised with
+`scripts/acceptance/linux_folder_simulation.py` and a Linux BOI binary. The
+simulation uses a local OpenAI-compatible fixture and does not prove a live,
+third-party Provider account.
 
 ## Architecture and release status
 

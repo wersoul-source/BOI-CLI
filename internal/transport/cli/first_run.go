@@ -27,7 +27,7 @@ func RunFirstRun(runtime *app.Runtime) {
 	if needsInit {
 		fmt.Println()
 		fmt.Println("🔧 First run — initializing BOI CLI workspace...")
-		if err := RunInit(true); err != nil {
+		if err := RunInitAt(runtime.WorkspaceRoot, true); err != nil {
 			fmt.Printf("  Warning: auto-init failed: %v\n", err)
 		} else {
 			fmt.Println("  ✅ Workspace initialized.")
@@ -40,8 +40,8 @@ func RunFirstRun(runtime *app.Runtime) {
 			fmt.Println("  ✅ Thai font installed (Noto Sans Thai)")
 		}
 	}
-	if err := app.EnsureCapabilityIndexes(boiDir); err != nil {
-		fmt.Printf("  Warning: capability indexes unavailable: %v\n", err)
+	if err := runtime.EnsureWorkspaceState(); err != nil {
+		fmt.Printf("  Warning: workspace state unavailable: %v\n", err)
 	}
 
 	needsSetup := !envfile.HasProviders(envPath)
@@ -53,7 +53,9 @@ func RunFirstRun(runtime *app.Runtime) {
 		fmt.Println("  Step 1: Configure AI Providers")
 		fmt.Println("  (TUI wizard — arrow keys, model picker)")
 		fmt.Println()
-		RunSetupWizard(false)
+		if err := RunSetupWizard(false); err != nil {
+			fmt.Printf("  Warning: provider setup failed: %v\n", err)
+		}
 		envfile.Load(envPath)
 		fmt.Println()
 	}

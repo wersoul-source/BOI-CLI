@@ -73,7 +73,10 @@ task output.
 ### `boi setup`
 
 Runs the interactive Provider configuration wizard. Configuration alone does
-not qualify a Provider for Agent routing.
+not qualify a Provider for Agent routing. BOI preserves unrelated `.env`
+variables, writes its own marked section, creates a timestamped backup when the
+file already exists, and protects local secret paths through Git's local
+exclude file when the workspace is a Git repository.
 
 ### `boi doctor`
 
@@ -164,6 +167,10 @@ and repository map data.
 The legacy `boi run` command executes a shell command directly. It is not part
 of the Agent Engine, Capability Broker, approval, or Tool authority contract;
 do not use it as evidence that an Agent Tool action was authorized.
+
+`boi upgrade` uses releases from `wersoul-source/BOI-CLI`, verifies the
+published `checksums.txt` SHA-256 entry, prepares the replacement before
+switching binaries, and leaves restarting to the user.
 
 ## Removed claims
 

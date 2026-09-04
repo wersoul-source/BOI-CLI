@@ -100,6 +100,11 @@ func TestSandboxRejectsSymlinkEscape(t *testing.T) {
 	if err := os.Symlink(outside, link); err != nil {
 		t.Skipf("symlink creation unavailable: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := os.Remove(link); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove test symlink: %v", err)
+		}
+	})
 
 	sandbox, err := NewSandbox(root)
 	if err != nil {

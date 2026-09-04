@@ -334,9 +334,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		if err := e.transition(state, PhaseAct, step); err != nil {
 			return e.invalidStateResult(state, started, err), nil
 		}
+		actStarted := time.Now()
 		actCtx, actCancel := context.WithTimeout(runCtx, call.Timeout)
 		toolResult, actErr := e.Actor.Act(actCtx, *call, authorization)
-		e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
 		actContextErr := actCtx.Err()
 		actCancel()
 		if actErr != nil || actContextErr != nil {
@@ -344,6 +344,8 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			if actContextErr != nil {
 				err = actContextErr
 			}
+			normalizeToolFailure(&toolResult, call.ID, err, actStarted)
+			e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
 			if reason, contextErr := contextStop(runCtx); contextErr != nil {
 				return e.stop(state, started, usage, provider, model, reason, contextErr.Error()), nil
 			}
@@ -357,6 +359,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			lastResult = &toolResult
 			continue
 		}
+		e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
 		if err := toolResult.Validate(); err != nil {
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				return e.stop(state, started, usage, provider, model, StopToolFailed, err.Error()), nil
@@ -392,6 +395,28 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		}
 	}
 	return e.stop(state, started, usage, provider, model, StopMaxSteps, "maximum Agent steps reached"), nil
+}
+
+func normalizeToolFailure(result *ToolResult, callID string, err error, started time.Time) {
+	if result.CallID == "" {
+		result.CallID = callID
+	}
+	if result.StartedAt.IsZero() {
+		result.StartedAt = started
+	}
+	result.FinishedAt = time.Now()
+	result.Status = ToolFailed
+	result.ErrorClass = "execution"
+	if errors.Is(err, context.DeadlineExceeded) {
+		result.Status = ToolTimedOut
+		result.ErrorClass = "timeout"
+	} else if errors.Is(err, context.Canceled) {
+		result.Status = ToolCancelled
+		result.ErrorClass = "cancelled"
+	}
+	if err != nil {
+		result.ErrorMessage = err.Error()
+	}
 }
 
 func (e *Engine) authorize(ctx context.Context, call ToolCall) (Authorization, error) {

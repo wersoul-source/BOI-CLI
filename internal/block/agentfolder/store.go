@@ -75,6 +75,20 @@ type checkpoint struct {
 }
 
 func NewStore(root string) (*Store, error) {
+	store, err := OpenStore(root)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.Ensure(); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+// OpenStore resolves an Agent Folder without creating it. This keeps read-only
+// CLI commands side-effect free; Begin and explicit initialization still call
+// Ensure before writing task state.
+func OpenStore(root string) (*Store, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
 		return nil, fmt.Errorf("Agent Folder root is required")
@@ -83,11 +97,7 @@ func NewStore(root string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve Agent Folder root: %w", err)
 	}
-	store := &Store{root: filepath.Clean(abs), now: func() time.Time { return time.Now().UTC() }}
-	if err := store.Ensure(); err != nil {
-		return nil, err
-	}
-	return store, nil
+	return &Store{root: filepath.Clean(abs), now: func() time.Time { return time.Now().UTC() }}, nil
 }
 
 func (s *Store) Root() string       { return s.root }

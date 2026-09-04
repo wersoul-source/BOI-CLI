@@ -69,6 +69,9 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 		if len(providers) == 0 {
 			return finishAsk(cmd, nil, unavailable("no qualified providers; run 'boi provider qualify <name>'", nil))
 		}
+		if err := runtime.EnsureWorkspaceState(); err != nil {
+			return finishAsk(cmd, nil, unavailable("initialize workspace state", err))
+		}
 
 		dbDir := filepath.Join(runtime.BoiDir, "memory")
 		store, err := memory.Open(dbDir)

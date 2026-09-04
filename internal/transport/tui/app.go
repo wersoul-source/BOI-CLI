@@ -596,7 +596,7 @@ var helpText = `Available commands:
 
 Keyboard shortcuts:
   Enter      Send message
-  Tab        Switch persona (or autocomplete for /commands)
+  Tab        Autocomplete /commands
   Ctrl+N     Newline in input
   Ctrl+L     Clear chat
   Ctrl+Q     Quit

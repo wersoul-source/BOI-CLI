@@ -21,13 +21,12 @@ var setupCmd = &cobra.Command{
 	Short: "Configure AI providers interactively (TUI wizard)",
 	Long:  `Interactive TUI wizard to configure AI provider API keys for auto-fallback.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		RunSetupWizard(setupRefresh)
-		return nil
+		return RunSetupWizard(setupRefresh)
 	},
 }
 
 // RunSetupWizard launches the interactive provider setup TUI.
-func RunSetupWizard(refresh bool) {
+func RunSetupWizard(refresh bool) error {
 	reg := registry.LoadEmbedded()
 
 	if refresh {
@@ -38,12 +37,20 @@ func RunSetupWizard(refresh bool) {
 	}
 
 	result := setup.Run(reg)
+	if result.Err != nil {
+		return fmt.Errorf("save Provider configuration: %w", result.Err)
+	}
 	if result.Cancelled {
 		fmt.Println("  Setup cancelled.")
-		return
+		return nil
 	}
 	if len(result.Providers) == 0 {
 		fmt.Println("  No providers configured.")
-		return
+		return nil
 	}
+	fmt.Printf("  Provider configuration saved securely: %s\n", result.EnvPath)
+	if result.BackupPath != "" {
+		fmt.Printf("  Previous environment backed up: %s\n", result.BackupPath)
+	}
+	return nil
 }

@@ -38,8 +38,7 @@ var upgradeCmd = &cobra.Command{
 			return fmt.Errorf("upgrade failed: %w", err)
 		}
 
-		fmt.Println("Upgrade complete! Restarting...")
-		platformupdate.RestartSelf()
+		fmt.Println("Upgrade complete. Restart BOI CLI to use the new version.")
 		return nil
 	},
 }

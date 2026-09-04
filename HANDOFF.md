@@ -51,6 +51,17 @@ headless TUI/CLI smoke, corrected product documentation, and release/rollback
 notes. Work 1 is complete on the host release path; do not enable side-effecting
 Automation or SubAgent execution as an implied next step.
 
+Post-W1.7 debug hardening makes runtime discovery read-only, protects and backs
+up Provider environment configuration, removes blocking endpoint probes from
+the Setup TUI, rejects nil Provider contracts, stabilizes the Windows symlink
+fixture, and binds checksum-verified upgrades to the canonical GitHub remote.
+
+Work 1 finalization adds repeatable built-binary folder simulations on Windows
+and Linux/WSL, Linux symlink-escape coverage, Linux/Android ARM64 build gates,
+and structured Tool failure observations before Agent recovery. GitHub CI runs
+the repository tests, vet, and build on both Windows and Linux. This is the
+single-Agent release baseline; Work 2 remains gated.
+
 The owner is pursuing S25+ through a separate path. Cross-build is not physical
 acceptance: keep mobile TUI, Thai input/rendering, filesystem, cancellation,
 Provider networking, and battery/thermal results as external evidence.

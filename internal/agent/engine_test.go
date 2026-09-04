@@ -11,10 +11,12 @@ import (
 type sequenceDecider struct {
 	decisions []Decision
 	errors    []error
+	inputs    []DecisionInput
 	calls     int
 }
 
-func (d *sequenceDecider) Decide(_ context.Context, _ DecisionInput) (Decision, error) {
+func (d *sequenceDecider) Decide(_ context.Context, input DecisionInput) (Decision, error) {
+	d.inputs = append(d.inputs, input)
 	index := d.calls
 	d.calls++
 	var decision Decision
@@ -165,6 +167,10 @@ func TestEngineRecoversFromToolFailure(t *testing.T) {
 	}
 	if result.Plan == nil || result.Plan.Revision != 2 {
 		t.Fatalf("recovery did not revise Plan: %#v", result.Plan)
+	}
+	observed := decider.inputs[1].LastResult
+	if observed == nil || observed.Status != ToolFailed || observed.ErrorClass != "execution" || observed.ErrorMessage != "temporary failure" || observed.FinishedAt.IsZero() {
+		t.Fatalf("tool failure observation was not normalized: %#v", observed)
 	}
 }
 

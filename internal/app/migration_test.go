@@ -42,6 +42,9 @@ func TestLegacyWorkspaceMigratesWithoutOverwritingUserFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := runtime.EnsureWorkspaceState(); err != nil {
+		t.Fatal(err)
+	}
 	for path, want := range map[string][]byte{
 		filepath.Join(root, ".boi", "config.yaml"):              legacyConfig,
 		filepath.Join(root, ".boi", "personas", "kamkaew.yaml"): legacyPersona,

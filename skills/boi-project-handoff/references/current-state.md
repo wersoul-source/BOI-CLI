@@ -39,6 +39,13 @@
 - Work 1 task fixtures cover explanation, repository inspection, report creation, approved write, rejection, cancellation, Provider failure, and bounded recovery.
 - Migrated workspaces receive only missing registry indexes; existing config and legacy Persona files are preserved and loose Skills remain unexposed.
 - README, command reference, and release/rollback notes describe the one-Persona, qualified-Provider product contract.
+- Informational CLI startup is read-only; Agent/TUI paths explicitly initialize missing registries and Agent Folder trays.
+- Provider setup preserves unrelated environment variables, backs up existing files, applies private Unix permissions, and protects local secrets with Git excludes.
+- Upgrade source matches `wersoul-source/BOI-CLI` and requires the published SHA-256 checksum before binary replacement.
+- Nil successful Provider responses are typed failures instead of Agent panics; Setup TUI performs no blocking network probe in its update loop.
+- Failed Tool executions are normalized before recovery with typed status, error class, error message, Call ID, and timing so Provider decisions receive an explicit host observation.
+- Built-binary folder simulations pass on Windows and Linux/WSL; Linux additionally verifies symlink escape and the source-data hash remains unchanged.
+- CI executes tests, vet, and build on Windows and Linux and cross-builds Android ARM64.
 
 ## Implemented but not connected to the main Agent path
 
@@ -116,3 +123,17 @@
 - Headless TUI state/render and built CLI contract smokes: passed.
 - Full repository tests, vet, native build, and cross-build targets: passed.
 - Physical S25+ runtime and live billable Provider qualification: not verified by the host path.
+
+## Verification after post-W1.7 debug hardening
+
+- `go test -count=1 -shuffle=on ./...`: passed.
+- Windows symlink escape test repeated 25 times: passed.
+- `go vet ./...`, native build, and Linux/macOS/Android cross-builds: passed.
+- Built-binary smoke proves help, version, and invalid JSON input create no workspace state; explicit init creates protected state.
+
+## Verification after Work 1 finalization
+
+- Windows built-binary simulation: passed all recursive folder, bounded listing, approval denial, traversal, binary, missing, corrupt Registry, and unqualified Provider scenarios.
+- Linux built-binary simulation on WSL2: passed the same contract plus symlink escape on a native Linux temporary filesystem.
+- Linux ARM64 and Android ARM64 cross-builds: passed; accepted as the owner-approved S25+/Termux simulation baseline without claiming physical-device execution.
+- Full shuffled repository tests, vet, native build, and diff checks: passed before release commit.

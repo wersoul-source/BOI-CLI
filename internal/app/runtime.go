@@ -26,7 +26,9 @@ type Runtime struct {
 	Sandbox         *workspace.Sandbox
 }
 
-// NewRuntime resolves workspace-scoped paths once at process startup.
+// NewRuntime resolves workspace-scoped paths once at process startup without
+// creating files. Commands that perform Agent work call EnsureWorkspaceState;
+// informational commands therefore remain read-only.
 func NewRuntime(version string) (*Runtime, error) {
 	root, err := workspace.DetectRoot()
 	if err != nil {
@@ -39,12 +41,9 @@ func NewRuntime(version string) (*Runtime, error) {
 		return nil, fmt.Errorf("create workspace sandbox: %w", err)
 	}
 	agentFolderRoot := filepath.Join(root, "agent-folder")
-	agentFolder, err := agentfolder.NewStore(agentFolderRoot)
+	agentFolder, err := agentfolder.OpenStore(agentFolderRoot)
 	if err != nil {
-		return nil, fmt.Errorf("create Agent Folder: %w", err)
-	}
-	if err := EnsureCapabilityIndexes(boiDir); err != nil {
-		return nil, fmt.Errorf("migrate capability indexes: %w", err)
+		return nil, fmt.Errorf("resolve Agent Folder: %w", err)
 	}
 	return &Runtime{
 		Version:         version,
@@ -57,6 +56,21 @@ func NewRuntime(version string) (*Runtime, error) {
 		AgentFolder:     agentFolder,
 		Sandbox:         sandbox,
 	}, nil
+}
+
+// EnsureWorkspaceState performs the additive, non-overwriting initialization
+// required by TUI and Agent execution paths.
+func (r *Runtime) EnsureWorkspaceState() error {
+	if r == nil || r.AgentFolder == nil {
+		return fmt.Errorf("application runtime is not configured")
+	}
+	if err := r.AgentFolder.Ensure(); err != nil {
+		return fmt.Errorf("create Agent Folder: %w", err)
+	}
+	if err := EnsureCapabilityIndexes(r.BoiDir); err != nil {
+		return fmt.Errorf("migrate capability indexes: %w", err)
+	}
+	return nil
 }
 
 // WithRuntime attaches the process runtime to a request context.

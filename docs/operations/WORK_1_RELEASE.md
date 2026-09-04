@@ -32,9 +32,22 @@ Loose Skill or Tool files remain inactive until explicitly registered.
 | CLI parser/JSON smoke | Passed on built Windows binary |
 | TUI state/render smoke | Passed headlessly; not a physical-terminal test |
 | Native build and vet | Passed on Windows host |
-| Android ARM64 cross-build | Passed; build evidence only |
+| Windows built-binary folder simulation | Passed, including structured Tool failures |
+| Linux built-binary folder simulation | Passed on WSL2, including symlink escape |
+| Linux ARM64 and Android ARM64 cross-build | Passed; accepted S25+/Termux simulation baseline |
 | Live third-party Provider qualification | Not run automatically; may be billable |
-| Physical S25+ Termux/TUI/runtime | Not verified in this release path |
+| Physical S25+ Termux/TUI/runtime | Not exercised; recommended follow-up, not a host-release blocker |
+
+Post-W1.7 hardening additionally verifies that clean shuffled tests pass,
+Windows symlink fixtures clean up deterministically, informational CLI commands
+do not create workspace state, Provider setup preserves and secures existing
+environment data, nil Provider responses cannot panic the Agent, and upgrades
+require the canonical release checksum.
+
+Final Work 1 hardening normalizes every failed Tool Result before recovery so
+the Model observes a typed status, error class, error message, Call ID, and
+timing instead of an ambiguous empty result. CI now runs tests, vet, and build
+on Windows and Linux and cross-builds Android ARM64.
 
 ## Rollback
 
@@ -49,9 +62,9 @@ rewrite legacy Persona/config files. Therefore rollback does not require a
 destructive schema downgrade. New output manifests can remain as historical
 artifacts even when an older binary does not consume them.
 
-## Release blockers outside host acceptance
+## Follow-up evidence outside host acceptance
 
-- Physical S25+ validation must observe `boi version`, `boi doctor`, one TUI
+- Physical S25+ validation should observe `boi version`, `boi doctor`, one TUI
   query, one `boi ask` query, Thai rendering/input, cancellation, storage paths,
   Provider networking, and practical battery/thermal behavior.
 - Side-effecting Automation requires a persistent replay and scoped machine

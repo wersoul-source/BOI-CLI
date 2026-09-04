@@ -8,9 +8,10 @@ import (
 )
 
 type scriptedProvider struct {
-	name   string
-	errors []error
-	calls  int
+	name        string
+	errors      []error
+	calls       int
+	nilResponse bool
 }
 
 func (p *scriptedProvider) Name() string { return p.name }
@@ -18,6 +19,9 @@ func (p *scriptedProvider) Complete(ctx context.Context, req CompletionRequest) 
 	p.calls++
 	if p.calls <= len(p.errors) && p.errors[p.calls-1] != nil {
 		return nil, p.errors[p.calls-1]
+	}
+	if p.nilResponse {
+		return nil, nil
 	}
 	return &CompletionResponse{Content: p.name, Provider: p.name}, nil
 }
@@ -103,5 +107,18 @@ func TestStatsReturnsDefensiveCopy(t *testing.T) {
 	stats[0].CallCount = 99
 	if r.Stats()[0].CallCount != 0 {
 		t.Fatal("caller mutated router stats")
+	}
+}
+
+func TestRouterRejectsNilSuccessfulResponseAndFailsOver(t *testing.T) {
+	one := &scriptedProvider{name: "one", nilResponse: true}
+	two := &scriptedProvider{name: "two"}
+	r := NewRouterWithOptions([]Provider{one, two}, RouterOptions{MaxRetries: 0})
+	resp, err := r.Complete(context.Background(), CompletionRequest{})
+	if err != nil || resp == nil || resp.Provider != "two" {
+		t.Fatalf("response=%#v err=%v", resp, err)
+	}
+	if stats := r.Stats()[0]; stats.SuccessCount != 0 || stats.FailCount != 1 {
+		t.Fatalf("nil response stats=%+v", stats)
 	}
 }

@@ -104,6 +104,9 @@ func (r *Router) Complete(ctx context.Context, req CompletionRequest) (*Completi
 				return nil, err
 			}
 			resp, err := p.Complete(ctx, req)
+			if err == nil && resp == nil {
+				err = &ProviderError{Provider: p.Name(), Class: ErrorUnavailable, Message: "Provider returned an empty response contract"}
+			}
 			r.recordAttempt(idx, resp, err, attempt > 0)
 			if err == nil {
 				r.mu.Lock()

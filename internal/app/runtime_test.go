@@ -42,6 +42,15 @@ func TestNewRuntimeResolvesWorkspacePaths(t *testing.T) {
 	if runtime.AgentFolderRoot != filepath.Join(root, "agent-folder") || runtime.AgentFolder == nil {
 		t.Fatalf("Agent Folder = (%q, %#v)", runtime.AgentFolderRoot, runtime.AgentFolder)
 	}
+	if _, statErr := os.Stat(runtime.AgentFolderRoot); !os.IsNotExist(statErr) {
+		t.Fatalf("read-only runtime created Agent Folder: %v", statErr)
+	}
+	if _, statErr := os.Stat(runtime.BoiDir); !os.IsNotExist(statErr) {
+		t.Fatalf("read-only runtime created BOI directory: %v", statErr)
+	}
+	if err := runtime.EnsureWorkspaceState(); err != nil {
+		t.Fatalf("ensure workspace state: %v", err)
+	}
 	for _, tray := range []string{"bin", "output"} {
 		if info, statErr := os.Stat(filepath.Join(runtime.AgentFolderRoot, tray)); statErr != nil || !info.IsDir() {
 			t.Fatalf("Agent Folder tray %s missing: %v", tray, statErr)
