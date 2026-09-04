@@ -1,5 +1,7 @@
 # BOI CLI
 
+[English](README.md) | [ภาษาไทย](README-TH.md)
+
 BOI CLI is a bounded, tool-using Agent runtime for terminal workspaces. It has
 one Core Persona, `boi`, while each user gives their Agent instance its own name
 on the first TUI launch.
