@@ -129,11 +129,6 @@ func (e *Executor) RunWithDirContext(ctx context.Context, command, dir string) (
 	return output, err
 }
 
-// buildCommand creates the appropriate exec.Cmd for the OS
-func (e *Executor) buildCommand(command, dir string) *exec.Cmd {
-	return e.buildCommandContext(context.Background(), command, dir)
-}
-
 func (e *Executor) buildCommandContext(ctx context.Context, command, dir string) *exec.Cmd {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {

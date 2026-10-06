@@ -57,7 +57,6 @@ type WizardModel struct {
 	curName       string
 	curLabel      string
 	curBaseURL    string
-	curModel      string
 	curCustomText bool // currently entering custom model name via text input
 
 	done      bool

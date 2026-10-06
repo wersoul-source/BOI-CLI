@@ -83,7 +83,9 @@ func TestCapabilityProfileRoundTripAndNoCredentials(t *testing.T) {
 
 func TestTargetFingerprintEquivalentForSameInputs(t *testing.T) {
 	target := ProviderTarget{Provider: "OpenAI", Model: "m", EndpointClass: "Official"}
-	if TargetFingerprint(target, ProbeSuiteVersion) != TargetFingerprint(target, ProbeSuiteVersion) {
+	first := TargetFingerprint(target, ProbeSuiteVersion)
+	second := TargetFingerprint(target, ProbeSuiteVersion)
+	if first != second {
 		t.Fatal("fingerprint is not deterministic")
 	}
 }
