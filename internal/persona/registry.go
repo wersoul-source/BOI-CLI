@@ -49,7 +49,7 @@ func Load(path string) (*Registry, error) {
 			return nil, fmt.Errorf("load persona %s: %w", entry.Name(), err)
 		}
 
-		r.personas[p.Name] = p
+		r.Register(p)
 	}
 
 	if len(r.personas) == 0 {
