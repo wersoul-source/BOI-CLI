@@ -9,17 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+	"github.com/boi-family/boi-cli/internal/equipment/tools/mcp"
 )
-
-func testBroker(t *testing.T) *Broker {
-	t.Helper()
-	sandbox, err := workspace.NewSandbox(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return NewBroker(sandbox)
-}
 
 func TestParseDecisionRejectsModelSecurityFields(t *testing.T) {
 	_, err := ParseDecision(`<boi-action>{"id":"1","tool":"workspace.read","purpose":"inspect","arguments":{"path":"a"},"risk":"read"}</boi-action>`)
@@ -53,11 +44,13 @@ func TestBrokerCapabilityProfileCanDisableAllTools(t *testing.T) {
 }
 
 func TestBrokerRejectsSixteenthActiveTool(t *testing.T) {
-	b := testBroker(t)
+	b := NewBroker()
 	names := make([]string, 16)
 	for index := range names {
 		names[index] = fmt.Sprintf("tool-%02d", index)
-		b.capabilities[names[index]] = Capability{Name: names[index]}
+		if err := b.Register(&fakeTool{name: names[index]}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := b.SetActiveCapabilities(names); err == nil {
 		t.Fatal("expected active Tool limit rejection")
@@ -94,9 +87,9 @@ func TestBrokerPreservesHostIdempotencyNamespace(t *testing.T) {
 }
 
 func TestBrokerDisablesLocalCapabilitiesWithoutWorkspace(t *testing.T) {
-	b := NewBroker(nil)
+	b := NewBroker()
 	if _, err := b.Prepare(ToolCall{ID: "1", Tool: "process.run", Purpose: "run", Arguments: map[string]any{"command": "echo unsafe"}}); err == nil {
-		t.Fatal("process capability enabled without workspace")
+		t.Fatal("process capability enabled without a registered Tool")
 	}
 }
 
@@ -134,7 +127,7 @@ func TestBrokerWritesOnlyAfterExactApproval(t *testing.T) {
 	if err != nil || result.Status != ToolSucceeded {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
-	content, err := os.ReadFile(filepath.Join(b.sandbox.Root(), "note.txt"))
+	content, err := os.ReadFile(filepath.Join(b.root, "note.txt"))
 	if err != nil || string(content) != "hello" {
 		t.Fatalf("content=%q err=%v", content, err)
 	}
@@ -165,8 +158,14 @@ func (f *fakeExternalInvoker) CallTool(context.Context, string, string, map[stri
 func TestMCPToolIsExternalAndApprovalGated(t *testing.T) {
 	b := testBroker(t)
 	invoker := &fakeExternalInvoker{}
-	if err := b.RegisterMCP("docs", []string{"search"}, invoker); err != nil {
+	tools, err := mcp.Tools("docs", []string{"search"}, invoker)
+	if err != nil {
 		t.Fatal(err)
+	}
+	for _, tool := range tools {
+		if err := b.Register(tool); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if _, err := b.Prepare(ToolCall{ID: "m0", Tool: "mcp.docs.search", Purpose: "probe", Arguments: map[string]any{"query": "agent"}}); err == nil {
 		t.Fatal("registered MCP Tool became active without registry selection")
@@ -194,5 +193,43 @@ func TestMCPToolIsExternalAndApprovalGated(t *testing.T) {
 	result, err := b.Act(context.Background(), call, Authorization{Allowed: true, State: ApprovalApproved, Request: &request})
 	if err != nil || result.Status != ToolSucceeded || invoker.calls != 1 {
 		t.Fatalf("result=%#v calls=%d err=%v", result, invoker.calls, err)
+	}
+}
+
+func TestBrokerRejectsDuplicateAndInvalidTools(t *testing.T) {
+	b := NewBroker()
+	if err := b.Register(&fakeTool{name: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Register(&fakeTool{name: "x"}); err == nil {
+		t.Fatal("duplicate Tool name accepted")
+	}
+	if err := b.Register(&fakeTool{name: ""}); err == nil {
+		t.Fatal("unnamed Tool accepted")
+	}
+	if err := b.Register(nil); err == nil {
+		t.Fatal("nil Tool accepted")
+	}
+}
+
+func TestNewToolNeedsNoBrokerChange(t *testing.T) {
+	b := NewBroker()
+	tool := &fakeTool{name: "custom.echo"}
+	if err := b.Register(tool); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SetActiveCapabilities([]string{"custom.echo"}); err != nil {
+		t.Fatal(err)
+	}
+	call, err := b.Prepare(ToolCall{ID: "c1", Tool: "custom.echo", Purpose: "probe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := b.Act(context.Background(), call, Authorization{})
+	if err != nil || result.Output != "ok" || tool.calls != 1 {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if !strings.Contains(ToolPrompt(b), "custom.echo()") {
+		t.Fatal("ToolPrompt must list the registered Tool's usage")
 	}
 }

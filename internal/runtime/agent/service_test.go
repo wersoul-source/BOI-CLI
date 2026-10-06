@@ -114,7 +114,7 @@ func TestServiceComposesAgentFolderScopeAndProviderProfile(t *testing.T) {
 		ID: "task-test", BinDir: filepath.Join(root, "agent-folder", "bin", "task-test"),
 		OutputDir: filepath.Join(root, "agent-folder", "output", "task-test"), StartedAt: time.Now(),
 	}}
-	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	service := withWorkspaceTools(t, NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox), sandbox)
 	service.SetTaskRecorder(recorder)
 	service.SetProviderProfileReference("capture", "test-model", ".boi/provider-profiles/test.json")
 	result, err := service.Run(context.Background(), "produce a report")
@@ -140,7 +140,7 @@ func TestAutomationMutationIsDeniedWithoutWaitingOrWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := &sequenceProvider{responses: []string{`<boi-action>{"id":"write-automation","tool":"workspace.write","purpose":"save","arguments":{"path":"blocked.txt","content":"no"}}</boi-action>`}}
-	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	service := withWorkspaceTools(t, NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox), sandbox)
 	result, err := service.RunAutomation(context.Background(), "write a file", "automation-001")
 	if err == nil || result == nil || result.StopReason != StopNeedsApproval {
 		t.Fatalf("result=%#v err=%v", result, err)
@@ -160,7 +160,7 @@ func TestServiceInteractiveApprovalCompletesWriteLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := &sequenceProvider{responses: []string{`<boi-action>{"id":"write-1","tool":"workspace.write","purpose":"save note","arguments":{"path":"note.txt","content":"hello"}}</boi-action>`, "saved"}}
-	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	service := withWorkspaceTools(t, NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox), sandbox)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	events := service.Start(ctx, "save note")

@@ -8,25 +8,29 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/boi-family/boi-cli/internal/block/port"
 )
 
-type RiskClass string
+// RiskClass and ApprovalClass are owned by the plug-in port so Tools in other
+// Blocks share the exact policy vocabulary the Broker enforces.
+type RiskClass = port.Risk
 
 const (
-	RiskRead     RiskClass = "read"
-	RiskChange   RiskClass = "change"
-	RiskExecute  RiskClass = "execute"
-	RiskExternal RiskClass = "external"
-	RiskCritical RiskClass = "critical"
+	RiskRead     = port.RiskRead
+	RiskChange   = port.RiskChange
+	RiskExecute  = port.RiskExecute
+	RiskExternal = port.RiskExternal
+	RiskCritical = port.RiskCritical
 )
 
-type ApprovalClass string
+type ApprovalClass = port.Approval
 
 const (
-	ApprovalAuto     ApprovalClass = "auto"
-	ApprovalConfirm  ApprovalClass = "confirm"
-	ApprovalCritical ApprovalClass = "critical"
-	ApprovalDenied   ApprovalClass = "denied"
+	ApprovalAuto     = port.ApprovalAuto
+	ApprovalConfirm  = port.ApprovalConfirm
+	ApprovalCritical = port.ApprovalCritical
+	ApprovalDenied   = port.ApprovalDenied
 )
 
 // ToolCall is an untrusted proposal from an Agent. It cannot execute itself;
@@ -87,24 +91,6 @@ func (c ToolCall) Fingerprint() (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func (r RiskClass) Valid() bool {
-	switch r {
-	case RiskRead, RiskChange, RiskExecute, RiskExternal, RiskCritical:
-		return true
-	default:
-		return false
-	}
-}
-
-func (a ApprovalClass) Valid() bool {
-	switch a {
-	case ApprovalAuto, ApprovalConfirm, ApprovalCritical, ApprovalDenied:
-		return true
-	default:
-		return false
-	}
-}
-
 type ToolResultStatus string
 
 const (
@@ -130,11 +116,7 @@ type ToolResult struct {
 	FinishedAt   time.Time
 }
 
-type Evidence struct {
-	Kind    string
-	Summary string
-	Ref     string
-}
+type Evidence = port.Evidence
 
 func (r ToolResult) Validate() error {
 	if strings.TrimSpace(r.CallID) == "" {

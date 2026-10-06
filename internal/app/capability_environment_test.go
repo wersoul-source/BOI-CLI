@@ -23,7 +23,7 @@ func TestLooseSkillFileIsNotExposedUntilIndexed(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := coreblock.AgentEnvironment{ToolCalling: true, SkillCalling: true, ContextBytes: 4096}
-	set, err := SelectCapabilities(boiDir, "loose", env)
+	set, err := SelectCapabilities(boiDir, "loose", env, builtinToolNames)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestLooseSkillFileIsNotExposedUntilIndexed(t *testing.T) {
 	if err := capability.AddEntry(capability.IndexPath(boiDir, capability.KindSkill), capability.KindSkill, entry); err != nil {
 		t.Fatal(err)
 	}
-	set, err = SelectCapabilities(boiDir, "loose", env)
+	set, err = SelectCapabilities(boiDir, "loose", env, builtinToolNames)
 	if err != nil || len(set.Skills.Active) != 1 || set.Skills.Active[0] != "loose" {
 		t.Fatalf("indexed Skill not active: %#v %v", set, err)
 	}
@@ -58,8 +58,10 @@ func TestDefaultToolIndexIsExplicitAndBounded(t *testing.T) {
 	if len(index.Entries) != 4 {
 		t.Fatalf("default Tool entries = %d", len(index.Entries))
 	}
-	set, err := SelectCapabilities(boiDir, "read files", coreblock.AgentEnvironment{ToolCalling: true})
+	set, err := SelectCapabilities(boiDir, "read files", coreblock.AgentEnvironment{ToolCalling: true}, builtinToolNames)
 	if err != nil || len(set.Tools.Active) != 4 {
 		t.Fatalf("default active Tools: %#v %v", set, err)
 	}
 }
+
+var builtinToolNames = []string{"workspace.list", "workspace.read", "workspace.write", "process.run"}

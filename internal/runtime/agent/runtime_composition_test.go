@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/core/persona"
-	"github.com/boi-family/boi-cli/internal/equipment/skill"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
@@ -39,14 +38,16 @@ func TestRuntimeVerifierReadsBackWorkspaceWrite(t *testing.T) {
 	}
 	now := time.Now()
 	result := ToolResult{CallID: "w1", Status: ToolSucceeded, Output: "wrote out.txt", StartedAt: now, FinishedAt: now.Add(time.Millisecond)}
-	verification, err := (RuntimeVerifier{Sandbox: sandbox}).Verify(context.Background(), VerificationInput{ToolCall: &call, ToolResult: &result})
+	b := NewBroker()
+	activateAll(t, b, builtinTools(sandbox))
+	verification, err := (RuntimeVerifier{Tools: b}).Verify(context.Background(), VerificationInput{ToolCall: &call, ToolResult: &result})
 	if err != nil || !verification.Passed || len(verification.Evidence) < 2 {
 		t.Fatalf("valid write not verified: %#v %v", verification, err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "out.txt"), []byte("tampered"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	verification, _ = (RuntimeVerifier{Sandbox: sandbox}).Verify(context.Background(), VerificationInput{ToolCall: &call, ToolResult: &result})
+	verification, _ = (RuntimeVerifier{Tools: b}).Verify(context.Background(), VerificationInput{ToolCall: &call, ToolResult: &result})
 	if verification.Passed {
 		t.Fatal("Model/Tool success claim passed despite failed read-back")
 	}
@@ -72,7 +73,7 @@ func TestBoundedRecovererOnlyRetriesSafeClasses(t *testing.T) {
 func TestServiceLoadsOnlyActiveSkillAsUntrustedContext(t *testing.T) {
 	provider := &sequenceProvider{responses: []string{`<boi-skill>{"name":"git-helper"}</boi-skill>`, "used active instructions"}}
 	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, nil)
-	service.SetSkills([]*skill.Skill{{Name: "git-helper", Description: "Git helper", Prompt: "inspect status"}})
+	service.SetSkills([]SkillDoc{{Name: "git-helper", Description: "Git helper", Instructions: "inspect status"}})
 	result, err := service.Run(context.Background(), "use git helper")
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +89,7 @@ func TestServiceLoadsOnlyActiveSkillAsUntrustedContext(t *testing.T) {
 func TestServiceRejectsInactiveSkill(t *testing.T) {
 	provider := &sequenceProvider{responses: []string{`<boi-skill>{"name":"not-active"}</boi-skill>`}}
 	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, nil)
-	service.SetSkills([]*skill.Skill{{Name: "git-helper", Description: "Git helper", Prompt: "inspect status"}})
+	service.SetSkills([]SkillDoc{{Name: "git-helper", Description: "Git helper", Instructions: "inspect status"}})
 	_, err := service.Run(context.Background(), "use an inactive skill")
 	if err == nil || !strings.Contains(err.Error(), "Skill is not active for this task") {
 		t.Fatalf("inactive Skill was not rejected deterministically: %v", err)

@@ -59,7 +59,7 @@ func TestLegacyWorkspaceMigratesWithoutOverwritingUserFiles(t *testing.T) {
 			t.Fatalf("migrated %s index: %v", kind, err)
 		}
 	}
-	set, err := SelectCapabilities(runtime.BoiDir, "inspect files", coreblock.AgentEnvironment{ToolCalling: true, SkillCalling: true, ContextBytes: 4096})
+	set, err := SelectCapabilities(runtime.BoiDir, "inspect files", coreblock.AgentEnvironment{ToolCalling: true, SkillCalling: true, ContextBytes: 4096}, builtinToolNames)
 	if err != nil {
 		t.Fatal(err)
 	}

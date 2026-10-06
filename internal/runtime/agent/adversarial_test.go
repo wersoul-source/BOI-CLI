@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,7 +39,7 @@ func TestToolObservationIsMarkedAsUntrustedData(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := &sequenceProvider{responses: []string{`<boi-action>{"id":"read-1","tool":"workspace.read","purpose":"inspect note","arguments":{"path":"note.txt"}}</boi-action>`, "safe summary"}}
-	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	service := withWorkspaceTools(t, NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox), sandbox)
 	result, err := service.Run(context.Background(), "inspect note")
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +55,7 @@ func TestToolObservationIsMarkedAsUntrustedData(t *testing.T) {
 
 func TestProcessCannotRunWithoutApproval(t *testing.T) {
 	b := testBroker(t)
-	marker := filepath.Join(b.sandbox.Root(), "must-not-exist.txt")
+	marker := filepath.Join(b.root, "must-not-exist.txt")
 	call, err := b.Prepare(ToolCall{ID: "p1", Tool: "process.run", Purpose: "create marker", Arguments: map[string]any{"command": "Set-Content -LiteralPath '" + marker + "' -Value bad"}})
 	if err != nil {
 		t.Fatal(err)
@@ -86,13 +85,13 @@ func TestWriteIdempotencyPreventsDuplicateExecution(t *testing.T) {
 	if _, err := b.Act(context.Background(), call, auth); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(b.sandbox.Root(), "note.txt"), []byte("external-change"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(b.root, "note.txt"), []byte("external-change"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := b.Act(context.Background(), call, auth); err != nil {
 		t.Fatal(err)
 	}
-	content, _ := os.ReadFile(filepath.Join(b.sandbox.Root(), "note.txt"))
+	content, _ := os.ReadFile(filepath.Join(b.root, "note.txt"))
 	if string(content) != "external-change" {
 		t.Fatalf("duplicate execution overwrote file: %q", content)
 	}
@@ -115,14 +114,5 @@ func TestIdempotencyKeyReuseWithDifferentCallIsRejected(t *testing.T) {
 	secondRequest, _ := NewApprovalRequest("approval_same_2", second, time.Now(), time.Now().Add(time.Minute))
 	if _, err := b.Act(context.Background(), second, Authorization{Allowed: true, State: ApprovalApproved, Request: &secondRequest}); err == nil {
 		t.Fatal("idempotency collision was accepted")
-	}
-}
-
-func TestSubagentsRemainDisabled(t *testing.T) {
-	if SubagentsEnabled {
-		t.Fatal("subagents unexpectedly enabled")
-	}
-	if _, err := NewSubagent().Delegate(context.Background(), "task", "persona"); !errors.Is(err, ErrSubagentsDisabled) {
-		t.Fatalf("got %v", err)
 	}
 }

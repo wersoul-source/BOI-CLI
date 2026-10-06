@@ -2,16 +2,13 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
-	"github.com/boi-family/boi-cli/internal/equipment/memory"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
-	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/spf13/cobra"
 )
@@ -61,40 +58,21 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 		if err != nil {
 			return finishAsk(cmd, nil, unavailable("load providers", err))
 		}
-		qualified := app.QualifiedProviders(runtime.BoiDir, configured)
-		providers := make([]llm.Provider, 0, len(qualified))
-		for _, item := range qualified {
-			providers = append(providers, item.Provider)
-		}
-		if len(providers) == 0 {
+		if len(app.QualifiedProviders(runtime.BoiDir, configured)) == 0 {
 			return finishAsk(cmd, nil, unavailable("no qualified providers; run 'boi provider qualify <name>'", nil))
 		}
 		if err := runtime.EnsureWorkspaceState(); err != nil {
 			return finishAsk(cmd, nil, unavailable("initialize workspace state", err))
 		}
-
-		dbDir := filepath.Join(runtime.BoiDir, "memory")
-		store, err := memory.Open(dbDir)
-		var memHook *memory.MemoryHook
-		if err == nil {
-			extractor := &memory.SimpleExtractor{}
-			memHook = memory.NewMemoryHook(store, extractor)
-			defer store.Close()
+		composed, err := runtime.BuildAgent(configured)
+		if err != nil {
+			return finishAsk(cmd, nil, &CommandError{Code: ExitInternal, Class: "internal", Message: "compose Agent", Cause: err})
 		}
-
-		service := agent.NewService(p, llm.NewRouter(providers), memHook, runtime.Sandbox)
-		service.SetTaskRecorder(runtime.AgentFolder)
-		app.ConfigureProviderProfileReferences(service, runtime.WorkspaceRoot, runtime.BoiDir, qualified)
-		environment := app.ProviderEnvironment(runtime.BoiDir, qualified)
-		service.SetToolCallingAllowed(environment.ToolCalling)
-		capabilities, err := app.SelectCapabilities(runtime.BoiDir, query, environment)
+		service, environment := composed.Service, composed.Environment
+		capabilities, err := composed.PrepareTask(query)
 		if err != nil {
 			return finishAsk(cmd, nil, unavailable("select capability registry; run 'boi registry init'", err))
 		}
-		if err := service.SetActiveTools(capabilities.Tools.Active); err != nil {
-			return finishAsk(cmd, nil, &CommandError{Code: ExitInternal, Class: "internal", Message: "activate Tool registry", Cause: err})
-		}
-		service.SetSkills(capabilities.LoadedSkills)
 		limits := agent.DefaultEngineLimits()
 		limits.MaxSteps = agentSteps
 		service.SetLimits(limits)

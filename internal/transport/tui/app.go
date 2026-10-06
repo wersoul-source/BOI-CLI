@@ -12,7 +12,6 @@ import (
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/capability"
-	"github.com/boi-family/boi-cli/internal/equipment/memory"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
@@ -66,6 +65,7 @@ type Model struct {
 	runtimeEvents   <-chan agent.RuntimeEvent
 	boiDir          string
 	environment     coreblock.AgentEnvironment
+	agent           *app.Agent
 }
 
 func NewApp(runtime *app.Runtime) *Model {
@@ -92,43 +92,25 @@ func NewApp(runtime *app.Runtime) *Model {
 	skillList, skillCount := indexedSkillNames(boiDir)
 	providerCount := 0
 
-	// Load LLM providers and create router
+	// Compose the Agent once through the application composition root.
+	configuredProviders, _ := llmfactory.LoadConfiguredProvidersFromEnv()
+	composed, composeErr := runtime.BuildAgent(configuredProviders)
 	var router *llm.Router
-	configuredProviders, llmErr := llmfactory.LoadConfiguredProvidersFromEnv()
-	qualifiedProviders := app.QualifiedProviders(runtime.BoiDir, configuredProviders)
-	providerCount = len(qualifiedProviders)
+	var agentService *agent.Service
+	var environment coreblock.AgentEnvironment
+	if composeErr == nil {
+		router, agentService, environment = composed.Router, composed.Service, composed.Environment
+		providerCount = len(composed.Qualified)
+	}
 	if providerCount == 0 && len(configuredProviders) > 0 {
 		provider = "unqualified"
 	} else if providerCount > 0 {
-		provider = qualifiedProviders[0].Name + "/" + qualifiedProviders[0].Model
-	}
-	llmProviders := make([]llm.Provider, 0, len(qualifiedProviders))
-	for _, item := range qualifiedProviders {
-		llmProviders = append(llmProviders, item.Provider)
-	}
-	if llmErr == nil && len(llmProviders) > 0 {
-		router = llm.NewRouter(llmProviders)
-		// Update status bar provider
-		if provider == "none" || provider == "" {
-			n := router.ProviderNames()
-			if len(n) > 0 {
-				provider = n[0]
-			}
-		}
+		provider = composed.Qualified[0].Name + "/" + composed.Qualified[0].Model
 	}
 	splash := NewSplash(root, agentName, coreblock.CorePersonaName, providerCount, memoryCount, skillCount, strings.Join(skillList, ", "), runtime.Version)
 
 	// Runtime persona is a Core invariant. The user names the Agent, not the persona.
 	activeP := persona.CorePersona()
-	var memoryHook *memory.MemoryHook
-	if store, storeErr := memory.Open(filepath.Join(runtime.BoiDir, "memory")); storeErr == nil {
-		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
-	}
-	agentService := agent.NewService(activeP, router, memoryHook, runtime.Sandbox)
-	agentService.SetTaskRecorder(runtime.AgentFolder)
-	app.ConfigureProviderProfileReferences(agentService, runtime.WorkspaceRoot, runtime.BoiDir, qualifiedProviders)
-	environment := app.ProviderEnvironment(runtime.BoiDir, qualifiedProviders)
-	agentService.SetToolCallingAllowed(environment.ToolCalling)
 
 	m := &Model{
 		splash:          splash,
@@ -143,6 +125,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		root:            root,
 		workspaceReader: filesystem.NewReader(runtime.Sandbox),
 		agentService:    agentService,
+		agent:           composed,
 		boiDir:          runtime.BoiDir,
 		environment:     environment,
 	}
@@ -430,14 +413,9 @@ func (m *Model) startAgentCmd(input string) tea.Cmd {
 	if m.agentService == nil {
 		return func() tea.Msg { return agentResponseMsg{err: fmt.Errorf("agent service is not configured")} }
 	}
-	capabilities, err := app.SelectCapabilities(m.boiDir, input, m.environment)
-	if err != nil {
+	if _, err := m.agent.PrepareTask(input); err != nil {
 		return func() tea.Msg { return agentResponseMsg{err: fmt.Errorf("select capability registry: %w", err)} }
 	}
-	if err := m.agentService.SetActiveTools(capabilities.Tools.Active); err != nil {
-		return func() tea.Msg { return agentResponseMsg{err: err} }
-	}
-	m.agentService.SetSkills(capabilities.LoadedSkills)
 	m.runtimeEvents = m.agentService.Start(ctx, input)
 	return waitAgentEventCmd(m.runtimeEvents)
 }

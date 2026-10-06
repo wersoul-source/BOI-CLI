@@ -9,26 +9,39 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/boi-family/boi-cli/internal/block/port"
 	"github.com/boi-family/boi-cli/internal/core/persona"
-	"github.com/boi-family/boi-cli/internal/equipment/memory"
-	"github.com/boi-family/boi-cli/internal/equipment/skill"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
 var ErrNoProvider = errors.New("no AI providers configured")
 
+// MemoryHook is the Runtime port for recall before and learning after a turn.
+type MemoryHook interface {
+	BeforeTurn(query string) string
+	AfterTurn(query, response string)
+}
+
+// SkillDoc is the Runtime view of one active Skill. Instructions are
+// untrusted context and never grant Tool authority.
+type SkillDoc struct {
+	Name         string
+	Description  string
+	Instructions string
+}
+
 // Service is the shared single-agent entry point used by CLI and TUI.
 type Service struct {
 	mu               sync.RWMutex
 	persona          *persona.Persona
 	router           *llm.Router
-	memory           *memory.MemoryHook
+	memory           MemoryHook
 	sandbox          *workspace.Sandbox
 	broker           *Broker
 	limits           EngineLimits
 	skillSummaries   string
-	activeSkills     map[string]*skill.Skill
+	activeSkills     map[string]SkillDoc
 	taskRecorder     TaskRecorder
 	providerProfiles map[string]string
 }
@@ -36,7 +49,7 @@ type Service struct {
 func NewService(
 	activePersona *persona.Persona,
 	router *llm.Router,
-	memoryHook *memory.MemoryHook,
+	memoryHook MemoryHook,
 	sandbox *workspace.Sandbox,
 ) *Service {
 	if activePersona == nil {
@@ -47,9 +60,9 @@ func NewService(
 		router:           router,
 		memory:           memoryHook,
 		sandbox:          sandbox,
-		broker:           NewBroker(sandbox),
+		broker:           NewBroker(),
 		limits:           DefaultEngineLimits(),
-		activeSkills:     make(map[string]*skill.Skill),
+		activeSkills:     make(map[string]SkillDoc),
 		providerProfiles: make(map[string]string),
 	}
 }
@@ -93,11 +106,11 @@ func (s *Service) SetSkillSummaries(summary string) {
 	s.mu.Unlock()
 }
 
-func (s *Service) SetSkills(skills []*skill.Skill) {
-	active := make(map[string]*skill.Skill, len(skills))
+func (s *Service) SetSkills(skills []SkillDoc) {
+	active := make(map[string]SkillDoc, len(skills))
 	var summaries []string
 	for _, item := range skills {
-		if item != nil {
+		if strings.TrimSpace(item.Name) != "" {
 			active[item.Name] = item
 			summaries = append(summaries, "- "+item.Name+": "+item.Description)
 		}
@@ -108,9 +121,12 @@ func (s *Service) SetSkills(skills []*skill.Skill) {
 	s.mu.Unlock()
 }
 
-func (s *Service) RegisterMCP(server string, tools []string, invoker ExternalInvoker) error {
-	return s.broker.RegisterMCP(server, tools, invoker)
-}
+// RegisterTool adds a Tool to the library. It stays inactive until a task's
+// registry selection activates it.
+func (s *Service) RegisterTool(tool port.Tool) error { return s.broker.Register(tool) }
+
+// RegisteredTools lists every Tool in the library.
+func (s *Service) RegisteredTools() []string { return s.broker.RegisteredNames() }
 
 type RuntimeEvent struct {
 	Approval *ApprovalEvent
@@ -175,7 +191,7 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 	activePersona := *s.persona
 	limits := s.limits
 	skillSummaries := s.skillSummaries
-	activeSkills := make(map[string]*skill.Skill, len(s.activeSkills))
+	activeSkills := make(map[string]SkillDoc, len(s.activeSkills))
 	for name, item := range s.activeSkills {
 		activeSkills[name] = item
 	}
@@ -269,11 +285,11 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 		return decision, nil
 	})
 	loader := skillLoaderFunc(func(name string) (string, error) {
-		item := activeSkills[name]
-		if item == nil {
+		item, ok := activeSkills[name]
+		if !ok {
 			return "", fmt.Errorf("Skill is not active for this task: %s", name)
 		}
-		return item.Prompt, nil
+		return item.Instructions, nil
 	})
 	var recordErr error
 	emit := func(event EngineEvent) {
@@ -284,7 +300,7 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 			onEngine(event)
 		}
 	}
-	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Sandbox: s.sandbox}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader}
+	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader}
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID
 	}
