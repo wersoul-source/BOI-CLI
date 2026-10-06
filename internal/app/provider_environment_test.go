@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
 
 func TestProviderEnvironmentFailsClosedAndRequiresEveryProvider(t *testing.T) {

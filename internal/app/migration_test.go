@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/capability"
-	"github.com/boi-family/boi-cli/internal/persona"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/core/persona"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
 )
 
 func TestLegacyWorkspaceMigratesWithoutOverwritingUserFiles(t *testing.T) {

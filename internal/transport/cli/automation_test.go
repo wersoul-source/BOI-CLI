@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
 )
 
 func TestResolveAskQueryContract(t *testing.T) {

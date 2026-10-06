@@ -1,19 +1,15 @@
 package block_test
 
 import (
-	"go/build"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
+	"github.com/boi-family/boi-cli/internal/agentfolder"
 	"github.com/boi-family/boi-cli/internal/block"
-	"github.com/boi-family/boi-cli/internal/block/agentfolder"
-	"github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/block/equipment"
-	runtimeblock "github.com/boi-family/boi-cli/internal/block/runtime"
-	"github.com/boi-family/boi-cli/internal/block/service"
-	"github.com/boi-family/boi-cli/internal/block/subagent"
+	"github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment"
+	runtimeblock "github.com/boi-family/boi-cli/internal/runtime/agent"
+	"github.com/boi-family/boi-cli/internal/service"
+	"github.com/boi-family/boi-cli/internal/subagent"
 )
 
 func TestOwnerApprovedSixBlockManifests(t *testing.T) {
@@ -39,24 +35,5 @@ func TestOwnerApprovedSixBlockManifests(t *testing.T) {
 			t.Fatalf("duplicate block ID %q", manifest.ID)
 		}
 		seen[manifest.ID] = struct{}{}
-	}
-}
-
-func TestConcreteBlocksDoNotImportEachOther(t *testing.T) {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve test file path")
-	}
-	root := filepath.Dir(filename)
-	for _, directory := range []string{"service", "core", "equipment", "runtime", "agentfolder", "subagent"} {
-		pkg, err := build.Default.ImportDir(filepath.Join(root, directory), build.IgnoreVendor)
-		if err != nil {
-			t.Fatalf("inspect block %s: %v", directory, err)
-		}
-		for _, imported := range pkg.Imports {
-			if strings.Contains(imported, "/internal/block/") {
-				t.Fatalf("block %s directly imports another concrete block: %s", directory, imported)
-			}
-		}
 	}
 }

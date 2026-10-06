@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/capability"
-	"github.com/boi-family/boi-cli/internal/skill"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
+	"github.com/boi-family/boi-cli/internal/equipment/skill"
 )
 
 type CapabilitySet struct {

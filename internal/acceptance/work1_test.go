@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
-	"github.com/boi-family/boi-cli/internal/block/agentfolder"
-	"github.com/boi-family/boi-cli/internal/persona"
-	llm "github.com/boi-family/boi-cli/internal/provider"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/agentfolder"
+	"github.com/boi-family/boi-cli/internal/core/persona"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
 type scriptedProvider struct {

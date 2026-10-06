@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/capability"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
 )
 
 func TestLooseSkillFileIsNotExposedUntilIndexed(t *testing.T) {

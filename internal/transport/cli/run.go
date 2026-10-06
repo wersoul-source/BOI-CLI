@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/boi-family/boi-cli/internal/app"
+	command "github.com/boi-family/boi-cli/internal/equipment/tools/process"
 	logger "github.com/boi-family/boi-cli/internal/platform/logging"
-	command "github.com/boi-family/boi-cli/internal/tool/process"
 	"github.com/spf13/cobra"
 )
 

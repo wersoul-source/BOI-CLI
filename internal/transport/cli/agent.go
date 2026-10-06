@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
 	"github.com/boi-family/boi-cli/internal/app"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/memory"
-	"github.com/boi-family/boi-cli/internal/persona"
-	llm "github.com/boi-family/boi-cli/internal/provider"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/core/persona"
+	"github.com/boi-family/boi-cli/internal/equipment/memory"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/spf13/cobra"
 )
 

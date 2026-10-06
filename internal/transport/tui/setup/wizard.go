@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	registry "github.com/boi-family/boi-cli/internal/provider/catalog"
+	registry "github.com/boi-family/boi-cli/internal/service/provider/catalog"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

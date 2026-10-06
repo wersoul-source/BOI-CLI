@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boi-family/boi-cli/internal/tool/filesystem"
+	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

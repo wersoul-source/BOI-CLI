@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/config"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+	"github.com/boi-family/boi-cli/internal/service/config"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/spf13/cobra"
 )
 

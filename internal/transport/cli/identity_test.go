@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 )
 
 func TestEnsureAgentIdentityCreatesThenLoads(t *testing.T) {
