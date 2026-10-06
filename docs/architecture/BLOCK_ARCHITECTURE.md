@@ -24,6 +24,10 @@ exactly two plug paths:
 2. **Run time**: an external process speaks MCP and is adapted into a Tool by
    `equipment/tools/mcp`. Nothing external is linked into the binary.
 
+## Task flow
+
+![BOI task flow](task-flow.svg)
+
 ## Layout
 
 ```text
