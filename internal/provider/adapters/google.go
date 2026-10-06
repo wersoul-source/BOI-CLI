@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -30,7 +29,7 @@ func NewGoogleProvider(name, apiKey, baseURL, model string) llm.Provider {
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		model:   model,
-		client:  &http.Client{},
+		client:  newHTTPClient(),
 	}
 }
 
@@ -109,12 +108,13 @@ func (p *GoogleProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", p.baseURL, p.model, p.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", p.baseURL, p.model)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", p.apiKey)
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
@@ -122,7 +122,7 @@ func (p *GoogleProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}

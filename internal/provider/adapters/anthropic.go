@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -30,7 +29,7 @@ func NewAnthropicProvider(name, apiKey, baseURL, model string) llm.Provider {
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		model:   model,
-		client:  &http.Client{},
+		client:  newHTTPClient(),
 	}
 }
 
@@ -120,7 +119,7 @@ func (p *AnthropicProvider) Complete(ctx context.Context, req llm.CompletionRequ
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -30,7 +29,7 @@ func NewOpenAIProvider(name, apiKey, baseURL, model string) llm.Provider {
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		model:   model,
-		client:  &http.Client{},
+		client:  newHTTPClient(),
 	}
 }
 
@@ -96,7 +95,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}
