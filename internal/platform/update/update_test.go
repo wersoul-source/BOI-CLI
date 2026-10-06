@@ -1,8 +1,12 @@
 package update
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,5 +71,90 @@ func TestFindExtractedBinarySupportsWrappedArchive(t *testing.T) {
 	got, err := findExtractedBinary(root, "windows")
 	if err != nil || got != want {
 		t.Fatalf("findExtractedBinary()=(%q,%v), want %q", got, err, want)
+	}
+}
+
+func writeTarGz(t *testing.T, path string, files map[string]string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	for name, body := range files {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(body)), Typeflag: tar.TypeReg}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExtractTarGzSkipsTraversalEntries(t *testing.T) {
+	root := t.TempDir()
+	dest := filepath.Join(root, "dest")
+	archive := filepath.Join(root, "a.tar.gz")
+	writeTarGz(t, archive, map[string]string{"boi/boi": "bin", "../escaped": "evil"})
+	if err := extractTarGz(archive, dest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "escaped")); err == nil {
+		t.Fatal("traversal entry escaped the destination")
+	}
+	if b, err := os.ReadFile(filepath.Join(dest, "boi", "boi")); err != nil || string(b) != "bin" {
+		t.Fatalf("regular entry not extracted: %v", err)
+	}
+}
+
+func TestExtractTarGzRejectsCorruptArchive(t *testing.T) {
+	bad := filepath.Join(t.TempDir(), "bad.tar.gz")
+	_ = os.WriteFile(bad, []byte("not gzip"), 0o600)
+	if err := extractTarGz(bad, t.TempDir()); err == nil {
+		t.Fatal("corrupt archive must error")
+	}
+}
+
+func TestVerifyChecksumFileRejectsMismatchAndMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "asset")
+	_ = os.WriteFile(path, []byte("data"), 0o600)
+	wrong := fmt.Sprintf("%x  asset\n", sha256.Sum256([]byte("other")))
+	if err := verifyChecksumFile(path, "asset", []byte(wrong)); err == nil {
+		t.Fatal("checksum mismatch must fail")
+	}
+	if err := verifyChecksumFile(path, "asset", []byte("deadbeef  asset\n")); err == nil {
+		t.Fatal("short checksum must fail")
+	}
+	if err := verifyChecksumFile(path, "asset", []byte(wrong[:0])); err == nil {
+		t.Fatal("missing checksum must fail")
+	}
+}
+
+func TestDownloadChecksumsBounds(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ok", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("abc")) })
+	mux.HandleFunc("/missing", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(404) })
+	mux.HandleFunc("/huge", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(make([]byte, maxChecksumsBytes+10))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	if b, err := downloadChecksums(srv.URL + "/ok"); err != nil || string(b) != "abc" {
+		t.Fatalf("ok: %q %v", b, err)
+	}
+	if _, err := downloadChecksums(srv.URL + "/missing"); err == nil {
+		t.Fatal("404 must error")
+	}
+	if _, err := downloadChecksums(srv.URL + "/huge"); err == nil {
+		t.Fatal("oversized checksums must error")
 	}
 }

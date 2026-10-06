@@ -38,12 +38,24 @@ func Open(dbDir string) (*Store, error) {
 	return s, nil
 }
 
+// entryPath maps a memory ID to a file inside the store directory.
+// IDs that could escape the directory are rejected.
+func (s *Store) entryPath(id string) (string, error) {
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) || filepath.Base(id) != id {
+		return "", fmt.Errorf("invalid memory id %q", id)
+	}
+	return filepath.Join(s.dir, id+".json"), nil
+}
+
 // Save stores a memory entry as JSON file
 func (s *Store) Save(entry *MemoryEntry) error {
+	path, err := s.entryPath(entry.MemID)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	path := filepath.Join(s.dir, entry.MemID+".json")
 	data, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
 		return err
@@ -129,9 +141,12 @@ func (s *Store) QueryBySession(sessionID string) ([]MemoryEntry, error) {
 
 // Delete removes a memory entry
 func (s *Store) Delete(id string) error {
+	path, err := s.entryPath(id)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	path := filepath.Join(s.dir, id+".json")
 	return os.Remove(path)
 }
 
@@ -146,7 +161,10 @@ func (s *Store) CleanExpired() (int64, error) {
 	now := time.Now().Unix()
 	for _, m := range all {
 		if m.TTL > 0 && (m.CreatedAt.Unix()+m.TTL) < now {
-			path := filepath.Join(s.dir, m.MemID+".json")
+			path, err := s.entryPath(m.MemID)
+			if err != nil {
+				continue
+			}
 			if os.Remove(path) == nil {
 				removed++
 			}
