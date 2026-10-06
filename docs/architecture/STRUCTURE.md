@@ -73,6 +73,11 @@ The workspace boundary validates lexical and canonical paths, including
 symlink targets. It constrains filesystem paths only and must not be described
 as process, container, or operating-system isolation.
 
+The command deny-list in `internal/tool/process/sandbox.go` is a best-effort
+guard against obviously destructive text, not isolation. Obfuscated commands
+(variable expansion, encoded payloads, nested interpreters) evade it. The real
+controls are the Broker approval step and the workspace path boundary.
+
 Typed Agent lifecycle, Tool Call, Tool Result, Approval, Usage, and Stop Reason
 contracts are defined in `internal/agent`. The TUI owns presentation of an
 approval request, while authorization and execution policy remain Agent/runtime
