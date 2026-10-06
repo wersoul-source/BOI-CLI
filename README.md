@@ -1,333 +1,199 @@
-# BOI CLI
+# BOI Agent Suite v1.5
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
-BOI CLI is a bounded, tool-using Agent runtime for terminal workspaces. It has
-one Core Persona, `boi`, while each user gives their Agent instance its own name
-on the first TUI launch.
+BOI is a bounded, tool-using Agent for terminal workspaces. It reads your
+project, proposes actions, asks before changing anything, verifies what it
+did, and leaves a manifest of the result.
 
-The product is organized into six Blocks: Service, Core, Various Equipment,
-Runtime, Agent Folder, and SubAgent. Work 1 connects the first five into one
-controlled TUI/CLI execution path; SubAgent execution remains disabled.
+v1.5 rebuilds the codebase around one idea: **a fixed spine with pluggable
+Blocks**. The Agent's core stays the same, and new capabilities plug in
+without editing it.
 
-## Work 1 capabilities
-
-- One shared Agent Service and Engine for TUI and `boi ask`.
-- Observe → Decide → Authorize → Act → Verify → Recover lifecycle with bounded
-  steps, tools, tokens, time, and recovery.
-- Explicit Provider qualification before a Provider can enter Agent routing.
-- Fail-closed Local Registry with at most 15 active Skills and 15 active Tools.
-- Capability Broker for risk classification, approval, timeout, and execution.
-- Workspace Sandbox path boundary plus an interactive TUI approval panel.
-- One `agent-folder` tray: diagnostics in `bin`, deliverables and manifests in
-  `output`.
-- Schema-v1 JSON output, stable exits, stdin/argv input, and deterministic
-  read-only Automation.
-
-BOI CLI does not fall back to a simulated AI response. A configured Provider
-must pass `boi provider qualify` before Agent tasks can use it.
-
-## Work 1 status
-
-Work 1 is complete for the single-Agent host path. The Core Persona, qualified
-Provider Router, bounded Registry, Broker, Sandbox, Agent Folder, TUI approval,
-and read-only Automation all use one Agent Service contract. SubAgent and
-side-effecting Automation remain deliberately disabled for Work 2.
-
-Built-binary acceptance runs on Windows and Linux. The shared simulation covers
-Unicode and spaced paths, nested and large folders, approval denial, traversal,
-binary and missing inputs, corrupt registries, and unqualified Providers. The
-Linux suite additionally verifies symlink escape. Linux ARM64 and Android ARM64
-cross-builds are release gates; this establishes the owner-approved Termux/S25+
-compatibility baseline without claiming that a physical handset was exercised.
+Linux is the first supported platform. Windows, macOS and Android compile but
+are not yet release targets.
 
 ## Architecture
 
-BOI has a fixed spine (Core + Runtime) and pluggable Blocks (Equipment,
-Service, Agent Folder, SubAgent). Tools plug in through `block/port.Tool`;
-`internal/app` is the only wiring point. See
+```text
+            ┌──────────────── fixed spine ────────────────┐
+            │  Core      identity, qualification, Persona │
+            │  Runtime   engine, Broker, approval, LLM    │
+            └──────────────────────┬──────────────────────┘
+                                   │ ports (block/port, llm.Provider, ...)
+      ┌──────────────┬─────────────┼──────────────┬──────────────┐
+  Equipment       Service      Agent Folder     SubAgent       (yours)
+  tools, skills,  providers,   bin / output     gated,
+  memory, MCP     config       manifests        disabled
+```
+
+- **Spine** (`internal/core`, `internal/runtime`): fixed. It defines the
+  contracts every Block must satisfy and never imports a Block.
+- **Blocks** (`internal/equipment`, `internal/service`, `internal/agentfolder`,
+  `internal/subagent`): pluggable. A Block depends only on the spine and never
+  on another Block.
+- **Composition root** (`internal/app`): the only place that wires Blocks
+  into the spine. TUI and CLI both build their Agent through
+  `app.BuildAgent`.
+
+The rules are enforced by `internal/architecture/deps_test.go`. A change that
+breaks them fails `go test ./...`. Full layout:
 [docs/architecture/BLOCK_ARCHITECTURE.md](docs/architecture/BLOCK_ARCHITECTURE.md).
-The dependency rules are enforced by `go test ./...`.
 
-## Linux acceptance
+### Two ways to plug in
 
-Linux is the first release target. On a Linux machine or VM:
+| Path | When | How |
+|---|---|---|
+| Compile time | A Tool written in Go | Implement `port.Tool`, add it to `app.BuiltinTools` and to the capability index. The Broker is not edited. |
+| Run time | Anything outside the binary | Expose it as an MCP server. `equipment/tools/mcp` adapts each MCP tool into an approval-gated Tool. |
 
-```text
-make smoke
-```
-
-runs vet, race tests, the architecture rules, and the built-binary folder
-simulation. Export `PSC_1_NAME`, `PSC_1_API_KEY` and `PSC_1_MODEL` first to
-add a real Provider round trip.
-
-## Requirements
-
-- Go 1.24.2 or a compatible later toolchain
-- A supported Provider configured through environment or setup
-- A terminal capable of running the TUI
-
-## Build and start
+## How a task runs
 
 ```text
-go build -o boi ./cmd/boi
-boi init
-boi setup
-boi provider qualify <provider-name>
-boi registry init
-boi
+Observe → Decide → Authorize → Act → Verify → Recover
 ```
 
-`boi registry init` is safe and non-overwriting. Normal runtime initialization
-also creates missing indexes so migrated workspaces continue without exposing
-loose, unindexed capability files.
+1. Core selects at most 15 Tools and 15 Skills for the task.
+2. The Model proposes one Tool call. It cannot set risk or approval; the
+   Broker assigns them from the Tool's spec.
+3. Reads run automatically. Writes, processes and MCP calls need your exact
+   approval in the TUI. Non-interactive mode denies them.
+4. The Tool verifies its own effect (for example, it reads a written file
+   back) before the step counts as done.
+5. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
+   Failed or cancelled work stays in `agent-folder/bin/<task-id>/`.
 
-`boi setup` preserves unrelated `.env` values, replaces only its managed
-Provider section, keeps a timestamped backup, uses private file permissions on
-Unix-like systems, and adds local Git excludes for BOI secrets. Setup does not
-qualify a Provider; qualification remains an explicit behavioral test.
+## Quick start (Linux)
 
-The first TUI start asks for the Agent instance name and stores it in
-`.boi/agent.yaml`. This name is not a Persona or a Provider identity.
-
-## Work 1 quickstart — create your first artifact
-
-Work inside the project directory that BOI is allowed to inspect and change.
-The directory becomes the Workspace Sandbox boundary, so start BOI from the
-repository or folder that contains the work you want the Agent to perform.
-
-### 1. Build BOI
-
-Windows PowerShell:
-
-```powershell
-go build -o boi.exe ./cmd/boi
-```
-
-Linux, WSL, or Termux:
+Requires Go 1.24.2 or later and an API key for a supported Provider.
 
 ```bash
-go build -o boi ./cmd/boi
-chmod +x ./boi
+git clone https://github.com/wersoul-source/BOI-CLI.git
+cd BOI-CLI
+go build -trimpath -o boi ./cmd/boi
+sudo install boi /usr/local/bin/      # or keep ./boi
 ```
 
-The examples below use `boi`. Use `.\boi.exe` on Windows when the executable
-is not installed on `PATH`, or `./boi` on Linux/Termux.
+In the project you want the Agent to work on:
 
-### 2. Initialize the Workspace
+```bash
+boi init                        # create .boi state (non-destructive)
+boi registry init               # create the bounded Tool/Skill index
+boi setup                       # choose a Provider and enter the API key
+boi provider qualify <name>     # real behavioral test; uses API tokens
+boi doctor                      # health check
+boi                             # start the TUI
+```
+
+On first launch the TUI asks for your Agent's name. The Core Persona is always
+`boi`; the name belongs to your Agent instance only.
+
+A Provider that has not passed `boi provider qualify` never enters the Agent
+Router. BOI does not fall back to simulated answers.
+
+### First task
 
 ```text
-boi init
-boi registry init
+Create hello-boi.md with a title, a short description of this repository,
+and three useful next steps. Read the project first and report the path.
 ```
 
-Initialization creates the `.boi` runtime state and the bounded Local Registry.
-It does not delete existing project files or Agent output.
-
-### 3. Connect and qualify a Provider
-
-```text
-boi setup
-boi provider list
-boi provider qualify <provider-name>
-boi doctor
-```
-
-`boi setup` opens the Provider wizard. Select a Provider and model, then enter
-the API credential when prompted. Use the configured name shown by
-`boi provider list` in the qualification command; for example:
-
-```text
-boi provider qualify openai
-```
-
-Qualification sends a real behavioral probe suite to the Provider and may
-consume billable API tokens. Configuration alone is not enough: an unqualified
-Provider is excluded from the Agent Router.
-
-### 4. Start the TUI
-
-```text
-boi
-```
-
-On the first launch, give the Agent instance a name. Press `Enter` on the
-Splash Screen to open the Chat. The Core Persona remains `boi` regardless of
-the instance name.
-
-### 5. Ask BOI to create a file
-
-Use this safe first task inside an initialized test Workspace:
-
-```text
-Create a file named hello-boi.md in this workspace. Add a title, a short
-description of this repository, and a checklist of three useful next steps.
-Read the available project context before writing, and report the final path.
-```
-
-Expected flow:
-
-1. BOI inspects the Workspace with read-only Tools.
-2. The Model proposes a `workspace.write` Tool Call.
-3. TUI replaces the input box with an Approval Panel showing purpose, target,
-   risk, and preview.
-4. Press `A` to approve that exact write once, `R` to reject it, or `Esc` to
-   cancel the task. `Enter` never approves a write.
-5. BOI verifies the Tool Result and reports the Task ID and manifest path.
-
-Inspect the result without leaving the TUI:
-
-```text
-/ls
-/read hello-boi.md
-```
-
-The created file remains in the Workspace. BOI records completed task evidence
-under:
-
-```text
-agent-folder/output/<task-id>/manifest.json
-```
-
-Failed, rejected, cancelled, or recovery diagnostics remain under
-`agent-folder/bin/<task-id>/` and are not presented as completed deliverables.
-
-### 6. Try a repository task
-
-After the first file succeeds, try a bounded task with an explicit output:
-
-```text
-Inspect this repository and create WORKSPACE_REVIEW.md. Summarize the project
-structure, identify three concrete risks supported by files you inspected, and
-propose a five-step improvement plan. Do not modify any other file.
-```
-
-Review the Approval Panel carefully before authorizing the write. BOI's
-Workspace Sandbox limits filesystem paths, but it is not OS/container
-isolation. Run unfamiliar projects inside an appropriately isolated operating
-environment when stronger protection is required.
-
-### TUI controls used in Work 1
-
-| Input | Action |
-|---|---|
-| `Enter` | Send a Chat message; never approves a Tool Call |
-| `Ctrl+N` | Insert a newline in the input box |
-| `Tab` | Complete a slash command |
-| `Esc` or `Ctrl+C` | Cancel an active task; quit when idle |
-| `Ctrl+Q` | Quit immediately |
-| `Ctrl+L` | Clear the visible Chat |
-| `/workspace` | Show the active Sandbox root |
-| `/ls [path]` | List a directory inside the Workspace |
-| `/read <path>` | Read a text file inside the Workspace |
-| `/providers` | Show qualified Provider state |
-| `/persona` | Show the fixed Core Persona and Agent instance name |
-
-### Troubleshooting the first run
-
-| Symptom | Meaning and action |
-|---|---|
-| `no qualified providers` | Run `boi provider list`, then `boi provider qualify <name>`. |
-| Provider qualification fails | Check API key, Base URL, model name, network access, and Provider quota. |
-| A write is denied by `boi ask` | Work 1 non-interactive Automation is read-only; use the TUI approval flow. |
-| `capability registry` error | Run `boi registry init`; inspect rather than overwrite an existing invalid Registry. |
-| Workspace path is rejected | Keep the target inside the Workspace root and avoid symlink/traversal paths. |
-| Binary file is rejected | Work 1 Workspace reading accepts bounded text files, not binary content. |
-
-Never commit `.env`, API credentials, or Provider backups. BOI adds local Git
-exclusions during setup, but the user remains responsible for repository and
-credential hygiene.
+When the write is proposed, the input box becomes an Approval Panel. Press `A`
+to approve that exact write once, `R` to reject, `Esc` to cancel. `Enter`
+never approves.
 
 ## Non-interactive use
 
-```text
-boi ask explain this repository
-Get-Content task.txt | boi ask --json --idempotency-key task-001
+```bash
+boi ask "explain this repository"
+cat task.txt | boi ask --json --idempotency-key task-001
 ```
 
-Work 1 Automation is read-only. A Tool call requiring approval is denied in
-non-interactive mode; the process never waits for an approval prompt. JSON goes
-to stdout as one object and verbose diagnostics go to stderr. See the
+`--json` writes one versioned object to stdout and diagnostics to stderr.
+Automation is read-only: any call that needs approval is denied, never
+awaited. Exit codes: `0` completed, `1` internal, `2` invalid input,
+`3` denied, `4` cancelled, `5` unavailable, `6` verification failed. See the
 [Automation contract](docs/operations/AUTOMATION_CONTRACT.md).
 
-## Command groups
+## Commands
 
 | Command | Purpose |
 |---|---|
 | `boi` | Start the TUI |
-| `boi ask` | Run the bounded Agent non-interactively |
-| `boi setup` | Configure Providers interactively |
-| `boi provider list/switch/qualify` | Manage and qualify Provider candidates |
-| `boi registry init/list/add` | Manage explicit Skill and Tool indexes |
-| `boi config` / `boi model` | Inspect or change runtime configuration |
-| `boi doctor` | Run local health checks |
-| `boi skill` / `boi memory` | Manage installed Skills and local memory |
-| `boi persona` | Show the fixed Core Persona compatibility contract |
-| `boi version` / `boi upgrade` | Inspect or update the binary |
+| `boi ask` | Run the Agent non-interactively |
+| `boi init` / `boi setup` | Initialize the workspace / configure Providers |
+| `boi provider list\|switch\|qualify` | Manage and qualify Providers |
+| `boi registry init\|list\|add` | Manage the explicit Tool and Skill index |
+| `boi doctor` | Local health checks |
+| `boi skill` / `boi memory` | Manage Skills and local memory |
+| `boi config` / `boi model` | Inspect or change configuration |
+| `boi version` / `boi upgrade` | Show version / checksum-verified upgrade |
 
-Use `boi <command> --help` for the live flag contract. The legacy `boi run`
-shell helper is not part of the Agent Tool authority path.
-Informational commands such as `--help` and `version` resolve the workspace
-without creating `.boi` or `agent-folder` state.
+### TUI keys
+
+| Key | Action |
+|---|---|
+| `Enter` | Send; never approves a Tool call |
+| `Ctrl+N` | New line |
+| `Tab` | Complete a slash command |
+| `Esc` / `Ctrl+C` | Cancel the active task; quit when idle |
+| `Ctrl+Q` | Quit |
+| `/ls [path]`, `/read <path>` | Inspect the workspace |
+| `/workspace`, `/providers`, `/persona` | Show sandbox root, Provider state, identity |
 
 ## Workspace layout
 
 ```text
-workspace/
+your-project/
 ├── .boi/
-│   ├── agent.yaml
+│   ├── agent.yaml             Agent instance name
 │   ├── config.yaml
-│   ├── provider-profiles/
-│   ├── registry/
-│   │   ├── skills.json
-│   │   └── tools.json
+│   ├── provider-profiles/     qualification results
+│   ├── registry/              tools.json, skills.json (15/15 active max)
 │   ├── skills/
 │   └── memory/
 └── agent-folder/
-    ├── bin/
-    └── output/
+    ├── bin/                   drafts, logs, failed and cancelled tasks
+    └── output/                deliverables and manifests
 ```
 
-Completed task manifests live under `agent-folder/output/<task-id>/`. Failed or
-cancelled task diagnostics remain under `agent-folder/bin/<task-id>/`. Cleanup
-is bin-only and dry-run by default.
+Never commit `.env` or API keys. `boi setup` adds local Git excludes, keeps a
+timestamped backup, and writes the file with private permissions.
 
-## Safety and current limits
+## Verify on Linux
 
-- The Workspace Sandbox enforces path boundaries; it is not OS or container
-  isolation.
-- Mutating Tools require exact interactive approval. Side-effecting Automation
-  remains disabled.
-- MCP primitives exist, but full discovery and Library routing are not yet on
-  the main Agent path.
-- SubAgent execution is disabled until its separate authority and evaluation
-  gate is accepted.
-- BOI CLI is network-capable and is not designed as offline-first.
-- Android ARM64 cross-build is verified; physical S25+ runtime acceptance is a
-  recommended device check rather than a Work 1 host-release blocker. Linux
-  runtime parity is the accepted Termux/S25+ simulation baseline.
-- `boi upgrade` downloads only from the canonical release repository and
-  verifies the published SHA-256 checksum before replacing the binary.
-
-## Verification
-
-```text
-go test -count=1 ./...
-go vet ./...
-go build ./...
+```bash
+make smoke
 ```
 
-CI runs these gates on Windows and Linux and cross-builds Android ARM64. Manual
-WSL parity can be exercised with
-`scripts/acceptance/linux_folder_simulation.py` and a Linux BOI binary. The
-simulation uses a local OpenAI-compatible fixture and does not prove a live,
-third-party Provider account.
+runs vet, race tests, the architecture rules, and a built-binary simulation
+of nine workspace scenarios against a local fake Provider. To add a real
+Provider round trip:
 
-## Architecture and release status
+```bash
+PSC_1_NAME=openai PSC_1_API_KEY=... PSC_1_MODEL=... make smoke
+```
 
-- [Work 1 plan](docs/planning/WORK_1_PLAN.md)
-- [CLI command reference](docs/reference/CLI_COMMANDS.md)
-- [Work 1 release and rollback notes](docs/operations/WORK_1_RELEASE.md)
-- [Project handoff](HANDOFF.md)
+CI runs the same Linux gates plus staticcheck and a coverage floor, and
+compile-checks linux/arm64, windows, darwin and android.
+
+## Safety and limits
+
+- The workspace sandbox enforces path boundaries, including symlinks. It is
+  not OS or container isolation; run unfamiliar projects in an isolated VM.
+- The command deny-list is a best-effort guard, not isolation. The real
+  controls are the Broker approval step and the path boundary.
+- SubAgent execution is disabled until its evaluation gate is accepted.
+- MCP Tools can be registered, but automatic MCP discovery is not yet on the
+  main path.
+- BOI needs the network to reach Providers; it is not offline-first.
+- Only Linux has been exercised end to end. Other platforms are compile
+  checks.
+
+## Contributing
+
+Read [BLOCK_ARCHITECTURE.md](docs/architecture/BLOCK_ARCHITECTURE.md) before
+adding a package, and [CONTRIBUTING.md](CONTRIBUTING.md) for workflow.
+Project history and handoff notes: [HANDOFF.md](HANDOFF.md).
 
 License: MIT
