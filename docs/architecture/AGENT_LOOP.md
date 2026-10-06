@@ -1,6 +1,6 @@
 # BOI Agent Kernel Loop
 
-Phase 2 Task 6 introduces one bounded Agent kernel in `internal/agent.Engine`.
+Phase 2 Task 6 introduces one bounded Agent kernel in `internal/runtime/agent.Engine`.
 Both the interactive Agent Service and the compatibility CLI Loop execute
 through this kernel.
 

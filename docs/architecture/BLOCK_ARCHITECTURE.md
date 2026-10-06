@@ -39,10 +39,10 @@ internal/
   runtime/workspace/                             FIXED  workspace path boundary
 
   equipment/                 Block 3 Equipment   PLUG   manifest
-  equipment/tools/workspace/                     PLUG   workspace.list/read/write
+  equipment/tools/filesystem/                    PLUG   workspace.list/read/write
   equipment/tools/process/                       PLUG   process.run
   equipment/tools/mcp/                           PLUG   MCP client + Tool adapter
-  equipment/registry/                            PLUG   15/15 bounded capability index
+  equipment/capability/                          PLUG   15/15 bounded capability index
   equipment/skill/                               PLUG   Skill files
   equipment/memory/                              PLUG   memory store and weights
   service/                   Block 1 Service     PLUG   manifest

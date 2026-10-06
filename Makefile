@@ -1,4 +1,4 @@
-.PHONY: build run test clean
+.PHONY: build run test clean lint smoke
 
 BINARY_NAME=boi
 BUILD_DIR=bin
@@ -21,3 +21,6 @@ install: build
 lint:
 	go vet ./...
 	staticcheck ./...
+
+smoke:
+	scripts/acceptance/linux_smoke.sh
