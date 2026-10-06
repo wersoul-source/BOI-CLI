@@ -41,6 +41,26 @@ Linux suite additionally verifies symlink escape. Linux ARM64 and Android ARM64
 cross-builds are release gates; this establishes the owner-approved Termux/S25+
 compatibility baseline without claiming that a physical handset was exercised.
 
+## Architecture
+
+BOI has a fixed spine (Core + Runtime) and pluggable Blocks (Equipment,
+Service, Agent Folder, SubAgent). Tools plug in through `block/port.Tool`;
+`internal/app` is the only wiring point. See
+[docs/architecture/BLOCK_ARCHITECTURE.md](docs/architecture/BLOCK_ARCHITECTURE.md).
+The dependency rules are enforced by `go test ./...`.
+
+## Linux acceptance
+
+Linux is the first release target. On a Linux machine or VM:
+
+```text
+make smoke
+```
+
+runs vet, race tests, the architecture rules, and the built-binary folder
+simulation. Export `PSC_1_NAME`, `PSC_1_API_KEY` and `PSC_1_MODEL` first to
+add a real Provider round trip.
+
 ## Requirements
 
 - Go 1.24.2 or a compatible later toolchain

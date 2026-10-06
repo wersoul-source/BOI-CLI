@@ -3,9 +3,9 @@ package app
 import (
 	"path/filepath"
 
-	"github.com/boi-family/boi-cli/internal/agent"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
 
 // ConfigureProviderProfileReferences gives task manifests a credential-free

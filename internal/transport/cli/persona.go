@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/boi-family/boi-cli/internal/config"
-	"github.com/boi-family/boi-cli/internal/persona"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/core/persona"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+	"github.com/boi-family/boi-cli/internal/service/config"
 	"github.com/spf13/cobra"
 )
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	"github.com/boi-family/boi-cli/internal/capability"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
 	"github.com/spf13/cobra"
 )
 

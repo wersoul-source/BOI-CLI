@@ -123,7 +123,7 @@ func (i *InputModel) Update(msg tea.Msg) (InputModel, tea.Cmd) {
 func (i *InputModel) View() string {
 	border := InputBorderStyle
 	if i.textarea.Focused() {
-		border = border.Copy().BorderForeground(boiTeal)
+		border = border.BorderForeground(boiTeal)
 	}
 	return border.Width(i.width).Render(i.textarea.View())
 }

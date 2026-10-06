@@ -5,7 +5,7 @@
 - The owner-approved six Blocks now have explicit package manifests under `internal/block`.
 - Conformance tests require exactly six unique valid manifests and prevent concrete Blocks from importing one another directly.
 - Repository was restructured around `internal/app`, transports, Agent, Provider, Tool, Memory, Persona, Skill, Workspace, Config, and Platform boundaries.
-- TUI and `boi ask` use `internal/agent.Service`.
+- TUI and `boi ask` use `internal/runtime/agent.Service`.
 - The bounded Engine implements Observe, Decide, Authorize, Act, Verify, Recover, typed stops, step/tool/token/time budgets, and cancellation.
 - Provider Router classifies failures and performs bounded retry/failover.
 - Capability Broker owns Tool risk, approval, timeout, preview, and execution policy.

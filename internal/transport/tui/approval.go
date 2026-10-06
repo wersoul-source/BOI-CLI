@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
 )
 
 const approvalPreviewLines = 5

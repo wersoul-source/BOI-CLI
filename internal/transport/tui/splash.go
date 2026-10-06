@@ -194,18 +194,3 @@ func countMemoryEntries(dir string) int {
 	}
 	return count
 }
-
-func listSkills(dir string) ([]string, int) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, 0
-	}
-	var names []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".skill.md") {
-			name := strings.TrimSuffix(e.Name(), ".skill.md")
-			names = append(names, name)
-		}
-	}
-	return names, len(names)
-}

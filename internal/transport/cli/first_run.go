@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	"github.com/boi-family/boi-cli/internal/config/envfile"
 	term "github.com/boi-family/boi-cli/internal/platform/terminal"
+	"github.com/boi-family/boi-cli/internal/service/config/envfile"
 )
 
 // RunFirstRun prepares a workspace before the interactive TUI starts.
