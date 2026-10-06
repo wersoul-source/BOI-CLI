@@ -8,7 +8,7 @@ This is the entry point for Kampun or any Agent continuing BOI CLI.
 - Primary branch: `master`
 - Historical architecture baseline: `f5c0934`
 - Pre-W1.7 rollback baseline: `f3db72b`
-- Product version in source: `0.3.0`
+- Product version in source: `1.5.0` (BOI Agent Suite v1.5)
 - Language: Go `1.24.2` or later compatible toolchain
 - Main interfaces: TUI (`boi`) and non-interactive CLI (`boi ask`)
 
