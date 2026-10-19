@@ -16,10 +16,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 model="${1:-deepseek-v4.1-flash-free}"
 base="https://opencode.ai/inference/openai/v1"
 
-if [ -z "${PSC_1_API_KEY:-}" ]; then
-	read -r -s -p "OpenCode API key: " PSC_1_API_KEY
-	echo
-fi
+# Always ask: a PSC_1_API_KEY left over in the shell is a common cause of 401/403.
+read -r -s -p "OpenCode API key: " PSC_1_API_KEY
+echo
 [ -n "$PSC_1_API_KEY" ] || { echo "FAIL: empty API key" >&2; exit 1; }
 
 echo "Checking that $model answers on $base ..."
