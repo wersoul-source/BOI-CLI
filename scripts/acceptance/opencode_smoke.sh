@@ -21,18 +21,34 @@ read -r -s -p "OpenCode API key: " PSC_1_API_KEY
 echo
 [ -n "$PSC_1_API_KEY" ] || { echo "FAIL: empty API key" >&2; exit 1; }
 
+body=$(mktemp)
+trap 'rm -f "$body"' EXIT
+probe() { # $1 = "auth" or "noauth"
+	local auth=()
+	[ "$1" = auth ] && auth=(-H "Authorization: Bearer $PSC_1_API_KEY")
+	curl -sS -m 60 -o "$body" -w '%{http_code}' "$base/chat/completions" "${auth[@]}" \
+		-H "Content-Type: application/json" -H "User-Agent: boi-cli-smoke/1.5" \
+		-d "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK\"}],\"max_tokens\":8}" || echo 000
+}
+
 echo "Checking that $model answers on $base ..."
-code=$(curl -sS -m 60 -o /dev/null -w '%{http_code}' "$base/chat/completions" \
-	-H "Authorization: Bearer $PSC_1_API_KEY" -H "Content-Type: application/json" \
-	-d "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK\"}],\"max_tokens\":8}") || code=000
-case "$code" in
-	200) echo "OK: provider answered" ;;
-	000) echo "FAIL: cannot reach opencode.ai (network)" >&2; exit 1 ;;
-	401|403) echo "FAIL: OpenCode rejected the API key (HTTP $code)" >&2; exit 1 ;;
-	404) echo "FAIL: model '$model' not found on the chat/completions endpoint (HTTP 404)" >&2; exit 1 ;;
-	402) echo "FAIL: no credits for '$model' (HTTP 402); use a *-free model" >&2; exit 1 ;;
-	*) echo "FAIL: OpenCode returned HTTP $code for '$model'" >&2; exit 1 ;;
-esac
+code=$(probe auth)
+if [ "$code" != 200 ]; then
+	echo "With key: HTTP $code"
+	echo "Response: $(head -c 400 "$body" | tr -d '\n')"
+	noauth=$(probe noauth)
+	echo "Without key: HTTP $noauth"
+	echo "Response: $(head -c 400 "$body" | tr -d '\n')"
+	case "$code" in
+		000) echo "FAIL: cannot reach opencode.ai (network)" >&2 ;;
+		401|403) echo "FAIL: OpenCode rejected the request with this key (HTTP $code); see responses above" >&2 ;;
+		404) echo "FAIL: model '$model' not found on the chat/completions endpoint" >&2 ;;
+		402) echo "FAIL: no credits for '$model'; use a *-free model" >&2 ;;
+		*) echo "FAIL: OpenCode returned HTTP $code for '$model'" >&2 ;;
+	esac
+	exit 1
+fi
+echo "OK: provider answered"
 
 export PSC_1_NAME=openai PSC_1_BASE_URL="$base" PSC_1_MODEL="$model" PSC_1_API_KEY
 make smoke
