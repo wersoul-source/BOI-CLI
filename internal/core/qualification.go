@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -191,7 +193,7 @@ func (q Qualifier) Run(ctx context.Context, target ProviderTarget, provider llm.
 		result := CapabilityResult{Capability: probe.capability, InputBytes: probe.inputBytes}
 		if err != nil {
 			result.Status = CapabilityFailed
-			result.Detail = "provider request failed"
+			result.Detail = probeFailureDetail(err)
 		} else if response == nil || strings.TrimSpace(response.Content) != probe.expected {
 			result.Status = CapabilityFailed
 			result.Detail = "exact-output validation failed"
@@ -241,4 +243,30 @@ func LoadCapabilityProfile(path string) (*CapabilityProfile, error) {
 
 func CapabilityProfilePath(boiDir string, target ProviderTarget) string {
 	return filepath.Join(boiDir, "provider-profiles", TargetFingerprint(target, ProbeSuiteVersion)+".json")
+}
+
+// probeFailureDetail names why a probe request failed without echoing the
+// provider's response body, which can be long or contain request echoes.
+func probeFailureDetail(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "provider request failed: timeout (check network or raise --timeout)"
+	}
+	var providerErr *llm.ProviderError
+	if errors.As(err, &providerErr) && providerErr.StatusCode > 0 {
+		hint := ""
+		switch providerErr.Class {
+		case llm.ErrorAuth:
+			hint = " (check the API key)"
+		case llm.ErrorNotFound:
+			hint = " (check the model name and base URL)"
+		case llm.ErrorRateLimit:
+			hint = " (rate limit or quota)"
+		}
+		return fmt.Sprintf("provider request failed: %s, HTTP %d%s", providerErr.Class, providerErr.StatusCode, hint)
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return "provider request failed: network error (cannot reach the provider)"
+	}
+	return "provider request failed: " + string(llm.ClassifyError(err))
 }

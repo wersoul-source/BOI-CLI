@@ -50,7 +50,11 @@ var providerQualifyCmd = &cobra.Command{
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Provider: %s\nModel: %s\nEndpoint class: %s\n", target.Provider, target.Model, target.EndpointClass)
 			for _, result := range profile.Results {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-20s %s\n", result.Capability, result.Status)
+				line := fmt.Sprintf("  %-20s %s", result.Capability, result.Status)
+				if result.Status == coreblock.CapabilityFailed && result.Detail != "" {
+					line += "  - " + result.Detail
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), line)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Profile: %s\n", path)
 			return nil

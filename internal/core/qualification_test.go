@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -102,5 +103,19 @@ func TestRepeatedQualificationIsEquivalentIgnoringTimestamp(t *testing.T) {
 	}
 	if !first.Equivalent(*second) {
 		t.Fatal("unchanged probes should produce an equivalent profile")
+	}
+}
+
+func TestProbeFailureDetailNamesTheCause(t *testing.T) {
+	cases := map[string]error{
+		"auth, HTTP 401": &llm.ProviderError{Class: llm.ErrorAuth, StatusCode: 401},
+		"not_found":      &llm.ProviderError{Class: llm.ErrorNotFound, StatusCode: 404},
+		"timeout":        context.DeadlineExceeded,
+		"network error":  &net.OpError{Op: "dial", Err: errors.New("i/o timeout")},
+	}
+	for want, err := range cases {
+		if got := probeFailureDetail(err); !strings.Contains(got, want) {
+			t.Errorf("detail %q does not contain %q", got, want)
+		}
 	}
 }
