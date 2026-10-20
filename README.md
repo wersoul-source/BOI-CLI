@@ -63,9 +63,12 @@ Observe → Decide → Authorize → Act → Verify → Recover
    order.
 3. Reads run automatically. Writes, processes and MCP calls need your exact
    approval in the TUI. Non-interactive mode denies them.
-4. The Tool verifies its own effect (for example, it reads a written file
+4. Large or old tool outputs are shortened in the model context but kept in
+   full in a per-task store; the model reads any part back exactly with
+   `context.expand(ref, lines)`.
+5. The Tool verifies its own effect (for example, it reads a written file
    back) before the step counts as done.
-5. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
+6. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
    Failed or cancelled work stays in `agent-folder/bin/<task-id>/`.
 
 ## Quick start (Linux)

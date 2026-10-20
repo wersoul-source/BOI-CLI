@@ -14,6 +14,13 @@ All notable changes to BOI CLI.
 - A batch made only of automatic reads runs concurrently; any change, process or external call keeps the batch sequential, and each call is still authorized, executed and verified on its own
 - A denied or failed call stops the rest of the batch
 
+### Context lifecycle (compute once, reference many)
+- Every tool output is kept in a per-task context store with a checksum
+- An output above 16 KB keeps its head and tail and names the reference and line range of the omitted middle; for `workspace.read` the file content is shortened inside the JSON, so line numbers refer to the file and fields such as `Truncated` stay intact
+- When the 48 KB observation budget is spent, older observations become stubs with their reference instead of disappearing
+- New Runtime Tool `context.expand(ref, lines)` reads any stored output back exactly, after an integrity check; it is added to every non-empty active set that has room
+- No lossy compression: nothing is summarized or abbreviated, so an answer built from expanded context sees the original text
+
 ### Planning
 - The static Task Plan is no longer sent to the model every turn; it stays in the task manifest
 

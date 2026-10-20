@@ -47,6 +47,7 @@ tasks=(
 	"multi_read|Read a.txt, b.txt and c.txt and reply with the three code words they contain, separated by spaces.|amber birch cedar"
 	"search|One file in the docs folder mentions a lantern. Find it and reply with its file name only.|guide.md"
 	"recover|Read missing.txt. If it does not exist, reply NOT_FOUND only.|NOT_FOUND"
+	"deep_read|big.log contains a line with a secret word. Read the file and reply with that word only.|quartz"
 )
 
 prepare_workspace() { # $1 = dir
@@ -60,6 +61,11 @@ prepare_workspace() { # $1 = dir
 	printf 'Setup notes for the project.\n' >docs/setup.md
 	printf 'Carry a lantern when you walk the old path.\n' >docs/guide.md
 	printf 'Release history.\n' >docs/changes.md
+	# 3000 lines with the answer in the middle: more than one observation
+	# budget, so v1.6 must read it back through context.expand.
+	for i in $(seq 1 3000); do
+		if [ "$i" -eq 1700 ]; then echo "line $i: the secret word is quartz"; else echo "line $i: routine log entry"; fi
+	done >big.log
 }
 
 measure() { # $1 = label, $2 = binary
