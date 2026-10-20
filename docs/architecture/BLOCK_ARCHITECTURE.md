@@ -77,9 +77,20 @@ internal/
 |---|---|---|
 | `port.Tool` | `block/port` | `equipment/tools/*` |
 | `llm.Provider` | `runtime/llm` | `service/provider/adapters` |
+| `llm.ToolCaller` (optional) | `runtime/llm` | adapters that send native tool definitions (OpenAI-compatible) |
 | `runtime.TaskRecorder` | `runtime` | `agentfolder` |
 | `runtime.MemoryHook` | `runtime` | `equipment/memory` |
 | `runtime.SkillDoc` | `runtime` | built by `app` from `equipment/skill` |
+
+### Native tool calling (v1.6)
+
+The Broker turns each active `port.ToolSpec` into a native definition
+(`ToolSpec.Schema()`, derived from `Usage` unless `Parameters` is set). The
+Service sends definitions only when every Router candidate implements
+`llm.ToolCaller` and the profile passed `native_tool_schema`. Native calls and
+`<boi-action>` envelopes both become the same `ToolCall`, so authorization,
+idempotency and verification do not change. One turn may carry up to
+`MaxBatchCalls` (5) calls; a batch of automatic reads runs concurrently.
 
 ### Adding a Tool
 

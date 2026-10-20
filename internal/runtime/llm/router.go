@@ -194,6 +194,20 @@ func (r *Router) buildOrderLocked() []int {
 }
 
 func (r *Router) ProviderCount() int { return len(r.providers) }
+
+// SupportsNativeTools reports whether every failover candidate can carry
+// native tool definitions, since any of them may answer a request.
+func (r *Router) SupportsNativeTools() bool {
+	if len(r.providers) == 0 {
+		return false
+	}
+	for _, p := range r.providers {
+		if !SupportsNativeTools(p) {
+			return false
+		}
+	}
+	return true
+}
 func (r *Router) ProviderNames() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

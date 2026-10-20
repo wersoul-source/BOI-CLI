@@ -36,7 +36,7 @@ func ProviderEnvironment(boiDir string, configured []llmfactory.ConfiguredProvid
 	if len(qualified) == 0 {
 		return coreblock.AgentEnvironment{}
 	}
-	combined := coreblock.AgentEnvironment{Completion: true, ToolCalling: true, SkillCalling: true}
+	combined := coreblock.AgentEnvironment{Completion: true, ToolCalling: true, NativeTools: true, SkillCalling: true}
 	for _, item := range qualified {
 		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
 		profile, _, err := LoadProfile(boiDir, target)
@@ -46,6 +46,7 @@ func ProviderEnvironment(boiDir string, configured []llmfactory.ConfiguredProvid
 		env := coreblock.ComposeEnvironment(profile)
 		combined.Completion = combined.Completion && env.Completion
 		combined.ToolCalling = combined.ToolCalling && env.ToolCalling
+		combined.NativeTools = combined.NativeTools && env.NativeTools
 		combined.SkillCalling = combined.SkillCalling && env.SkillCalling
 		if combined.ContextBytes == 0 || env.ContextBytes < combined.ContextBytes {
 			combined.ContextBytes = env.ContextBytes

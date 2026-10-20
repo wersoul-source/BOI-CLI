@@ -76,6 +76,7 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 	ConfigureProviderProfileReferences(service, r.WorkspaceRoot, r.BoiDir, qualified)
 	environment := ProviderEnvironment(r.BoiDir, qualified)
 	service.SetToolCallingAllowed(environment.ToolCalling)
+	service.SetNativeToolCalling(environment.NativeTools)
 	return &Agent{Service: service, Qualified: qualified, Router: router, Environment: environment, boiDir: r.BoiDir}, nil
 }
 

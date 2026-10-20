@@ -42,3 +42,4 @@ obj/
 # ── Env (secret) ──
 .env
 !.env.example
+benchmark-results.tsv

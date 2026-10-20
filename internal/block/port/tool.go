@@ -54,10 +54,45 @@ type ToolSpec struct {
 	// Name is the capability name the model uses, e.g. "workspace.read".
 	Name string
 	// Usage is the call signature shown to the model, e.g. "workspace.read(path)".
-	Usage    string
-	Risk     Risk
-	Approval Approval
-	Timeout  time.Duration
+	Usage string
+	// Parameters is an optional JSON Schema object for the arguments. When it
+	// is nil, Schema derives one from Usage.
+	Parameters map[string]any
+	Risk       Risk
+	Approval   Approval
+	Timeout    time.Duration
+}
+
+// Schema returns the JSON Schema of the Tool arguments, for Providers that
+// accept native tool definitions. A Usage such as "workspace.write(path,
+// content)" becomes an object with required string properties path and
+// content; a Usage without a plain argument list accepts any object.
+func (s ToolSpec) Schema() map[string]any {
+	if s.Parameters != nil {
+		return s.Parameters
+	}
+	open, close := strings.Index(s.Usage, "("), strings.LastIndex(s.Usage, ")")
+	if open < 0 || close < open {
+		return map[string]any{"type": "object"}
+	}
+	properties := map[string]any{}
+	var required []string
+	for _, name := range strings.Split(s.Usage[open+1:close], ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if strings.ContainsAny(name, " -") {
+			return map[string]any{"type": "object"}
+		}
+		properties[name] = map[string]any{"type": "string"}
+		required = append(required, name)
+	}
+	schema := map[string]any{"type": "object", "properties": properties}
+	if len(required) > 0 {
+		schema["required"] = required
+	}
+	return schema
 }
 
 // Validate rejects a spec the Broker could not enforce safely.
