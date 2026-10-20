@@ -98,6 +98,7 @@ print("\t".join(str(v) for v in [
     label, task, "pass" if ok else "fail", usage.get("provider_calls", 0), usage.get("tool_calls", 0),
     usage.get("steps", 0), usage.get("input_tokens", 0) + usage.get("output_tokens", 0),
     usage.get("duration_ms", 0), data.get("stop_reason") or data.get("status", "error"),
+    "" if ok else " ".join(((data.get("error") or {}).get("message") or response or "no output").split())[:200],
 ]))
 PY
 			tail -1 "$work/results.tsv"
@@ -106,7 +107,7 @@ PY
 	cd "$repo"
 }
 
-printf 'version\ttask\tresult\tprovider_calls\ttool_calls\tsteps\ttokens\tduration_ms\tstop\n' >"$work/results.tsv"
+printf 'version\ttask\tresult\tprovider_calls\ttool_calls\tsteps\ttokens\tduration_ms\tstop\tdetail\n' >"$work/results.tsv"
 
 if [ -n "${BASE_REF:-}" ]; then
 	git -C "$repo" worktree add --detach "$work/base-src" "$BASE_REF" >/dev/null

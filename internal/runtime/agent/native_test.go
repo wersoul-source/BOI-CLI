@@ -221,3 +221,38 @@ func TestNativeReadBatchRunsConcurrently(t *testing.T) {
 		t.Fatalf("parallel read batch failed: err=%v result=%+v", err, result)
 	}
 }
+
+// replayRejectingProvider accepts tool definitions but returns HTTP 400 for
+// any request that replays tool messages, like some hosted endpoints.
+type replayRejectingProvider struct{ scriptedNativeProvider }
+
+func (p *replayRejectingProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	for _, message := range req.Messages {
+		if message.Role == "tool" {
+			return nil, llm.NewHTTPError("native", 400, "unsupported role tool", nil)
+		}
+	}
+	return p.scriptedNativeProvider.Complete(ctx, req)
+}
+
+func TestNativeReplayRejectionFallsBackToEnvelopes(t *testing.T) {
+	provider := &replayRejectingProvider{scriptedNativeProvider{responses: []llm.CompletionResponse{
+		{ToolCalls: []llm.ToolCallRequest{{Name: "workspace__read", Arguments: `{"path":"a.txt"}`}}},
+		{Content: "alpha seen"},
+	}}}
+	service, root := nativeService(t, provider)
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("alpha"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Run(context.Background(), "read a")
+	if err != nil || result.Response != "alpha seen" {
+		t.Fatalf("fallback failed: err=%v result=%+v", err, result)
+	}
+	last := provider.requests[len(provider.requests)-1]
+	if len(last.Tools) != 0 || !strings.Contains(last.Messages[0].Content, "<boi-action>") {
+		t.Fatal("the retry must use text envelopes without tool definitions")
+	}
+	if !strings.Contains(last.Messages[len(last.Messages)-1].Content, "alpha") {
+		t.Fatal("the observation must reach the model as text")
+	}
+}

@@ -217,7 +217,7 @@ func defaultProbeCases() []probeCase {
 	contextBody := strings.Repeat("BOI-CONTEXT-BLOCK-", 256)
 	return []probeCase{
 		{"completion", "BOI_PROBE completion: reply with exactly BOI_OK", 0, marker("BOI_OK")},
-		{"reasoning", "BOI_PROBE reasoning: sort the values 3,1,2 ascending and reply with exactly 1>2>3 format", 0, func(content string) (CapabilityStatus, string) {
+		{"reasoning", "BOI_PROBE reasoning: values 3,1,2; reply with exactly 1>2>3", 0, func(content string) (CapabilityStatus, string) {
 			return marker("1>2>3", "3>2>1")(strings.Join(strings.Fields(content), ""))
 		}},
 		{"tool_calling", `BOI_PROBE tool_calling: request the host tool workspace.read for the path README.md. Reply with one envelope in this form: <boi-action>{"id":"probe","tool":"workspace.read","purpose":"probe","arguments":{"path":"README.md"}}</boi-action>`, 0, probeEnvelope},

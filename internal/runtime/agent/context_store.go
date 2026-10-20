@@ -84,8 +84,9 @@ type contextExpand struct{}
 
 func (contextExpand) Spec() port.ToolSpec {
 	return port.ToolSpec{
-		Name:  ContextExpandTool,
-		Usage: "context.expand(ref, lines)",
+		Name:        ContextExpandTool,
+		Usage:       "context.expand(ref, lines)",
+		Description: "Read back the exact text of an observation the host shortened or released, by its reference and an optional line range.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

@@ -55,6 +55,8 @@ type ToolSpec struct {
 	Name string
 	// Usage is the call signature shown to the model, e.g. "workspace.read(path)".
 	Usage string
+	// Description tells the model when to use the Tool. Optional.
+	Description string
 	// Parameters is an optional JSON Schema object for the arguments. When it
 	// is nil, Schema derives one from Usage.
 	Parameters map[string]any
