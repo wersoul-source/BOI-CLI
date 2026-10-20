@@ -41,7 +41,6 @@ Providers, and who checks what a model sends back.
 | Item | Why not now | Reopen when |
 |---|---|---|
 | Compact / Standard / Extended profiles | One adapter and four simple Tools; the current output already is the compact form | A second adapter family or a Tool with nested arguments ships |
-| X-1 tool profile and dataset | X-1 does not exist yet; a profile without a model to measure is a guess | An X-1 checkpoint can be served behind an OpenAI-compatible endpoint; then run `benchmark.sh` against it |
 | `input_examples`, strict mode | No Provider in use is verified to support them | A probe confirms support on a real endpoint |
 | Contract version field | `ProbeSuiteVersion` already invalidates stale profiles; the Go module versions the contract | A Tool is loaded from outside the binary with its own schema |
 | Batch size above 5 | Benchmarks so far use at most 3 parallel reads | Benchmark shows tasks hitting the limit |
