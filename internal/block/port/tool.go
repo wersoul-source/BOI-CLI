@@ -90,7 +90,7 @@ func (s ToolSpec) Schema() map[string]any {
 		properties[name] = map[string]any{"type": "string"}
 		required = append(required, name)
 	}
-	schema := map[string]any{"type": "object", "properties": properties}
+	schema := map[string]any{"type": "object", "properties": properties, "additionalProperties": false}
 	if len(required) > 0 {
 		schema["required"] = required
 	}

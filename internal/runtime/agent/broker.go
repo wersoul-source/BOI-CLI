@@ -236,6 +236,9 @@ func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 		return ToolCall{}, fmt.Errorf("unknown or disabled capability: %s", proposed.Tool)
 	}
 	spec := tool.Spec()
+	if err := spec.ValidateArguments(proposed.Arguments); err != nil {
+		return ToolCall{}, err
+	}
 	call := proposed
 	call.Risk = spec.Risk
 	call.Approval = spec.Approval
@@ -341,7 +344,7 @@ func (b *Broker) NativeTools() ([]llm.ToolDefinition, map[string]string) {
 		definitions = append(definitions, llm.ToolDefinition{
 			Name:        native,
 			Description: strings.TrimSpace(spec.Description + fmt.Sprintf(" Host capability %s. Risk: %s; approval: %s.", spec.Usage, spec.Risk, spec.Approval)),
-			Parameters:  spec.Schema(),
+			Parameters:  spec.ProviderSchema(),
 		})
 	}
 	return definitions, lookup

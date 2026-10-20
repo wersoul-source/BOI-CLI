@@ -256,3 +256,31 @@ func TestNativeReplayRejectionFallsBackToEnvelopes(t *testing.T) {
 		t.Fatal("the observation must reach the model as text")
 	}
 }
+
+func TestInvalidNativeArgumentsAreRejectedBeforeAuthorization(t *testing.T) {
+	provider := &scriptedNativeProvider{responses: []llm.CompletionResponse{
+		{ToolCalls: []llm.ToolCallRequest{{Name: "workspace__write", Arguments: `{"path":"out.txt"}`}}},
+		{Content: "gave up"},
+	}}
+	service, root := nativeService(t, provider)
+	result, err := service.Run(context.Background(), "write")
+	if err != nil || result.Response != "gave up" || result.Usage.ToolCalls != 0 {
+		t.Fatalf("invalid arguments must never reach authorization: err=%v result=%+v", err, result)
+	}
+	retry := provider.requests[1].Messages
+	if !strings.Contains(retry[len(retry)-1].Content, "arguments.content is required") {
+		t.Fatalf("the model must be told what was wrong: %s", retry[len(retry)-1].Content)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "out.txt")); !os.IsNotExist(statErr) {
+		t.Fatal("nothing may be written")
+	}
+	for _, definition := range provider.requests[0].Tools {
+		for keyword := range definition.Parameters {
+			switch keyword {
+			case "type", "properties", "required", "additionalProperties", "description", "items", "enum":
+			default:
+				t.Errorf("%s sends unsupported keyword %q", definition.Name, keyword)
+			}
+		}
+	}
+}

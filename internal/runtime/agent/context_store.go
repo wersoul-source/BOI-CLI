@@ -94,7 +94,8 @@ func (contextExpand) Spec() port.ToolSpec {
 				"lines": map[string]any{"type": "string", "description": "optional 1-based line range such as 120-180"},
 				"match": map[string]any{"type": "string", "description": "optional case-insensitive text; returns only matching lines with their numbers"},
 			},
-			"required": []string{"ref"},
+			"required":             []string{"ref"},
+			"additionalProperties": false,
 		},
 		Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second,
 	}

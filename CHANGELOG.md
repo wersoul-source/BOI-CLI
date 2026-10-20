@@ -7,6 +7,7 @@ All notable changes to BOI CLI.
 ### Native tool calling
 - Providers can carry native tool definitions (`llm.ToolCaller`); the OpenAI-compatible adapter sends `tools` and reads `tool_calls`
 - Native mode is used only when every Router candidate supports it and the `native_tool_schema` probe proves the model calls tools correctly; otherwise the `<boi-action>` envelope remains, and an envelope is still accepted in native mode
+- `port.ToolSpec` is the single tool contract; `ProviderSchema()` sends only a supported JSON Schema subset and `ValidateArguments` checks every call (native or envelope) before authorization. See `docs/architecture/ADR-001-native-tool-schema.md`
 - Provider call IDs are replaced with host IDs, so Providers that reuse `call_0` cannot collide with idempotency keys
 
 ### Batch execution
