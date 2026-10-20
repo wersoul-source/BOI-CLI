@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
@@ -201,5 +202,97 @@ func TestServiceInteractiveApprovalCompletesWriteLoop(t *testing.T) {
 		if !kinds[kind] {
 			t.Fatalf("missing runtime event %q: %#v", kind, kinds)
 		}
+	}
+}
+
+func newSequenceService(t *testing.T, responses ...string) (*Service, *sequenceProvider, string) {
+	t.Helper()
+	root := t.TempDir()
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &sequenceProvider{responses: responses}
+	return withWorkspaceTools(t, NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox), sandbox), provider, root
+}
+
+func allContent(request llm.CompletionRequest) string {
+	var parts []string
+	for _, message := range request.Messages {
+		parts = append(parts, message.Content)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func TestMultiStepTaskKeepsEveryObservation(t *testing.T) {
+	service, provider, root := newSequenceService(t,
+		`<boi-action>{"id":"r1","tool":"workspace.read","purpose":"read a","arguments":{"path":"a.txt"}}</boi-action>`,
+		`<boi-action>{"id":"r2","tool":"workspace.read","purpose":"read b","arguments":{"path":"b.txt"}}</boi-action>`,
+		"both read",
+	)
+	_ = os.WriteFile(filepath.Join(root, "a.txt"), []byte("ALPHA-1"), 0o600)
+	_ = os.WriteFile(filepath.Join(root, "b.txt"), []byte("BRAVO-2"), 0o600)
+	if _, err := service.Run(context.Background(), "compare a and b"); err != nil {
+		t.Fatal(err)
+	}
+	last := allContent(provider.requests[2])
+	if !strings.Contains(last, "ALPHA-1") || !strings.Contains(last, "BRAVO-2") {
+		t.Fatal("third decision lost the first file's content")
+	}
+}
+
+func TestRejectedReplyIsExplainedAndCounted(t *testing.T) {
+	service, provider, _ := newSequenceService(t,
+		`<boi-action>{"id":"1","tool":"workspace.read","purpose":"x","risk":"read"}</boi-action>`,
+		"fixed answer",
+	)
+	result, err := service.Run(context.Background(), "hello")
+	if err != nil || result.Response != "fixed answer" {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if !strings.Contains(allContent(provider.requests[1]), "previous reply was rejected") {
+		t.Fatal("retry did not tell the model why its reply was rejected")
+	}
+	if result.Usage.ProviderCalls != 2 {
+		t.Fatalf("provider calls = %d, want 2", result.Usage.ProviderCalls)
+	}
+}
+
+func TestInteractiveConversationIsRememberedAndResettable(t *testing.T) {
+	service, provider, _ := newSequenceService(t, "my name is Kite", "you asked my name", "fresh")
+	runStart := func(query string) {
+		for event := range service.Start(context.Background(), query) {
+			if event.Err != nil {
+				t.Fatal(event.Err)
+			}
+		}
+	}
+	runStart("what is your name?")
+	runStart("what did I just ask?")
+	second := allContent(provider.requests[1])
+	if !strings.Contains(second, "what is your name?") || !strings.Contains(second, "my name is Kite") {
+		t.Fatal("follow-up turn lost the previous turn")
+	}
+	service.ResetConversation()
+	runStart("new topic")
+	if strings.Contains(allContent(provider.requests[2]), "my name is Kite") {
+		t.Fatal("ResetConversation did not forget prior turns")
+	}
+}
+
+func TestAutomationRunsDoNotShareConversation(t *testing.T) {
+	service, provider, _ := newSequenceService(t, "ANSWER-ZULU-7", "ANSWER-YANKEE-8")
+	_, _ = service.Run(context.Background(), "one")
+	_, _ = service.Run(context.Background(), "two")
+	if strings.Contains(allContent(provider.requests[1]), "ANSWER-ZULU-7") {
+		t.Fatal("non-interactive run leaked a previous run's answer")
+	}
+}
+
+func TestClipMiddleKeepsTailAndValidUTF8(t *testing.T) {
+	text := strings.Repeat("ไทย", 4000) + `"Truncated":true}`
+	clipped := clipMiddle(text, 1000)
+	if !strings.HasSuffix(clipped, `"Truncated":true}`) || !utf8.ValidString(clipped) || len(clipped) > 1100 {
+		t.Fatalf("bad clip: len=%d valid=%v", len(clipped), utf8.ValidString(clipped))
 	}
 }

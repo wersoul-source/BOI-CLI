@@ -327,7 +327,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "ctrl+l":
 			m.chat.Clear()
-			m.chat.AddMessage("system", "Chat cleared")
+			if m.agentService != nil {
+				m.agentService.ResetConversation()
+			}
+			m.chat.AddMessage("system", "Chat and conversation memory cleared")
 			return m, tea.Batch(cmds...)
 		}
 	}
@@ -365,7 +368,10 @@ func (m *Model) handleSlashCommand(input string) (string, bool) {
 		name := strings.TrimSpace(input[len("/model "):])
 		return fmt.Sprintf("Model set to: %s", name), false
 	case lower == "/clear":
-		return "Chat cleared", true
+		if m.agentService != nil {
+			m.agentService.ResetConversation()
+		}
+		return "Chat and conversation memory cleared", true
 	case lower == "/quit":
 		return "Use Ctrl+Q or Esc to quit", false
 	default:

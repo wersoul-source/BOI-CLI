@@ -23,6 +23,9 @@ type DecisionInput struct {
 	LastResult *ToolResult
 	LastSkill  *SkillObservation
 	Plan       *TaskPlan
+	// LastError is the host's reason for rejecting the previous decision, so
+	// a retry can correct its format instead of repeating the same mistake.
+	LastError string
 }
 
 type Decision struct {
@@ -213,6 +216,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	var usage Usage
 	var lastResult *ToolResult
 	var lastSkill *SkillObservation
+	lastError := ""
 	toolCalls := 0
 	skillCalls := 0
 	recoveries := 0
@@ -230,7 +234,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			LastResult: lastResult,
 			LastSkill:  lastSkill,
 			Plan:       plan,
+			LastError:  lastError,
 		})
+		lastError = ""
 		usage = addUsage(usage, decision.Usage)
 		provider, model = preferNonEmpty(decision.Provider, provider), preferNonEmpty(decision.Model, model)
 		if usage.TotalTokens() > limits.MaxTokens {
@@ -243,12 +249,14 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseDecide, Err: err, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				return e.stop(state, started, usage, provider, model, StopProviderFailed, err.Error()), nil
 			}
+			lastError = err.Error()
 			continue
 		}
 		if err := decision.Validate(); err != nil {
 			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseDecide, Err: err, Attempt: recoveries + 1}, &recoveries, limits, step) {
 				return e.stop(state, started, usage, provider, model, StopInvalidState, err.Error()), nil
 			}
+			lastError = err.Error()
 			continue
 		}
 		setPlanPhase(plan, PhaseDecide, PlanCompleted)
