@@ -256,29 +256,51 @@ func (q Qualifier) Run(ctx context.Context, target ProviderTarget, provider llm.
 		Fingerprint:   TargetFingerprint(target, ProbeSuiteVersion),
 		Target:        target,
 		GeneratedAt:   q.Now().UTC(),
-		Results:       []CapabilityResult{q.probeNativeTools(ctx, provider)},
 	}
+	native := q.probeNativeTools(ctx, provider)
+	if native.Status == CapabilityFailed {
+		if retry := q.probeNativeTools(ctx, provider); retry.Status == CapabilityPassed {
+			retry.Detail = "passed on retry; first attempt: " + native.Detail
+			native = retry
+		}
+	}
+	profile.Results = append(profile.Results, native)
 	for _, probe := range defaultProbeCases() {
-		probeCtx, cancel := context.WithTimeout(ctx, q.Timeout)
-		response, err := provider.Complete(probeCtx, llm.CompletionRequest{
-			Messages:  []llm.Message{{Role: "system", Content: probeSystemPrompt}, {Role: "user", Content: probe.prompt}},
-			MaxTokens: 256, Temperature: 0,
-		})
-		cancel()
-		result := CapabilityResult{Capability: probe.capability, InputBytes: probe.inputBytes}
-		switch {
-		case err != nil:
-			result.Status = CapabilityFailed
-			result.Detail = probeFailureDetail(err)
-		case response == nil:
-			result.Status, result.Detail = CapabilityInconclusive, "no response"
-		default:
-			result.Status, result.Detail = probe.check(response.Content)
+		result := q.runProbe(ctx, provider, probe)
+		if result.Status != CapabilityPassed {
+			// Hosted models are not fully deterministic even at temperature
+			// 0, and one stray reply would otherwise block every task. A
+			// capability passes only when a full attempt passes.
+			retry := q.runProbe(ctx, provider, probe)
+			if retry.Status == CapabilityPassed {
+				retry.Detail = strings.TrimSpace("passed on retry; first attempt: " + result.Detail)
+			}
+			result = retry
 		}
 		profile.Results = append(profile.Results, result)
 	}
 	sort.Slice(profile.Results, func(i, j int) bool { return profile.Results[i].Capability < profile.Results[j].Capability })
 	return profile, profile.Validate()
+}
+
+func (q Qualifier) runProbe(ctx context.Context, provider llm.Provider, probe probeCase) CapabilityResult {
+	probeCtx, cancel := context.WithTimeout(ctx, q.Timeout)
+	defer cancel()
+	response, err := provider.Complete(probeCtx, llm.CompletionRequest{
+		Messages:  []llm.Message{{Role: "system", Content: probeSystemPrompt}, {Role: "user", Content: probe.prompt}},
+		MaxTokens: 256, Temperature: 0,
+	})
+	result := CapabilityResult{Capability: probe.capability, InputBytes: probe.inputBytes}
+	switch {
+	case err != nil:
+		result.Status = CapabilityFailed
+		result.Detail = probeFailureDetail(err)
+	case response == nil:
+		result.Status, result.Detail = CapabilityInconclusive, "no response"
+	default:
+		result.Status, result.Detail = probe.check(response.Content)
+	}
+	return result
 }
 
 // probeNativeTools separates three facts: whether the adapter can carry tool

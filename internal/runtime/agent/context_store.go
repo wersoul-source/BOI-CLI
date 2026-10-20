@@ -85,13 +85,14 @@ type contextExpand struct{}
 func (contextExpand) Spec() port.ToolSpec {
 	return port.ToolSpec{
 		Name:        ContextExpandTool,
-		Usage:       "context.expand(ref, lines)",
-		Description: "Read back the exact text of an observation the host shortened or released, by its reference and an optional line range.",
+		Usage:       "context.expand(ref, lines, match)",
+		Description: "Read back the exact text of an observation the host shortened or released, by its reference. Give match to get only the lines containing that text, or lines for a range.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"ref":   map[string]any{"type": "string", "description": "reference such as r3 from a shortened observation"},
 				"lines": map[string]any{"type": "string", "description": "optional 1-based line range such as 120-180"},
+				"match": map[string]any{"type": "string", "description": "optional case-insensitive text; returns only matching lines with their numbers"},
 			},
 			"required": []string{"ref"},
 		},
@@ -124,12 +125,49 @@ func (contextExpand) Execute(ctx context.Context, arguments map[string]any) (por
 			return port.ToolOutput{}, err
 		}
 	}
-	body := strings.Join(lines[first-1:last], "\n")
-	if len(body) > maxExpandBytes {
-		return port.ToolOutput{}, fmt.Errorf("lines %d-%d are %d bytes; request a narrower range (limit %d bytes)", first, last, len(body), maxExpandBytes)
+	if match := strings.TrimSpace(port.OptionalString(arguments, "match")); match != "" {
+		return port.ToolOutput{Output: matchingLines(ref, entry, lines[first-1:last], first, match)}, nil
 	}
-	header := fmt.Sprintf("%s from %s, lines %d-%d of %d, sha256:%s verified\n", ref, entry.tool, first, last, len(lines), entry.digest)
-	return port.ToolOutput{Output: header + body}, nil
+	// Return the longest prefix of the range that fits, and say where to
+	// continue, rather than failing: a model that asked for too much then
+	// still makes progress with its next call.
+	end, size := first-1, 0
+	for end < last && (end == first-1 || size+len(lines[end])+1 <= maxExpandBytes) {
+		size += len(lines[end]) + 1
+		end++
+	}
+	body := strings.Join(lines[first-1:end], "\n")
+	if len(body) > maxExpandBytes {
+		body = clipMiddle(body, maxExpandBytes)
+	}
+	header := fmt.Sprintf("%s from %s, lines %d-%d of %d, sha256:%s verified", ref, entry.tool, first, end, len(lines), entry.digest)
+	if end < last {
+		header += fmt.Sprintf("; output limit reached, continue with lines %d-%d or use match", end+1, last)
+	}
+	return port.ToolOutput{Output: header + "\n" + body}, nil
+}
+
+// maxMatches bounds one match result.
+const maxMatches = 50
+
+func matchingLines(ref string, entry storedOutput, lines []string, offset int, match string) string {
+	needle := strings.ToLower(match)
+	var found []string
+	count := 0
+	for index, line := range lines {
+		if !strings.Contains(strings.ToLower(line), needle) {
+			continue
+		}
+		count++
+		if len(found) < maxMatches {
+			found = append(found, fmt.Sprintf("%d: %s", offset+index, clipMiddle(line, 512)))
+		}
+	}
+	header := fmt.Sprintf("%s from %s, %d lines match %q, sha256:%s verified", ref, entry.tool, count, match, entry.digest)
+	if count > len(found) {
+		header += fmt.Sprintf("; showing the first %d", len(found))
+	}
+	return strings.Join(append([]string{header}, found...), "\n")
 }
 
 func parseLineRange(span string, total int) (int, int, error) {

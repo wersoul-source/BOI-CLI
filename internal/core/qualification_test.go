@@ -220,3 +220,37 @@ func TestNativeToolProbe(t *testing.T) {
 		}
 	}
 }
+
+// flakyProvider gives one wrong completion reply, then correct ones.
+type flakyProvider struct {
+	probeProvider
+	misses *int
+}
+
+func (p flakyProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	if strings.HasPrefix(req.Messages[len(req.Messages)-1].Content, "BOI_PROBE completion:") && *p.misses > 0 {
+		*p.misses--
+		return &llm.CompletionResponse{Content: "Hello! How can I help?"}, nil
+	}
+	return p.probeProvider.Complete(ctx, req)
+}
+
+func TestProbeRetriesOnceBeforeFailing(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
+	misses := 1
+	profile, err := (Qualifier{}).Run(context.Background(), target, flakyProvider{misses: &misses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status("completion") != CapabilityPassed {
+		t.Fatalf("one stray reply must not fail a capability: %+v", profile.Results)
+	}
+	misses = 2
+	profile, err = (Qualifier{}).Run(context.Background(), target, flakyProvider{misses: &misses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status("completion") != CapabilityFailed {
+		t.Fatal("two wrong replies must fail the capability")
+	}
+}

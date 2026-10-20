@@ -564,7 +564,7 @@ func clipWithReference(text string, limit int, ref string) string {
 	}
 	head, tail := clipBounds(text, limit)
 	first, last := strings.Count(text[:head], "\n")+1, strings.Count(text[:tail], "\n")+1
-	return text[:head] + fmt.Sprintf("...[%d bytes omitted by host; read lines %d-%d with context.expand ref=%s]...", tail-head, first, last, ref) + text[tail:]
+	return text[:head] + fmt.Sprintf("...[%d bytes omitted by host; lines %d-%d stay readable with context.expand ref=%s, using match to search them or lines for a range]...", tail-head, first, last, ref) + text[tail:]
 }
 
 // releasedStub replaces an old observation that no longer fits the budget.
@@ -573,7 +573,7 @@ func releasedStub(text, ref string) string {
 	if ref == "" {
 		return fmt.Sprintf("[released by host: %d bytes, %d lines]", len(text), lines)
 	}
-	return fmt.Sprintf("[released by host: %d bytes, %d lines; read it back with context.expand ref=%s]", len(text), lines, ref)
+	return fmt.Sprintf("[released by host: %d bytes, %d lines; read it back with context.expand ref=%s, using match or lines]", len(text), lines, ref)
 }
 
 func observationJSON(item observation) string {

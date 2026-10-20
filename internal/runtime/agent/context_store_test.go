@@ -39,7 +39,7 @@ func TestLargeObservationKeepsReferenceToExactMiddle(t *testing.T) {
 
 	observations := collectObservations(input, store)
 	shown := observations[0].result.Output
-	if len(shown) > maxObservationBytes+512 || !strings.Contains(shown, "context.expand ref=r1") {
+	if len(shown) > maxObservationBytes+1024 || !strings.Contains(shown, "context.expand ref=r1") {
 		t.Fatalf("large output must be shortened with a reference, got %d bytes", len(shown))
 	}
 	var decoded map[string]any
@@ -151,4 +151,31 @@ func TestAgentExpandsShortenedObservationEndToEnd(t *testing.T) {
 
 func writeFile(root, name, content string) error {
 	return os.WriteFile(filepath.Join(root, name), []byte(content), 0o600)
+}
+
+func TestContextExpandMatchAndOversizedRange(t *testing.T) {
+	store := newContextStore()
+	var lines []string
+	for index := 1; index <= 3000; index++ {
+		line := fmt.Sprintf("line %d: routine log entry", index)
+		if index == 1700 {
+			line = "line 1700: the secret word is quartz"
+		}
+		lines = append(lines, line)
+	}
+	store.put("c1", "workspace.read", strings.Join(lines, "\n"))
+	ctx := withContextStore(context.Background(), store)
+
+	found, err := contextExpand{}.Execute(ctx, map[string]any{"ref": "r1", "match": "SECRET"})
+	if err != nil || !strings.Contains(found.Output, "1 lines match") || !strings.Contains(found.Output, "1700: line 1700: the secret word is quartz") {
+		t.Fatalf("match must return the line with its number: %v %q", err, found.Output)
+	}
+
+	whole, err := contextExpand{}.Execute(ctx, map[string]any{"ref": "r1", "lines": "1-3000"})
+	if err != nil {
+		t.Fatalf("an oversized range must return a prefix, not fail: %v", err)
+	}
+	if len(whole.Output) > maxExpandBytes+512 || !strings.Contains(whole.Output, "continue with lines") || !strings.Contains(whole.Output, "line 1: routine") {
+		t.Fatalf("prefix must fit and say where to continue: %d bytes", len(whole.Output))
+	}
 }
