@@ -155,6 +155,8 @@ def main() -> int:
                     "PSC_1_API_KEY": "simulation-key",
                     "PSC_1_BASE_URL": f"http://127.0.0.1:{server.server_port}",
                     "PSC_1_MODEL": "fixture-model",
+                    # Isolate from the user's shared ~/.config/boi (.env, cached profiles).
+                    "BOI_CONFIG_DIR": str(temp / "boi-config"),
                 }
             )
 
@@ -200,9 +202,10 @@ def main() -> int:
 
             unqualified = temp / "unqualified workspace"
             (unqualified / ".git").mkdir(parents=True)
-            initialized = run(binary, unqualified, env, "init")
+            fresh_env = dict(env, BOI_CONFIG_DIR=str(temp / "fresh-boi-config"))
+            initialized = run(binary, unqualified, fresh_env, "init")
             require(initialized.returncode == 0, "unqualified workspace init failed")
-            result, payload = automation(binary, unqualified, env, "SIM_LIST_FULL_FOLDER")
+            result, payload = automation(binary, unqualified, fresh_env, "SIM_LIST_FULL_FOLDER")
             error = payload.get("error") or {}
             require(result.returncode == 5 and "no qualified providers" in str(error.get("message", "")), f"unqualified provider gate failed: {payload}")
             require(not (unqualified / "agent-folder").exists(), "unqualified flow created Agent Folder")

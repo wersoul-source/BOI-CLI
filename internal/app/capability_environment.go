@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/capability"
-	"github.com/boi-family/boi-cli/internal/skill"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
+	"github.com/boi-family/boi-cli/internal/equipment/skill"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
 )
 
 type CapabilitySet struct {
@@ -52,6 +53,18 @@ func (set *CapabilitySet) Skill(name string) (*skill.Skill, error) {
 	return nil, fmt.Errorf("active Skill instructions are unavailable: %s", name)
 }
 
+// SkillDocs converts the loaded Skills into the Runtime port type.
+func (set *CapabilitySet) SkillDocs() []agent.SkillDoc {
+	if set == nil {
+		return nil
+	}
+	docs := make([]agent.SkillDoc, 0, len(set.LoadedSkills))
+	for _, item := range set.LoadedSkills {
+		docs = append(docs, agent.SkillDoc{Name: item.Name, Description: item.Description, Instructions: item.Prompt})
+	}
+	return docs
+}
+
 func DefaultCapabilityIndexes() (capability.Index, capability.Index) {
 	tools := capability.Index{SchemaVersion: capability.IndexSchemaVersion, Kind: capability.KindTool, Entries: []capability.Entry{
 		{Name: "workspace.list", Source: "builtin", Summary: "List files inside the workspace", Enabled: true, Priority: 100, Tags: []string{"list", "files"}},
@@ -82,12 +95,15 @@ func EnsureCapabilityIndexes(boiDir string) error {
 	return nil
 }
 
-func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment) (*CapabilitySet, error) {
+func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment, registeredTools []string) (*CapabilitySet, error) {
 	toolIndex, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindTool), capability.KindTool)
 	if err != nil {
 		return nil, err
 	}
-	installedTools := map[string]bool{"workspace.list": true, "workspace.read": true, "workspace.write": true, "process.run": true}
+	installedTools := make(map[string]bool, len(registeredTools))
+	for _, name := range registeredTools {
+		installedTools[name] = true
+	}
 	tools := capability.Select(*toolIndex, capability.SelectionInput{Task: task, Installed: installedTools, ProviderAllows: environment.ToolCalling})
 	available := map[string]bool{}
 	for _, name := range tools.Active {

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 )
 
 // EnsureAgentIdentity loads an existing identity or asks the interactive user

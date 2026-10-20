@@ -2,6 +2,26 @@
 
 All notable changes to BOI CLI.
 
+## v1.5.0 — BOI Agent Suite v1.5
+
+### Architecture
+- Fixed spine (`core`, `runtime`) and pluggable Blocks (`equipment`, `service`, `agentfolder`, `subagent`)
+- `block/port.Tool` contract; the Broker dispatches through a registered tool table
+- Built-in workspace, process and MCP Tools moved to Equipment and verify their own effects
+- `app.BuildAgent` is the single composition point for TUI and CLI
+- Dependency rules enforced by `internal/architecture/deps_test.go`
+
+### Fixes
+- Provider adapters: request timeout, 8 MB response cap; Google API key moved from URL to header
+- Memory store rejects path-traversal IDs; persona names match case-insensitively
+- Upgrade caps extracted archive entries at 512 MB
+- Command deny-list hardened and documented as best-effort, not isolation
+- `doctor` reports Config and Agent identity as separate checks
+
+### Build
+- Linux is the release gate: race tests, staticcheck, coverage floor, built-binary folder simulation
+- Other platforms are compile checks; `make smoke` runs the Linux acceptance on a VM
+
 ## v0.3.0 (2026-08-03) — Cross-platform Release + Full Audit
 
 ### Cross-platform Support

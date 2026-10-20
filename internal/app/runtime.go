@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/boi-family/boi-cli/internal/block/agentfolder"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/agentfolder"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
 type runtimeContextKey struct{}

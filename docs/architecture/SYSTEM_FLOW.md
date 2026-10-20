@@ -111,14 +111,14 @@ The system locates the project root by walking up the directory tree looking for
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/workspace/workspace.go` | `DetectRoot()` -- walks up from CWD looking for `.boi/` then `.git/`. `GetBoiDir()` returns `.boi/` path |
-| `internal/workspace/scanner.go` | Project structure scanning |
-| `internal/config/config.go` | Load/save `.boi/config.yaml` |
-| `internal/config/defaults.go` | Default configuration values |
-| `internal/persona/registry.go` | Persona registry -- Load/Get/List |
-| `internal/persona/loader.go` | YAML loader for persona profiles |
-| `internal/skill/registry.go` | Skill registry |
-| `internal/skill/loader.go` | SKILL.md loader |
+| `internal/runtime/workspace/workspace.go` | `DetectRoot()` -- walks up from CWD looking for `.boi/` then `.git/`. `GetBoiDir()` returns `.boi/` path |
+| `internal/runtime/workspace/scanner.go` | Project structure scanning |
+| `internal/service/config/config.go` | Load/save `.boi/config.yaml` |
+| `internal/service/config/defaults.go` | Default configuration values |
+| `internal/core/persona/registry.go` | Persona registry -- Load/Get/List |
+| `internal/core/persona/loader.go` | YAML loader for persona profiles |
+| `internal/equipment/skill/registry.go` | Skill registry |
+| `internal/equipment/skill/loader.go` | SKILL.md loader |
 
 **Data flow:**
 ```
@@ -154,10 +154,10 @@ The active persona is loaded from `.boi/config.yaml` (or defaults to `kamkaew`).
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/persona/registry.go` | Registry -- in-memory map of persona name -> Persona struct |
-| `internal/persona/loader.go` | Load YAML files from `.boi/personas/` directory |
-| `internal/persona/types.go` | Persona struct with Name, Model, Temperature, SystemPrompt, Description |
-| `internal/persona/defaults.go` | Embedded default persona YAMLs via `go:embed defaults/` |
+| `internal/core/persona/registry.go` | Registry -- in-memory map of persona name -> Persona struct |
+| `internal/core/persona/loader.go` | Load YAML files from `.boi/personas/` directory |
+| `internal/core/persona/types.go` | Persona struct with Name, Model, Temperature, SystemPrompt, Description |
+| `internal/core/persona/defaults.go` | Embedded default persona YAMLs via `go:embed defaults/` |
 | `.boi/personas/{boi,kamkaew,kampun,dang,don,kine}.yaml` | Per-project persona overrides |
 | `.boi/config.yaml` | Stores active persona name under `persona:` key |
 
@@ -189,7 +189,7 @@ Injected into agent.Loop builder
 
 **Error handling:**
 - Persona name not found: falls back to `kamkaew` default
-- Persona dir missing: uses embedded defaults from `internal/persona/defaults.go` (compiled into binary)
+- Persona dir missing: uses embedded defaults from `internal/core/persona/defaults.go` (compiled into binary)
 - YAML parse error: skips bad file, logs warning
 - Config missing persona field: uses `kamkaew`
 
@@ -203,12 +203,12 @@ Before each LLM turn, the Memory Hook searches Phantom DB for relevant past memo
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/memory/hook.go` | `BeforeTurn()` + `AfterTurn()` -- orchestrates memory lifecycle per agent turn |
-| `internal/memory/store.go` | Phantom DB -- file-based JSON store. `Open()`, `Save()`, `SearchMemory()`, `InjectMemory()` |
-| `internal/memory/prefetch.go` | `Prefetch()` -- keyword search + `InjectMemory()` -- formats memory context block |
-| `internal/memory/context.go` | ContextManager -- token budget tracking |
-| `internal/memory/extractor.go` | `Extractor` interface + `SimpleExtractor` -- extracts facts from agent output |
-| `internal/memory/entity.go` | Weight entity adapter for `MemoryEntry` |
+| `internal/equipment/memory/hook.go` | `BeforeTurn()` + `AfterTurn()` -- orchestrates memory lifecycle per agent turn |
+| `internal/equipment/memory/store.go` | Phantom DB -- file-based JSON store. `Open()`, `Save()`, `SearchMemory()`, `InjectMemory()` |
+| `internal/equipment/memory/prefetch.go` | `Prefetch()` -- keyword search + `InjectMemory()` -- formats memory context block |
+| `internal/equipment/memory/context.go` | ContextManager -- token budget tracking |
+| `internal/equipment/memory/extractor.go` | `Extractor` interface + `SimpleExtractor` -- extracts facts from agent output |
+| `internal/equipment/memory/entity.go` | Weight entity adapter for `MemoryEntry` |
 
 **Data flow:**
 ```
@@ -247,8 +247,8 @@ The Weight Engine scores memories across 5 dimensions (Truth, Confidence, Import
 | `internal/weight/types.go` | `Entity` interface, `Weights` struct, `.Sum()` method |
 | `internal/weight/policy.go` | `WeightPolicy` struct, `DefaultPolicy()` |
 | `internal/weight/explain.go` | `Explain()` -- generates `WeightExplanation` with per-dimension breakdown |
-| `internal/memory/entity.go` | `MemoryEntry` implements `weight.Entity` interface |
-| `internal/memory/prefetch.go` | `ReWeight()` -- resolves conflicts between two memories |
+| `internal/equipment/memory/entity.go` | `MemoryEntry` implements `weight.Entity` interface |
+| `internal/equipment/memory/prefetch.go` | `ReWeight()` -- resolves conflicts between two memories |
 
 **Weight Policy (Default):**
 | Dimension | Weight | Description |
@@ -372,7 +372,7 @@ The formatted prompt (system prompt + memory context + user message) is sent to 
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/agent/loop.go` | `.callLLM()` -- builds request, calls router, handles simulated fallback |
+| `internal/runtime/agent/loop.go` | `.callLLM()` -- builds request, calls router, handles simulated fallback |
 | `internal/llm/provider.go` | `CompletionRequest` / `CompletionResponse` structs |
 | `internal/llm/router.go` | Provider selection + fallback |
 
@@ -426,12 +426,12 @@ The agent loop implements the ReAct (Reasoning + Acting) pattern. It iterates up
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/agent/loop.go` | `Loop.Run()` -- main ReAct loop controller |
-| `internal/agent/types.go` | `AgentState`, `AgentStep`, `AgentResult` structs |
-| `internal/agent/planner.go` | Task decomposition |
-| `internal/agent/executor.go` | Tool execution engine |
-| `internal/agent/reviewer.go` | Quality review |
-| `internal/agent/subagent.go` | Sub-agent delegation |
+| `internal/runtime/agent/loop.go` | `Loop.Run()` -- main ReAct loop controller |
+| `internal/runtime/agent/types.go` | `AgentState`, `AgentStep`, `AgentResult` structs |
+| `internal/runtime/agent/planner.go` | Task decomposition |
+| `internal/runtime/agent/executor.go` | Tool execution engine |
+| `internal/runtime/agent/reviewer.go` | Quality review |
+| `internal/runtime/agent/subagent.go` | Sub-agent delegation |
 
 **Loop state machine:**
 ```
@@ -495,10 +495,10 @@ After the agent produces a final response, the Memory Hook extracts facts from t
 **Modules involved:**
 | File | Role |
 |------|------|
-| `internal/memory/hook.go` | `AfterTurn()` -- extract facts, save to store, increment turn counter |
-| `internal/memory/extractor.go` | `SimpleExtractor.Extract()` -- extracts facts from conversation (currently pass-through) |
-| `internal/memory/store.go` | `Save()` -- writes MemoryEntry as JSON to `.boi/memory/mem_{id}.json` |
-| `internal/memory/nudge.go` | Periodic memory maintenance trigger |
+| `internal/equipment/memory/hook.go` | `AfterTurn()` -- extract facts, save to store, increment turn counter |
+| `internal/equipment/memory/extractor.go` | `SimpleExtractor.Extract()` -- extracts facts from conversation (currently pass-through) |
+| `internal/equipment/memory/store.go` | `Save()` -- writes MemoryEntry as JSON to `.boi/memory/mem_{id}.json` |
+| `internal/equipment/memory/nudge.go` | Periodic memory maintenance trigger |
 
 **Data flow:**
 ```

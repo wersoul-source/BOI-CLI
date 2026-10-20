@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/boi-family/boi-cli/internal/tool/filesystem"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
 func TestWorkspaceReadCommandUsesSandbox(t *testing.T) {

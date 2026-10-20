@@ -334,7 +334,7 @@ All Cobra command definitions. Each file registers commands on `rootCmd`. This i
 
 ---
 
-### `internal/config/` -- Configuration (L1)
+### `internal/service/config/` -- Configuration (L1)
 
 | File | Purpose |
 |------|---------|
@@ -352,7 +352,7 @@ api_keys: {}
 
 ---
 
-### `internal/workspace/` -- Workspace Detection (L1)
+### `internal/runtime/workspace/` -- Workspace Detection (L1)
 
 | File | Purpose |
 |------|---------|
@@ -381,7 +381,7 @@ api_keys: {}
 
 ---
 
-### `internal/agent/` -- Agent Core (L3)
+### `internal/runtime/agent/` -- Agent Core (L3)
 
 The central execution engine. Orchestrates the ReAct loop:
 
@@ -408,7 +408,7 @@ The central execution engine. Orchestrates the ReAct loop:
 
 ---
 
-### `internal/persona/` -- Persona System (L4)
+### `internal/core/persona/` -- Persona System (L4)
 
 | File | Purpose |
 |------|---------|
@@ -428,7 +428,7 @@ description: "Debug & Code Specialist"
 
 ---
 
-### `internal/skill/` -- Skill System (L5)
+### `internal/equipment/skill/` -- Skill System (L5)
 
 | File | Purpose |
 |------|---------|
@@ -483,7 +483,7 @@ type Provider interface {
 
 ---
 
-### `internal/memory/` -- Phantom DB (L7)
+### `internal/equipment/memory/` -- Phantom DB (L7)
 
 | File | Purpose |
 |------|---------|
@@ -532,26 +532,26 @@ Bubbletea-based full-screen terminal interface.
 ```
 +=============================================================================+
 |  L1: CLI & INTERFACE     Cobra CLI + Flags + Help                          |
-|                          internal/cli/*, internal/config/*,                 |
-|                          internal/workspace/*, internal/logger/*           |
+|                          internal/cli/*, internal/service/config/*,                 |
+|                          internal/runtime/workspace/*, internal/logger/*           |
 +=============================================================================+
 |  L2: TUI                 Bubbletea full-screen interface                    |
 |                          internal/tui/*                                     |
 +=============================================================================+
 |  L3: AGENT CORE          ReAct Loop + Planner + Reviewer + SubAgent        |
-|                          internal/agent/*                                   |
+|                          internal/runtime/agent/*                                   |
 +=============================================================================+
 |  L4: PERSONA SYSTEM      6 Personas: boi, kamkaew, kampun, dang, don, kine |
-|                          internal/persona/*                                 |
+|                          internal/core/persona/*                                 |
 +=============================================================================+
 |  L5: SKILL SYSTEM        Skill Runtime + Loader + Registry + MCP           |
-|                          internal/skill/*, internal/mcp/*                  |
+|                          internal/equipment/skill/*, internal/mcp/*                  |
 +=============================================================================+
 |  L6: PSC (Providers)     OpenAI + Anthropic + DeepSeek + Ollama            |
 |                          internal/llm/*                                     |
 +=============================================================================+
 |  L7: MEMORY & WEIGHT     Phantom DB + Context + Weight Engine               |
-|                          internal/memory/*, internal/weight/*               |
+|                          internal/equipment/memory/*, internal/weight/*               |
 +=============================================================================+
 |  L8: EVOLUTION           GEPA Trace + Pattern Detection + Scoring           |
 |                          (future: internal/evolution/*)                     |

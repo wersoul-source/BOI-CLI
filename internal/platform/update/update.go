@@ -20,6 +20,7 @@ const (
 	releaseRepository = "BOI-CLI"
 	maxArchiveBytes   = 512 << 20
 	maxChecksumsBytes = 1 << 20
+	maxExtractedBytes = 512 << 20
 )
 
 var releaseHTTPClient = &http.Client{Timeout: 2 * time.Minute}
@@ -314,7 +315,11 @@ func extractTarGz(tarGzPath, dest string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tr); err != nil {
+			n, err := io.Copy(outFile, io.LimitReader(tr, maxExtractedBytes+1))
+			if err == nil && n > maxExtractedBytes {
+				err = fmt.Errorf("archive entry %s exceeds %d bytes", header.Name, maxExtractedBytes)
+			}
+			if err != nil {
 				outFile.Close()
 				return err
 			}

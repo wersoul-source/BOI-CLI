@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -14,8 +14,8 @@ func approvalFixture(now time.Time) agent.ApprovalRequest {
 		ID:             "call_001",
 		Tool:           "filesystem.write",
 		Purpose:        "update the Agent timeout",
-		Arguments:      map[string]any{"path": "internal/agent/service.go"},
-		Target:         "internal/agent/service.go",
+		Arguments:      map[string]any{"path": "internal/runtime/agent/service.go"},
+		Target:         "internal/runtime/agent/service.go",
 		ExpectedResult: "the timeout is updated",
 		Preview:        "- timeout: 30s\n+ timeout: 120s",
 		Risk:           agent.RiskChange,
@@ -46,7 +46,7 @@ func TestApprovalModelShowsExactActionAndRequiresExplicitKey(t *testing.T) {
 	for _, want := range []string{
 		"APPROVAL REQUIRED",
 		"filesystem.write",
-		"internal/agent/service.go",
+		"internal/runtime/agent/service.go",
 		"Risk: CHANGE",
 		"Approve once",
 	} {

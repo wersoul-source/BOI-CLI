@@ -8,7 +8,6 @@ var (
 	boiGreen    = lipgloss.Color("78")
 	boiOrange   = lipgloss.Color("208")
 	boiRed      = lipgloss.Color("197")
-	bgDark      = lipgloss.Color("234")
 	textPrimary = lipgloss.Color("252")
 	textDim     = lipgloss.Color("245")
 	borderColor = lipgloss.Color("62")
@@ -95,7 +94,7 @@ var (
 		botRight: lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("─╯"),
 		vert:     lipgloss.NewStyle().Foreground(lipgloss.Color("78")).Render("│"),
 		horiz:    "─",
-		header:   UserStyle.Copy().Foreground(lipgloss.Color("78")),
+		header:   UserStyle.Foreground(lipgloss.Color("78")),
 		meta:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 	}
 
@@ -106,7 +105,7 @@ var (
 		botRight: lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("─╯"),
 		vert:     lipgloss.NewStyle().Foreground(lipgloss.Color("99")).Render("│"),
 		horiz:    "─",
-		header:   AgentStyle.Copy().Foreground(lipgloss.Color("99")),
+		header:   AgentStyle.Foreground(lipgloss.Color("99")),
 		meta:     lipgloss.NewStyle().Foreground(lipgloss.Color("141")),
 	}
 )

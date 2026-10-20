@@ -1,16 +1,18 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/config"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+	"github.com/boi-family/boi-cli/internal/service/config"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/spf13/cobra"
 )
 
@@ -39,21 +41,7 @@ var providerQualifyCmd = &cobra.Command{
 			if strings.ToLower(item.Name) != name {
 				continue
 			}
-			target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
-			profile, err := (coreblock.Qualifier{Timeout: providerProbeTimeout}).Run(cmd.Context(), target, item.Provider)
-			if err != nil {
-				return fmt.Errorf("qualify provider: %w", err)
-			}
-			path := coreblock.CapabilityProfilePath(runtime.BoiDir, target)
-			if err := coreblock.SaveCapabilityProfile(path, profile); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Provider: %s\nModel: %s\nEndpoint class: %s\n", target.Provider, target.Model, target.EndpointClass)
-			for _, result := range profile.Results {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-20s %s\n", result.Capability, result.Status)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Profile: %s\n", path)
-			return nil
+			return qualifyProvider(cmd.Context(), runtime, item, cmd.OutOrStdout(), providerProbeTimeout)
 		}
 		return fmt.Errorf("provider %q is not configured", name)
 	},
@@ -148,4 +136,28 @@ func init() {
 	providerCmd.AddCommand(providerQualifyCmd)
 	rootCmd.AddCommand(providerCmd)
 	rootCmd.AddCommand(modelCmd)
+}
+
+// qualifyProvider runs the probe suite, stores the profile in the workspace
+// and the per-user cache, and prints each capability with its failure cause.
+func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.ConfiguredProvider, out io.Writer, timeout time.Duration) error {
+	target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
+	profile, err := (coreblock.Qualifier{Timeout: timeout}).Run(ctx, target, item.Provider)
+	if err != nil {
+		return fmt.Errorf("qualify provider: %w", err)
+	}
+	path, err := app.SaveProfile(runtime.BoiDir, target, profile)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Provider: %s\nModel: %s\nEndpoint class: %s\n", target.Provider, target.Model, target.EndpointClass)
+	for _, result := range profile.Results {
+		line := fmt.Sprintf("  %-20s %s", result.Capability, result.Status)
+		if result.Status == coreblock.CapabilityFailed && result.Detail != "" {
+			line += "  - " + result.Detail
+		}
+		fmt.Fprintln(out, line)
+	}
+	fmt.Fprintf(out, "Profile: %s\n", path)
+	return nil
 }

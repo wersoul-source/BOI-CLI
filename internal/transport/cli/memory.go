@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/memory"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/equipment/memory"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	"github.com/spf13/cobra"
 )
 

@@ -7,10 +7,10 @@ import (
 	"runtime"
 	"strings"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	"github.com/boi-family/boi-cli/internal/capability"
-	"github.com/boi-family/boi-cli/internal/config"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment/capability"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+	"github.com/boi-family/boi-cli/internal/service/config"
 	"github.com/spf13/cobra"
 )
 
@@ -59,16 +59,27 @@ var doctorCmd = &cobra.Command{
 		configPath := filepath.Join(workspace.GetBoiDir(root), "config.yaml")
 		_, err = config.LoadFrom(configPath)
 		cfgOK := err == nil
-		identity, identityErr := coreblock.LoadIdentity(filepath.Join(workspace.GetBoiDir(root), coreblock.IdentityFilename))
-		agentDetail := "Agent identity missing"
-		if identityErr == nil {
-			agentDetail = "Agent " + identity.Name
+		cfgDetail := configPath
+		if !cfgOK {
+			cfgDetail = "unreadable: " + err.Error()
 		}
 		total++
 		if cfgOK {
 			passed++
 		}
-		checks = append(checks, checkResult{label: "Config", ok: cfgOK, detail: agentDetail})
+		checks = append(checks, checkResult{label: "Config", ok: cfgOK, detail: cfgDetail})
+
+		identity, identityErr := coreblock.LoadIdentity(filepath.Join(workspace.GetBoiDir(root), coreblock.IdentityFilename))
+		agentOK := identityErr == nil
+		agentDetail := "missing; start 'boi' once to name your Agent"
+		if agentOK {
+			agentDetail = identity.Name
+		}
+		total++
+		if agentOK {
+			passed++
+		}
+		checks = append(checks, checkResult{label: "Agent", ok: agentOK, detail: agentDetail})
 
 		skills, skillErr := capability.LoadIndex(capability.IndexPath(workspace.GetBoiDir(root), capability.KindSkill), capability.KindSkill)
 		skillCount := 0

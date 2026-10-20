@@ -3,9 +3,9 @@ package app
 import (
 	"path/filepath"
 
-	"github.com/boi-family/boi-cli/internal/agent"
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
 
 // ConfigureProviderProfileReferences gives task manifests a credential-free
@@ -16,7 +16,10 @@ func ConfigureProviderProfileReferences(service *agent.Service, workspaceRoot, b
 	}
 	for _, item := range qualified {
 		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
-		path := coreblock.CapabilityProfilePath(boiDir, target)
+		_, path, loadErr := LoadProfile(boiDir, target)
+		if loadErr != nil {
+			path = coreblock.CapabilityProfilePath(boiDir, target)
+		}
 		reference, err := filepath.Rel(workspaceRoot, path)
 		if err != nil {
 			reference = path
@@ -36,7 +39,7 @@ func ProviderEnvironment(boiDir string, configured []llmfactory.ConfiguredProvid
 	combined := coreblock.AgentEnvironment{Completion: true, ToolCalling: true, SkillCalling: true}
 	for _, item := range qualified {
 		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
-		profile, err := coreblock.LoadCapabilityProfile(coreblock.CapabilityProfilePath(boiDir, target))
+		profile, _, err := LoadProfile(boiDir, target)
 		if err != nil {
 			continue
 		}
@@ -58,7 +61,7 @@ func QualifiedProviders(boiDir string, configured []llmfactory.ConfiguredProvide
 	qualified := make([]llmfactory.ConfiguredProvider, 0, len(configured))
 	for _, item := range configured {
 		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
-		profile, err := coreblock.LoadCapabilityProfile(coreblock.CapabilityProfilePath(boiDir, target))
+		profile, _, err := LoadProfile(boiDir, target)
 		if err == nil && coreblock.ComposeEnvironment(profile).Completion {
 			qualified = append(qualified, item)
 		}

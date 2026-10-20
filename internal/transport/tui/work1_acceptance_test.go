@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/boi-family/boi-cli/internal/agent"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

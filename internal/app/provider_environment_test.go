@@ -1,11 +1,13 @@
 package app
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	coreblock "github.com/boi-family/boi-cli/internal/block/core"
-	llmfactory "github.com/boi-family/boi-cli/internal/provider/factory"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
+	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
 
 func TestProviderEnvironmentFailsClosedAndRequiresEveryProvider(t *testing.T) {
@@ -40,5 +42,23 @@ func TestProviderEnvironmentFailsClosedAndRequiresEveryProvider(t *testing.T) {
 	}
 	if len(QualifiedProviders(boiDir, items)) != 2 {
 		t.Fatal("both passing Providers should enter Router")
+	}
+}
+
+func TestQualificationProfileIsSharedThroughGlobalDir(t *testing.T) {
+	global := t.TempDir()
+	t.Setenv("BOI_CONFIG_DIR", global)
+	target := coreblock.ProviderTarget{Provider: "openai", Model: "m", EndpointClass: "custom"}
+	profile := &coreblock.CapabilityProfile{SchemaVersion: 1, ProbeVersion: coreblock.ProbeSuiteVersion, Fingerprint: coreblock.TargetFingerprint(target, coreblock.ProbeSuiteVersion), Target: target, GeneratedAt: time.Unix(1, 0), Results: []coreblock.CapabilityResult{{Capability: "completion", Status: coreblock.CapabilityPassed}}}
+	first, second := filepath.Join(t.TempDir(), ".boi"), filepath.Join(t.TempDir(), ".boi")
+	if _, _, err := LoadProfile(second, target); err == nil {
+		t.Fatal("profile found before any qualification")
+	}
+	if _, err := SaveProfile(first, target, profile); err != nil {
+		t.Fatal(err)
+	}
+	_, path, err := LoadProfile(second, target)
+	if err != nil || !strings.HasPrefix(path, global) {
+		t.Fatalf("second workspace did not reuse the shared profile: path=%q err=%v", path, err)
 	}
 }

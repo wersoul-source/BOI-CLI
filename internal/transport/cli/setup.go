@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	registry "github.com/boi-family/boi-cli/internal/provider/catalog"
+	registry "github.com/boi-family/boi-cli/internal/service/provider/catalog"
 	"github.com/boi-family/boi-cli/internal/transport/tui/setup"
 	"github.com/spf13/cobra"
 )

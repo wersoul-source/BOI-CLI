@@ -11,11 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boi-family/boi-cli/internal/agent"
-	"github.com/boi-family/boi-cli/internal/block/agentfolder"
-	"github.com/boi-family/boi-cli/internal/persona"
-	llm "github.com/boi-family/boi-cli/internal/provider"
-	"github.com/boi-family/boi-cli/internal/workspace"
+	"github.com/boi-family/boi-cli/internal/agentfolder"
+	"github.com/boi-family/boi-cli/internal/app"
+	"github.com/boi-family/boi-cli/internal/core/persona"
+	"github.com/boi-family/boi-cli/internal/runtime/agent"
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
 type scriptedProvider struct {
@@ -76,6 +77,16 @@ func newService(t *testing.T, provider llm.Provider) (*agent.Service, string) {
 		t.Fatal(err)
 	}
 	service := agent.NewService(persona.CorePersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	var names []string
+	for _, tool := range app.BuiltinTools(sandbox) {
+		if err := service.RegisterTool(tool); err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, tool.Spec().Name)
+	}
+	if err := service.SetActiveTools(names); err != nil {
+		t.Fatal(err)
+	}
 	service.SetTaskRecorder(store)
 	service.SetProviderProfileReference(provider.Name(), "fixture-model", ".boi/provider-profiles/fixture.json")
 	return service, root
