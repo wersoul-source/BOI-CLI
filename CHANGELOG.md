@@ -8,8 +8,7 @@ Driven by the v1.6 benchmark on Cloudflare Workers AI: llama-3.3-70b never
 issued parallel tool calls, and `deep_read` spent 21k-35k tokens per task.
 
 - `workspace.read` accepts `paths` (up to 5) to read several files in one call, so batching no longer depends on the model emitting parallel tool calls; a missing file is reported on its own instead of failing the batch
-- An output above 16 KB keeps a 4 KB head and tail in context (was 16 KB); the full text stays in the context store for `context.expand`
-- `context.expand` returns at most 8 KB per call (was 16 KB)
+- Tried and reverted: shrinking the in-context preview of large outputs to 4 KB and `context.expand` to 8 KB. `deep_read` passed 1/3 (two runs hit the 64k token budget) against 2/3 for v1.6, because the model read more, smaller chunks
 
 ## v1.6.0 — Adaptive Execution
 

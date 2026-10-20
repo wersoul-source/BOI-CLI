@@ -18,7 +18,7 @@ import (
 const ContextExpandTool = "context.expand"
 
 // maxExpandBytes keeps one expansion within a single observation budget.
-const maxExpandBytes = 8 << 10
+const maxExpandBytes = maxObservationBytes
 
 // contextStore keeps the full output of every tool result in one task, so
 // the model context can carry a short reference instead of the whole text
