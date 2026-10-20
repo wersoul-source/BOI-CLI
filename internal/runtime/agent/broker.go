@@ -32,51 +32,71 @@ type proposedSkill struct {
 }
 
 // ParseDecision treats model output as either plain text or one strictly
-// delimited tool proposal. Security fields are deliberately absent from the
+// delimited proposal. Real models often add a sentence or a code fence around
+// the envelope; that prose is discarded, but the envelope itself must be
+// unique and its JSON strict. Security fields are deliberately absent from the
 // model-controlled schema and are assigned by Broker.Prepare.
 func ParseDecision(content string) (Decision, error) {
-	if strings.Contains(content, skillOpen) || strings.Contains(content, skillClose) {
-		if strings.Contains(content, actionOpen) || strings.Contains(content, actionClose) {
-			return Decision{}, fmt.Errorf("response cannot request a Skill and Tool together")
+	hasSkill := strings.Contains(content, skillOpen) || strings.Contains(content, skillClose)
+	hasAction := strings.Contains(content, actionOpen) || strings.Contains(content, actionClose)
+	if hasSkill && hasAction {
+		return Decision{}, fmt.Errorf("response cannot request a Skill and Tool together")
+	}
+	if hasSkill {
+		payload, err := envelopePayload(content, skillOpen, skillClose)
+		if err != nil {
+			return Decision{}, fmt.Errorf("invalid BOI Skill envelope: %w", err)
 		}
-		start, end := strings.Index(content, skillOpen), strings.Index(content, skillClose)
-		if start < 0 || end < start || strings.Count(content, skillOpen) != 1 || strings.Count(content, skillClose) != 1 || strings.TrimSpace(content[:start]) != "" || strings.TrimSpace(content[end+len(skillClose):]) != "" {
-			return Decision{}, fmt.Errorf("invalid BOI Skill envelope")
-		}
-		decoder := json.NewDecoder(strings.NewReader(content[start+len(skillOpen) : end]))
-		decoder.DisallowUnknownFields()
 		var proposal proposedSkill
-		if err := decoder.Decode(&proposal); err != nil {
+		if err := decodeStrict(payload, &proposal); err != nil {
 			return Decision{}, fmt.Errorf("decode BOI Skill: %w", err)
-		}
-		var trailing any
-		if err := decoder.Decode(&trailing); err != io.EOF {
-			return Decision{}, fmt.Errorf("BOI Skill contains trailing JSON")
 		}
 		return Decision{Kind: DecisionUseSkill, SkillName: strings.TrimSpace(proposal.Name)}, nil
 	}
-	start := strings.Index(content, actionOpen)
-	end := strings.Index(content, actionClose)
-	if start < 0 && end < 0 {
+	if !hasAction {
 		return Decision{Kind: DecisionRespond, Response: strings.TrimSpace(content)}, nil
 	}
-	if start < 0 || end < 0 || end < start || strings.Count(content, actionOpen) != 1 || strings.Count(content, actionClose) != 1 {
-		return Decision{}, fmt.Errorf("invalid BOI action envelope")
+	payload, err := envelopePayload(content, actionOpen, actionClose)
+	if err != nil {
+		return Decision{}, fmt.Errorf("invalid BOI action envelope: %w", err)
 	}
-	if strings.TrimSpace(content[:start]) != "" || strings.TrimSpace(content[end+len(actionClose):]) != "" {
-		return Decision{}, fmt.Errorf("BOI action envelope must be the entire response")
-	}
-	decoder := json.NewDecoder(strings.NewReader(content[start+len(actionOpen) : end]))
-	decoder.DisallowUnknownFields()
 	var proposal proposedAction
-	if err := decoder.Decode(&proposal); err != nil {
+	if err := decodeStrict(payload, &proposal); err != nil {
 		return Decision{}, fmt.Errorf("decode BOI action: %w", err)
+	}
+	return Decision{Kind: DecisionUseTool, ToolCall: &ToolCall{ID: proposal.ID, Tool: proposal.Tool, Purpose: proposal.Purpose, Arguments: proposal.Arguments}}, nil
+}
+
+// envelopePayload returns the content of exactly one open/close pair, with an
+// optional markdown code fence inside it removed.
+func envelopePayload(content, open, close string) (string, error) {
+	if strings.Count(content, open) != 1 || strings.Count(content, close) != 1 {
+		return "", fmt.Errorf("exactly one %s...%s pair is required", open, close)
+	}
+	start, end := strings.Index(content, open), strings.Index(content, close)
+	if end < start {
+		return "", fmt.Errorf("closing tag precedes opening tag")
+	}
+	payload := strings.TrimSpace(content[start+len(open) : end])
+	if strings.HasPrefix(payload, "```") {
+		payload = strings.TrimPrefix(payload, "```")
+		payload = strings.TrimPrefix(payload, "json")
+		payload = strings.TrimSuffix(strings.TrimSpace(payload), "```")
+	}
+	return payload, nil
+}
+
+func decodeStrict(payload string, target any) error {
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != io.EOF {
-		return Decision{}, fmt.Errorf("BOI action contains trailing JSON")
+		return fmt.Errorf("trailing JSON after the proposal")
 	}
-	return Decision{Kind: DecisionUseTool, ToolCall: &ToolCall{ID: proposal.ID, Tool: proposal.Tool, Purpose: proposal.Purpose, Arguments: proposal.Arguments}}, nil
+	return nil
 }
 
 // MaxActiveTools is the Core rule for the active Tool working set.

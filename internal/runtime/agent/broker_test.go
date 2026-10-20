@@ -24,8 +24,11 @@ func TestParseDecisionAcceptsStrictSkillEnvelope(t *testing.T) {
 	if err != nil || decision.Kind != DecisionUseSkill || decision.SkillName != "git-helper" {
 		t.Fatalf("decision=%#v err=%v", decision, err)
 	}
-	if _, err := ParseDecision(`text <boi-skill>{"name":"git-helper"}</boi-skill>`); err == nil {
-		t.Fatal("accepted mixed Skill envelope")
+	if d, err := ParseDecision(`text <boi-skill>{"name":"git-helper"}</boi-skill>`); err != nil || d.SkillName != "git-helper" {
+		t.Fatalf("surrounding prose must be ignored: %#v %v", d, err)
+	}
+	if _, err := ParseDecision(`<boi-skill>{"name":"a"}</boi-skill><boi-skill>{"name":"b"}</boi-skill>`); err == nil {
+		t.Fatal("accepted two Skill envelopes")
 	}
 	if _, err := ParseDecision(`<boi-skill>{"name":"git-helper"}</boi-skill><boi-action>{}</boi-action>`); err == nil {
 		t.Fatal("accepted Skill and Tool together")
@@ -231,5 +234,27 @@ func TestNewToolNeedsNoBrokerChange(t *testing.T) {
 	}
 	if !strings.Contains(ToolPrompt(b), "custom.echo()") {
 		t.Fatal("ToolPrompt must list the registered Tool's usage")
+	}
+}
+
+func TestParseDecisionToleratesRealModelFormatting(t *testing.T) {
+	inputs := []string{
+		"I will read the file first.\n<boi-action>{\"id\":\"1\",\"tool\":\"workspace.read\",\"purpose\":\"inspect\",\"arguments\":{\"path\":\"a\"}}</boi-action>",
+		"<boi-action>\n```json\n{\"id\":\"1\",\"tool\":\"workspace.read\",\"purpose\":\"inspect\",\"arguments\":{\"path\":\"a\"}}\n```\n</boi-action>\nDone.",
+	}
+	for _, input := range inputs {
+		decision, err := ParseDecision(input)
+		if err != nil || decision.Kind != DecisionUseTool || decision.ToolCall.Tool != "workspace.read" {
+			t.Fatalf("input %q: %#v %v", input, decision, err)
+		}
+	}
+	for _, bad := range []string{
+		"<boi-action>{}</boi-action><boi-action>{}</boi-action>",
+		"</boi-action>{}<boi-action>",
+		"<boi-action>{\"id\":\"1\",\"tool\":\"x\",\"purpose\":\"p\",\"risk\":\"read\"}</boi-action>",
+	} {
+		if _, err := ParseDecision(bad); err == nil {
+			t.Fatalf("accepted unsafe envelope %q", bad)
+		}
 	}
 }
