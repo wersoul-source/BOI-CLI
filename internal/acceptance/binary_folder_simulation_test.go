@@ -158,15 +158,31 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 		}
 	})
 
+	t.Run("qualification is shared across workspaces", func(t *testing.T) {
+		other := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(other, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, exit := runBuiltCLI(binary, other, providerEnv, "init"); exit != 0 {
+			t.Fatalf("init exit=%d", exit)
+		}
+		result, exit, stderr := runAutomation(t, binary, other, providerEnv, "SIM_MISSING_FILE")
+		if exit != 0 || result.Status != "completed" {
+			t.Fatalf("second workspace needed re-qualification: exit=%d result=%+v stderr=%s", exit, result, stderr)
+		}
+	})
+
 	t.Run("unqualified Provider fails before task creation", func(t *testing.T) {
 		unqualified := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(unqualified, ".git"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, exit := runBuiltCLI(binary, unqualified, providerEnv, "init"); exit != 0 {
+		// A fresh per-user directory: no profile cached by the qualified workspace.
+		freshEnv := append(append([]string(nil), providerEnv...), "BOI_CONFIG_DIR="+t.TempDir())
+		if _, _, exit := runBuiltCLI(binary, unqualified, freshEnv, "init"); exit != 0 {
 			t.Fatalf("init exit=%d", exit)
 		}
-		result, exit, stderr := runAutomation(t, binary, unqualified, providerEnv, "SIM_LIST_FULL_FOLDER")
+		result, exit, stderr := runAutomation(t, binary, unqualified, freshEnv, "SIM_LIST_FULL_FOLDER")
 		if exit != 5 || result.Status != "unavailable" || result.Error == nil || !strings.Contains(result.Error.Message, "no qualified providers") {
 			t.Fatalf("exit=%d result=%+v stderr=%s", exit, result, stderr)
 		}

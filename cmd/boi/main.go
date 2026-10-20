@@ -26,8 +26,12 @@ func main() {
 		return
 	}
 
-	// Load .env for CLI commands (boi ask, boi config, etc.)
+	// Load .env for CLI commands (boi ask, boi config, etc.): workspace
+	// first, then the per-user file; an earlier value is never overridden.
 	envfile.Load(runtime.EnvPath)
+	if global := app.GlobalEnvPath(); global != "" {
+		envfile.Load(global)
+	}
 
 	if err := cli.Execute(runtime); err != nil {
 		if !cli.ErrorReported(err) {

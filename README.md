@@ -157,6 +157,18 @@ your-project/
     └── output/                deliverables and manifests
 ```
 
+### Use one Provider in every project
+
+Put shared Provider settings in `~/.config/boi/.env` (same `PSC_*` keys as a
+workspace `.env`). A workspace `.env` still wins when both set a key, and
+shell variables win over both. Qualification results are cached in
+`~/.config/boi/provider-profiles`, so a Provider qualified once is ready in
+every new project. `.env` values may be quoted and may start with `export`.
+
+Any OpenAI-compatible endpoint works by setting `PSC_1_NAME=openai` and
+`PSC_1_BASE_URL`. Verified so far: Cloudflare Workers AI
+(`scripts/acceptance/cloudflare_smoke.sh`).
+
 Never commit `.env` or API keys. `boi setup` adds local Git excludes, keeps a
 timestamped backup, and writes the file with private permissions.
 

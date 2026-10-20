@@ -141,6 +141,16 @@ your-project/
     └── output/                ผลงานและ manifest
 ```
 
+### ใช้ provider ชุดเดียวกับทุกโปรเจกต์
+
+ใส่ค่า provider ที่ใช้ร่วมกันไว้ใน `~/.config/boi/.env` (ใช้ key `PSC_*` แบบเดียวกับ `.env` ในโปรเจกต์)
+ถ้าตั้งค่าซ้ำกัน ค่าใน `.env` ของโปรเจกต์จะชนะ และค่าที่ export ใน shell จะชนะทั้งคู่
+ผล qualify จะถูกเก็บไว้ที่ `~/.config/boi/provider-profiles` จึง qualify ครั้งเดียวแล้วใช้ได้ทุกโปรเจกต์
+ค่าใน `.env` ใส่เครื่องหมายคำพูดหรือขึ้นต้นด้วย `export` ได้
+
+endpoint ใดก็ได้ที่ใช้รูปแบบเดียวกับ OpenAI ใช้กับ BOI ได้ โดยตั้ง `PSC_1_NAME=openai` และ `PSC_1_BASE_URL`
+ที่ทดสอบผ่านแล้ว: Cloudflare Workers AI (`scripts/acceptance/cloudflare_smoke.sh`)
+
 อย่า commit `.env` หรือ API key `boi setup` จะเพิ่ม Git exclude ในเครื่อง สำรองไฟล์เดิม และเขียนไฟล์แบบสิทธิ์ส่วนตัว
 
 ## ตรวจบน Linux
