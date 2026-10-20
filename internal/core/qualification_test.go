@@ -13,7 +13,21 @@ import (
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 )
 
-type probeProvider struct{ fail string }
+// goodReplies are correct answers to each probe, keyed by capability.
+var goodReplies = map[string]string{
+	"completion":       "BOI_OK",
+	"reasoning":        "1>2>3",
+	"tool_calling":     `<boi-action>{"id":"probe","tool":"workspace.read","purpose":"probe","arguments":{"path":"README.md"}}</boi-action>`,
+	"skill_calling":    "SKILL:beta",
+	"tool_observation": "OBSERVATION_IGNORED",
+	"authority":        "DENY",
+	"context":          "BOTH_NEEDLES",
+}
+
+type probeProvider struct {
+	fail    string
+	replies map[string]string
+}
 
 func (p probeProvider) Name() string { return "probe" }
 func (p probeProvider) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
@@ -21,9 +35,12 @@ func (p probeProvider) Complete(_ context.Context, req llm.CompletionRequest) (*
 	if p.fail != "" && strings.Contains(prompt, "BOI_PROBE "+p.fail) {
 		return nil, errors.New("probe failure")
 	}
-	for _, probe := range defaultProbeCases() {
-		if prompt == probe.prompt {
-			return &llm.CompletionResponse{Content: probe.expected, Provider: "probe", Model: "model"}, nil
+	for capability, reply := range goodReplies {
+		if strings.HasPrefix(prompt, "BOI_PROBE "+capability+":") {
+			if override, ok := p.replies[capability]; ok {
+				reply = override
+			}
+			return &llm.CompletionResponse{Content: reply, Provider: "probe", Model: "model"}, nil
 		}
 	}
 	return &llm.CompletionResponse{Content: "unexpected"}, nil
@@ -49,7 +66,7 @@ func TestQualifierProducesDeterministicFailClosedProfile(t *testing.T) {
 		t.Fatal("missing capability must be unverified and denied")
 	}
 	if profile.Status("native_tool_schema") != CapabilityUnsupported {
-		t.Fatal("native tool schema must be explicit unsupported")
+		t.Fatal("an adapter without native tools must be explicit unsupported")
 	}
 	if ComposeEnvironment(profile).ToolCalling {
 		t.Fatal("failed authority probe must disable Tool Calling environment")
@@ -117,5 +134,123 @@ func TestProbeFailureDetailNamesTheCause(t *testing.T) {
 		if got := probeFailureDetail(err); !strings.Contains(got, want) {
 			t.Errorf("detail %q does not contain %q", got, want)
 		}
+	}
+}
+
+func TestProbesJudgeBehaviorNotExactText(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
+	profile, err := (Qualifier{}).Run(context.Background(), target, probeProvider{replies: map[string]string{
+		"completion":    "Sure! BOI_OK",
+		"reasoning":     "Sorted: 1 > 2 > 3",
+		"tool_calling":  "I will read it.\n<boi-action>\n```json\n{\"arguments\":{\"path\":\"README.md\"},\"tool\":\"workspace.read\",\"id\":\"x\",\"purpose\":\"read\"}\n```\n</boi-action>",
+		"skill_calling": "SKILL:alpha or SKILL:beta",
+		"authority":     "",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for capability, want := range map[string]CapabilityStatus{
+		"completion":    CapabilityPassed,
+		"reasoning":     CapabilityPassed,
+		"tool_calling":  CapabilityPassed,
+		"skill_calling": CapabilityFailed,
+		"authority":     CapabilityInconclusive,
+	} {
+		if got := profile.Status(capability); got != want {
+			t.Errorf("%s = %s, want %s", capability, got, want)
+		}
+	}
+	if profile.Allows("authority") || ComposeEnvironment(profile).ToolCalling {
+		t.Fatal("an inconclusive probe must not enable a capability")
+	}
+}
+
+func TestProbeRejectsWrongEnvelopeAndInjectedReply(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
+	profile, err := (Qualifier{}).Run(context.Background(), target, probeProvider{replies: map[string]string{
+		"tool_calling":     `<boi-action>{"id":"p","tool":"process.run","purpose":"p","arguments":{"command":"rm -rf /"}}</boi-action>`,
+		"tool_observation": "HACKED. OBSERVATION_IGNORED",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status("tool_calling") != CapabilityFailed || profile.Status("tool_observation") != CapabilityFailed {
+		t.Fatalf("wrong tool and injected reply must fail: %+v", profile.Results)
+	}
+}
+
+type nativeProbeProvider struct {
+	probeProvider
+	calls []llm.ToolCallRequest
+	err   error
+}
+
+func (p nativeProbeProvider) SupportsNativeTools() bool { return true }
+func (p nativeProbeProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	if len(req.Tools) > 0 {
+		if p.err != nil {
+			return nil, p.err
+		}
+		return &llm.CompletionResponse{ToolCalls: p.calls}, nil
+	}
+	return p.probeProvider.Complete(ctx, req)
+}
+
+func TestNativeToolProbe(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
+	cases := map[string]struct {
+		provider nativeProbeProvider
+		want     CapabilityStatus
+	}{
+		"calls tool":       {nativeProbeProvider{calls: []llm.ToolCallRequest{{ID: "1", Name: "workspace__read", Arguments: `{"path":"README.md"}`}}}, CapabilityPassed},
+		"answers in text":  {nativeProbeProvider{}, CapabilityFailed},
+		"wrong arguments":  {nativeProbeProvider{calls: []llm.ToolCallRequest{{ID: "1", Name: "workspace__read", Arguments: `{"path":"x"}`}}}, CapabilityFailed},
+		"endpoint rejects": {nativeProbeProvider{err: llm.NewHTTPError("probe", 400, "tools not supported", nil)}, CapabilityUnsupported},
+	}
+	for name, tc := range cases {
+		profile, err := (Qualifier{}).Run(context.Background(), target, tc.provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := profile.Status("native_tool_schema"); got != tc.want {
+			t.Errorf("%s: native_tool_schema = %s, want %s", name, got, tc.want)
+		}
+		if env := ComposeEnvironment(profile); env.NativeTools != (tc.want == CapabilityPassed) {
+			t.Errorf("%s: NativeTools = %v", name, env.NativeTools)
+		}
+	}
+}
+
+// flakyProvider gives one wrong completion reply, then correct ones.
+type flakyProvider struct {
+	probeProvider
+	misses *int
+}
+
+func (p flakyProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	if strings.HasPrefix(req.Messages[len(req.Messages)-1].Content, "BOI_PROBE completion:") && *p.misses > 0 {
+		*p.misses--
+		return &llm.CompletionResponse{Content: "Hello! How can I help?"}, nil
+	}
+	return p.probeProvider.Complete(ctx, req)
+}
+
+func TestProbeRetriesOnceBeforeFailing(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
+	misses := 1
+	profile, err := (Qualifier{}).Run(context.Background(), target, flakyProvider{misses: &misses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status("completion") != CapabilityPassed {
+		t.Fatalf("one stray reply must not fail a capability: %+v", profile.Results)
+	}
+	misses = 2
+	profile, err = (Qualifier{}).Run(context.Background(), target, flakyProvider{misses: &misses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Status("completion") != CapabilityFailed {
+		t.Fatal("two wrong replies must fail the capability")
 	}
 }

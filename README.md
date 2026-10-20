@@ -1,4 +1,4 @@
-# BOI Agent Suite v1.5
+# BOI Agent Suite v1.6
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
@@ -6,9 +6,11 @@ BOI is a bounded, tool-using Agent for terminal workspaces. It reads your
 project, proposes actions, asks before changing anything, verifies what it
 did, and leaves a manifest of the result.
 
-v1.5 rebuilds the codebase around one idea: **a fixed spine with pluggable
+v1.5 rebuilt the codebase around one idea: **a fixed spine with pluggable
 Blocks**. The Agent's core stays the same, and new capabilities plug in
-without editing it.
+without editing it. v1.6 adapts how the Agent talks to each model: native
+tool calling where the model proves it works, several calls per turn, and
+behavioral qualification.
 
 Linux is the first supported platform. Windows, macOS and Android compile but
 are not yet release targets.
@@ -54,13 +56,19 @@ Observe → Decide → Authorize → Act → Verify → Recover
 ```
 
 1. Core selects at most 15 Tools and 15 Skills for the task.
-2. The Model proposes one Tool call. It cannot set risk or approval; the
-   Broker assigns them from the Tool's spec.
+2. The Model proposes up to 5 Tool calls per turn, as native tool calls when
+   its Provider qualified for them, otherwise as a `<boi-action>` envelope.
+   It cannot set risk or approval; the Broker assigns them from the Tool's
+   spec. A batch of automatic reads runs concurrently; anything else runs in
+   order.
 3. Reads run automatically. Writes, processes and MCP calls need your exact
    approval in the TUI. Non-interactive mode denies them.
-4. The Tool verifies its own effect (for example, it reads a written file
+4. Large or old tool outputs are shortened in the model context but kept in
+   full in a per-task store; the model reads any part back exactly with
+   `context.expand(ref, lines)`.
+5. The Tool verifies its own effect (for example, it reads a written file
    back) before the step counts as done.
-5. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
+6. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
    Failed or cancelled work stays in `agent-folder/bin/<task-id>/`.
 
 ## Quick start (Linux)
@@ -89,7 +97,9 @@ On first launch the TUI asks for your Agent's name. The Core Persona is always
 `boi`; the name belongs to your Agent instance only.
 
 A Provider that has not passed `boi provider qualify` never enters the Agent
-Router. BOI does not fall back to simulated answers.
+Router. BOI does not fall back to simulated answers. Qualification also
+decides whether native tool calling is used (`native_tool_schema`).
+Profiles from v1.5 do not load in v1.6; qualify again after upgrading.
 
 ### First task
 
@@ -188,6 +198,13 @@ PSC_1_NAME=openai PSC_1_API_KEY=... PSC_1_MODEL=... make smoke
 
 CI runs the same Linux gates plus staticcheck and a coverage floor, and
 compile-checks linux/arm64, windows, darwin and android.
+
+To measure task success, provider calls, tokens and time on a fixed task set,
+and compare against an earlier version:
+
+```bash
+BASE_REF=<commit-or-tag> bash scripts/acceptance/benchmark.sh
+```
 
 ## Safety and limits
 

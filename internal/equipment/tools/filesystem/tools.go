@@ -22,7 +22,7 @@ func Tools(sandbox *workspace.Sandbox) []port.Tool {
 type listTool struct{ reader *Reader }
 
 func (listTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "workspace.list", Usage: "workspace.list(path)", Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second}
+	return port.ToolSpec{Name: "workspace.list", Usage: "workspace.list(path)", Description: `List the files and folders under a workspace path. Use "." for the root.`, Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second}
 }
 
 func (listTool) Describe(arguments map[string]any) port.ToolPreview {
@@ -46,7 +46,7 @@ func (t listTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 type readTool struct{ reader *Reader }
 
 func (readTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "workspace.read", Usage: "workspace.read(path)", Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second}
+	return port.ToolSpec{Name: "workspace.read", Usage: "workspace.read(path)", Description: "Read one workspace text file. Use this, not process.run, to read files.", Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second}
 }
 
 func (readTool) Describe(arguments map[string]any) port.ToolPreview {
@@ -70,7 +70,7 @@ func (t readTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 type writeTool struct{ sandbox *workspace.Sandbox }
 
 func (writeTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "workspace.write", Usage: "workspace.write(path, content)", Risk: port.RiskChange, Approval: port.ApprovalConfirm, Timeout: 10 * time.Second}
+	return port.ToolSpec{Name: "workspace.write", Usage: "workspace.write(path, content)", Description: "Create or replace one workspace file. Needs the user's approval.", Risk: port.RiskChange, Approval: port.ApprovalConfirm, Timeout: 10 * time.Second}
 }
 
 func (writeTool) Describe(arguments map[string]any) port.ToolPreview {

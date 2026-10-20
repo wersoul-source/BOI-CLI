@@ -37,14 +37,40 @@ func (p *OpenAIProvider) Name() string {
 	return p.name
 }
 
+// SupportsNativeTools implements llm.ToolCaller: the Chat Completions
+// protocol carries "tools" and "tool_calls".
+func (p *OpenAIProvider) SupportsNativeTools() bool { return true }
+
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role string `json:"role"`
+	// Content is null on an assistant message that only calls tools.
+	Content    *string          `json:"content"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+}
+
+type openAIToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
+type openAITool struct {
+	Type     string `json:"type"`
+	Function struct {
+		Name        string         `json:"name"`
+		Description string         `json:"description,omitempty"`
+		Parameters  map[string]any `json:"parameters"`
+	} `json:"function"`
 }
 
 type openAIRequest struct {
 	Model       string          `json:"model"`
 	Messages    []openAIMessage `json:"messages"`
+	Tools       []openAITool    `json:"tools,omitempty"`
 	MaxTokens   int             `json:"max_tokens,omitempty"`
 	Temperature float64         `json:"temperature,omitempty"`
 	Stream      bool            `json:"stream"`
@@ -53,7 +79,8 @@ type openAIRequest struct {
 type openAIResponse struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string           `json:"content"`
+			ToolCalls []openAIToolCall `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`
 	Usage struct {
@@ -64,14 +91,10 @@ type openAIResponse struct {
 }
 
 func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	messages := make([]openAIMessage, len(req.Messages))
-	for i, m := range req.Messages {
-		messages[i] = openAIMessage{Role: m.Role, Content: m.Content}
-	}
-
 	body := openAIRequest{
 		Model:       p.model,
-		Messages:    messages,
+		Messages:    toOpenAIMessages(req.Messages),
+		Tools:       toOpenAITools(req.Tools),
 		MaxTokens:   req.MaxTokens,
 		Temperature: req.Temperature,
 		Stream:      false,
@@ -115,8 +138,14 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 
 	rateLimitRemaining, rateLimitTotal := parseRateLimitHeaders(resp.Header)
 
+	var calls []llm.ToolCallRequest
+	for _, call := range result.Choices[0].Message.ToolCalls {
+		calls = append(calls, llm.ToolCallRequest{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments})
+	}
+
 	return &llm.CompletionResponse{
 		Content:            result.Choices[0].Message.Content,
+		ToolCalls:          calls,
 		InputTokens:        result.Usage.PromptTokens,
 		OutputTokens:       result.Usage.CompletionTokens,
 		Model:              result.Model,
@@ -124,6 +153,35 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		RateLimitRemaining: rateLimitRemaining,
 		RateLimitTotal:     rateLimitTotal,
 	}, nil
+}
+
+func toOpenAIMessages(messages []llm.Message) []openAIMessage {
+	out := make([]openAIMessage, len(messages))
+	for i, m := range messages {
+		content := m.Content
+		out[i] = openAIMessage{Role: m.Role, Content: &content, ToolCallID: m.ToolCallID}
+		if len(m.ToolCalls) > 0 && content == "" {
+			out[i].Content = nil
+		}
+		for _, call := range m.ToolCalls {
+			var item openAIToolCall
+			item.ID, item.Type = call.ID, "function"
+			item.Function.Name, item.Function.Arguments = call.Name, call.Arguments
+			out[i].ToolCalls = append(out[i].ToolCalls, item)
+		}
+	}
+	return out
+}
+
+func toOpenAITools(tools []llm.ToolDefinition) []openAITool {
+	out := make([]openAITool, 0, len(tools))
+	for _, tool := range tools {
+		var item openAITool
+		item.Type = "function"
+		item.Function.Name, item.Function.Description, item.Function.Parameters = tool.Name, tool.Description, tool.Parameters
+		out = append(out, item)
+	}
+	return out
 }
 
 func parseRateLimitHeaders(h http.Header) (remaining, total int) {

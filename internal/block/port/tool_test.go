@@ -38,3 +38,18 @@ func TestArguments(t *testing.T) {
 		t.Fatal("OptionalString")
 	}
 }
+
+func TestSchemaDerivedFromUsage(t *testing.T) {
+	schema := ToolSpec{Usage: "workspace.write(path, content)"}.Schema()
+	required, _ := schema["required"].([]string)
+	if schema["type"] != "object" || len(required) != 2 || required[0] != "path" || required[1] != "content" {
+		t.Fatalf("schema = %v", schema)
+	}
+	if open := (ToolSpec{Usage: "mcp.x.y(server-defined arguments)"}).Schema(); open["properties"] != nil {
+		t.Fatalf("free-form usage must accept any object: %v", open)
+	}
+	explicit := map[string]any{"type": "object", "properties": map[string]any{"n": map[string]any{"type": "integer"}}}
+	if got := (ToolSpec{Usage: "t(n)", Parameters: explicit}).Schema(); got["properties"] == nil {
+		t.Fatal("explicit Parameters must win")
+	}
+}

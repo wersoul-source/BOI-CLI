@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,21 +22,41 @@ type DecisionInput struct {
 	Step       int
 	Steps      []AgentStep
 	LastResult *ToolResult
-	LastSkill  *SkillObservation
-	Plan       *TaskPlan
+	// LastCall is the call that produced LastResult, when known.
+	LastCall  *ToolCall
+	LastSkill *SkillObservation
+	Plan      *TaskPlan
 	// LastError is the host's reason for rejecting the previous decision, so
 	// a retry can correct its format instead of repeating the same mistake.
 	LastError string
 }
 
+// MaxBatchCalls bounds how many Tool calls one decision may propose.
+const MaxBatchCalls = 5
+
 type Decision struct {
-	Kind      DecisionKind
-	Response  string
-	ToolCall  *ToolCall
+	Kind     DecisionKind
+	Response string
+	ToolCall *ToolCall
+	// ToolCalls holds a batch of calls proposed in one turn. When it is set,
+	// ToolCall is ignored. Each call is still authorized, executed and
+	// verified on its own.
+	ToolCalls []*ToolCall
 	SkillName string
 	Usage     Usage
 	Provider  string
 	Model     string
+}
+
+// Calls returns the proposed Tool calls in execution order.
+func (d Decision) Calls() []*ToolCall {
+	if len(d.ToolCalls) > 0 {
+		return d.ToolCalls
+	}
+	if d.ToolCall != nil {
+		return []*ToolCall{d.ToolCall}
+	}
+	return nil
 }
 
 func (d Decision) Validate() error {
@@ -44,24 +65,38 @@ func (d Decision) Validate() error {
 		if strings.TrimSpace(d.Response) == "" {
 			return errors.New("response decision is empty")
 		}
-		if d.ToolCall != nil {
+		if len(d.Calls()) > 0 {
 			return errors.New("response decision must not contain a tool call")
 		}
 		if d.SkillName != "" {
 			return errors.New("response decision must not contain a Skill")
 		}
 	case DecisionUseTool:
-		if d.ToolCall == nil {
+		calls := d.Calls()
+		if len(calls) == 0 {
 			return errors.New("tool decision is missing a tool call")
 		}
-		if err := d.ToolCall.Validate(); err != nil {
-			return fmt.Errorf("tool decision: %w", err)
+		if len(calls) > MaxBatchCalls {
+			return fmt.Errorf("tool decision proposes %d calls; at most %d are allowed per turn", len(calls), MaxBatchCalls)
+		}
+		seen := map[string]bool{}
+		for _, call := range calls {
+			if call == nil {
+				return errors.New("tool decision contains an empty call")
+			}
+			if err := call.Validate(); err != nil {
+				return fmt.Errorf("tool decision: %w", err)
+			}
+			if seen[call.ID] {
+				return fmt.Errorf("tool decision repeats call id %q", call.ID)
+			}
+			seen[call.ID] = true
 		}
 		if d.SkillName != "" {
 			return errors.New("Tool decision must not contain a Skill")
 		}
 	case DecisionUseSkill:
-		if strings.TrimSpace(d.SkillName) == "" || d.ToolCall != nil {
+		if strings.TrimSpace(d.SkillName) == "" || len(d.Calls()) > 0 {
 			return errors.New("Skill decision requires only a Skill name")
 		}
 	default:
@@ -215,6 +250,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 
 	var usage Usage
 	var lastResult *ToolResult
+	var lastCall *ToolCall
 	var lastSkill *SkillObservation
 	lastError := ""
 	toolCalls := 0
@@ -232,6 +268,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			Step:       step,
 			Steps:      append([]AgentStep(nil), state.Steps...),
 			LastResult: lastResult,
+			LastCall:   lastCall,
 			LastSkill:  lastSkill,
 			Plan:       plan,
 			LastError:  lastError,
@@ -273,7 +310,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			}
 			skillCalls++
 			lastSkill = &SkillObservation{Name: decision.SkillName, Instructions: instructions}
-			lastResult = nil
+			lastResult, lastCall = nil, nil
 			state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseObserve, Action: "skill:" + decision.SkillName, Result: "active Skill instructions loaded as untrusted context", Success: true, Duration: time.Since(started)})
 			if err := e.transition(state, PhaseObserve, step); err != nil {
 				return e.invalidStateResult(state, started, err), nil
@@ -316,93 +353,162 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		if toolCalls >= limits.MaxToolCalls {
 			return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "tool-call budget exhausted"), nil
 		}
-		toolCalls++
-		usage.ToolCalls = toolCalls
-		call := decision.ToolCall
-		setPlanPhase(plan, PhaseAct, PlanRunning)
-		e.emit(EngineEvent{Kind: "tool", Phase: PhaseAuthorize, Step: step, ToolCall: call})
-		if err := e.transition(state, PhaseAuthorize, step); err != nil {
-			return e.invalidStateResult(state, started, err), nil
+		calls := decision.Calls()
+		if remaining := limits.MaxToolCalls - toolCalls; len(calls) > remaining {
+			calls = calls[:remaining]
 		}
-		authorization, err := e.authorize(runCtx, *call)
-		e.emit(EngineEvent{Kind: "approval", Phase: PhaseAuthorize, Step: step, ToolCall: call})
-		if err != nil {
-			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAuthorize, Err: err, ToolCall: call, Attempt: recoveries + 1}, &recoveries, limits, step) {
-				return e.stop(state, started, usage, provider, model, StopSafetyBlocked, err.Error()), nil
+		prefetched := e.prefetchReads(runCtx, calls)
+		retry := false
+		for index, call := range calls {
+			toolCalls++
+			usage.ToolCalls = toolCalls
+			setPlanPhase(plan, PhaseAct, PlanRunning)
+			e.emit(EngineEvent{Kind: "tool", Phase: PhaseAuthorize, Step: step, ToolCall: call})
+			if err := e.transition(state, PhaseAuthorize, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
 			}
-			continue
-		}
-		if !authorization.Allowed {
-			reason := stopReasonForAuthorization(authorization)
-			return e.stop(state, started, usage, provider, model, reason, authorization.Reason), nil
-		}
-		if e.Actor == nil {
-			return e.stop(state, started, usage, provider, model, StopSafetyBlocked, "agent actor is not configured"), nil
-		}
-		if err := e.transition(state, PhaseAct, step); err != nil {
-			return e.invalidStateResult(state, started, err), nil
-		}
-		actStarted := time.Now()
-		actCtx, actCancel := context.WithTimeout(runCtx, call.Timeout)
-		toolResult, actErr := e.Actor.Act(actCtx, *call, authorization)
-		actContextErr := actCtx.Err()
-		actCancel()
-		if actErr != nil || actContextErr != nil {
-			err := actErr
-			if actContextErr != nil {
-				err = actContextErr
-			}
-			normalizeToolFailure(&toolResult, call.ID, err, actStarted)
-			e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
-			if reason, contextErr := contextStop(runCtx); contextErr != nil {
-				return e.stop(state, started, usage, provider, model, reason, contextErr.Error()), nil
-			}
-			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
-				reason := StopToolFailed
-				if errors.Is(err, context.DeadlineExceeded) {
-					reason = StopTimeout
+			authorization, err := e.authorize(runCtx, *call)
+			e.emit(EngineEvent{Kind: "approval", Phase: PhaseAuthorize, Step: step, ToolCall: call})
+			if err != nil {
+				if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAuthorize, Err: err, ToolCall: call, Attempt: recoveries + 1}, &recoveries, limits, step) {
+					return e.stop(state, started, usage, provider, model, StopSafetyBlocked, err.Error()), nil
 				}
-				return e.stop(state, started, usage, provider, model, reason, err.Error()), nil
+				retry = true
+				break
 			}
-			lastResult = &toolResult
+			if !authorization.Allowed {
+				reason := stopReasonForAuthorization(authorization)
+				return e.stop(state, started, usage, provider, model, reason, authorization.Reason), nil
+			}
+			if e.Actor == nil {
+				return e.stop(state, started, usage, provider, model, StopSafetyBlocked, "agent actor is not configured"), nil
+			}
+			if err := e.transition(state, PhaseAct, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
+			}
+			var toolResult ToolResult
+			var actErr error
+			if done, ok := prefetched[index]; ok {
+				toolResult, actErr = done.result, done.err
+			} else {
+				toolResult, actErr = e.act(runCtx, call, authorization)
+			}
+			if actErr != nil {
+				normalizeToolFailure(&toolResult, call.ID, actErr, toolResult.StartedAt)
+				e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
+				if reason, contextErr := contextStop(runCtx); contextErr != nil {
+					return e.stop(state, started, usage, provider, model, reason, contextErr.Error()), nil
+				}
+				if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: actErr, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
+					reason := StopToolFailed
+					if errors.Is(actErr, context.DeadlineExceeded) {
+						reason = StopTimeout
+					}
+					return e.stop(state, started, usage, provider, model, reason, actErr.Error()), nil
+				}
+				lastResult, lastCall = &toolResult, call
+				retry = true
+				break
+			}
+			e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
+			if err := toolResult.Validate(); err != nil {
+				if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
+					return e.stop(state, started, usage, provider, model, StopToolFailed, err.Error()), nil
+				}
+				lastResult, lastCall = &toolResult, call
+				retry = true
+				break
+			}
+			if err := e.transition(state, PhaseVerify, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
+			}
+			verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, ToolCall: call, ToolResult: &toolResult})
+			e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, ToolCall: call, ToolResult: &toolResult, Verification: &verification})
+			if verifyErr != nil || !verification.Passed {
+				err := verifyErr
+				if err == nil {
+					err = errors.New(verification.Reason)
+				}
+				if !e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
+					return e.stop(state, started, usage, provider, model, StopVerificationFailed, err.Error()), nil
+				}
+				lastResult, lastCall = &toolResult, call
+				retry = true
+				break
+			}
+			toolResult.Evidence = append(toolResult.Evidence, verification.Evidence...)
+			state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseVerify, Action: call.Tool, Result: toolResult.Output, ToolCall: call, ToolResult: &toolResult, Success: true, Duration: time.Since(started)})
+			setPlanPhase(plan, PhaseAct, PlanCompleted)
+			setPlanPhase(plan, PhaseVerify, PlanCompleted)
+			lastResult, lastCall = &toolResult, call
+			lastSkill = nil
+			recoveries = 0
+			if err := e.transition(state, PhaseDecide, step); err != nil {
+				return e.invalidStateResult(state, started, err), nil
+			}
+		}
+		if retry {
 			continue
-		}
-		e.emit(EngineEvent{Kind: "tool_result", Phase: PhaseAct, Step: step, ToolCall: call, ToolResult: &toolResult})
-		if err := toolResult.Validate(); err != nil {
-			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseAct, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
-				return e.stop(state, started, usage, provider, model, StopToolFailed, err.Error()), nil
-			}
-			lastResult = &toolResult
-			continue
-		}
-		if err := e.transition(state, PhaseVerify, step); err != nil {
-			return e.invalidStateResult(state, started, err), nil
-		}
-		verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, ToolCall: call, ToolResult: &toolResult})
-		e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, ToolCall: call, ToolResult: &toolResult, Verification: &verification})
-		if verifyErr != nil || !verification.Passed {
-			err := verifyErr
-			if err == nil {
-				err = errors.New(verification.Reason)
-			}
-			if !e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: err, ToolCall: call, ToolResult: &toolResult, Attempt: recoveries + 1}, &recoveries, limits, step) {
-				return e.stop(state, started, usage, provider, model, StopVerificationFailed, err.Error()), nil
-			}
-			lastResult = &toolResult
-			continue
-		}
-		toolResult.Evidence = append(toolResult.Evidence, verification.Evidence...)
-		state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseVerify, Action: call.Tool, Result: toolResult.Output, ToolCall: call, ToolResult: &toolResult, Success: true, Duration: time.Since(started)})
-		setPlanPhase(plan, PhaseAct, PlanCompleted)
-		setPlanPhase(plan, PhaseVerify, PlanCompleted)
-		lastResult = &toolResult
-		lastSkill = nil
-		recoveries = 0
-		if err := e.transition(state, PhaseDecide, step); err != nil {
-			return e.invalidStateResult(state, started, err), nil
 		}
 	}
 	return e.stop(state, started, usage, provider, model, StopMaxSteps, "maximum Agent steps reached"), nil
+}
+
+// act runs one authorized call under its own timeout.
+func (e *Engine) act(ctx context.Context, call *ToolCall, authorization Authorization) (ToolResult, error) {
+	started := time.Now()
+	actCtx, cancel := context.WithTimeout(ctx, call.Timeout)
+	defer cancel()
+	result, err := e.Actor.Act(actCtx, *call, authorization)
+	if contextErr := actCtx.Err(); contextErr != nil {
+		err = contextErr
+	}
+	if result.StartedAt.IsZero() {
+		result.StartedAt = started
+	}
+	return result, err
+}
+
+type prefetchedResult struct {
+	result ToolResult
+	err    error
+}
+
+// prefetchReads runs a batch concurrently when every call is an automatic
+// read, so reading several files costs one round of latency. Each call is
+// authorized first; anything else in the batch keeps the batch sequential,
+// because a change or process call must be approved and verified in order.
+func (e *Engine) prefetchReads(ctx context.Context, calls []*ToolCall) map[int]prefetchedResult {
+	if len(calls) < 2 || e.Actor == nil {
+		return nil
+	}
+	authorizations := make([]Authorization, len(calls))
+	for index, call := range calls {
+		if call.Risk != RiskRead || call.Approval != ApprovalAuto {
+			return nil
+		}
+		authorization, err := e.authorize(ctx, *call)
+		if err != nil || !authorization.Allowed {
+			return nil
+		}
+		authorizations[index] = authorization
+	}
+	results := make([]prefetchedResult, len(calls))
+	var wg sync.WaitGroup
+	for index, call := range calls {
+		wg.Add(1)
+		go func(index int, call *ToolCall) {
+			defer wg.Done()
+			result, err := e.act(ctx, call, authorizations[index])
+			results[index] = prefetchedResult{result: result, err: err}
+		}(index, call)
+	}
+	wg.Wait()
+	prefetched := make(map[int]prefetchedResult, len(calls))
+	for index, item := range results {
+		prefetched[index] = item
+	}
+	return prefetched
 }
 
 func normalizeToolFailure(result *ToolResult, callID string, err error, started time.Time) {

@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -180,5 +181,56 @@ func TestStreamEmitsContentThenDone(t *testing.T) {
 				t.Fatalf("got %+v %+v", first, second)
 			}
 		})
+	}
+}
+
+func TestOpenAINativeToolRoundTrip(t *testing.T) {
+	var sent map[string]any
+	srv := serve(t, 200, `{"choices":[{"message":{"content":null,"tool_calls":[{"id":"c1","type":"function","function":{"name":"workspace__read","arguments":"{\"path\":\"a.txt\"}"}}]}}],"usage":{"prompt_tokens":3,"completion_tokens":2}}`, func(r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+			t.Error(err)
+		}
+	})
+	provider := NewOpenAIProvider("openai", "k", srv.URL, "m")
+	if !llm.SupportsNativeTools(provider) {
+		t.Fatal("OpenAI adapter must declare native tool support")
+	}
+	resp, err := provider.Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{
+			{Role: "user", Content: "read"},
+			{Role: "assistant", ToolCalls: []llm.ToolCallRequest{{ID: "h1", Name: "workspace__read", Arguments: `{"path":"x"}`}}},
+			{Role: "tool", ToolCallID: "h1", Content: "data"},
+		},
+		Tools: []llm.ToolDefinition{{Name: "workspace__read", Description: "read", Parameters: map[string]any{"type": "object"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.ToolCalls) != 1 || resp.ToolCalls[0].Name != "workspace__read" || resp.ToolCalls[0].Arguments != `{"path":"a.txt"}` {
+		t.Fatalf("tool calls not parsed: %+v", resp.ToolCalls)
+	}
+	tools, _ := sent["tools"].([]any)
+	if len(tools) != 1 {
+		t.Fatalf("tools not sent: %v", sent["tools"])
+	}
+	messages, _ := sent["messages"].([]any)
+	assistant, _ := messages[1].(map[string]any)
+	if assistant["content"] != nil || assistant["tool_calls"] == nil {
+		t.Fatalf("assistant tool-call message must have null content and tool_calls: %v", assistant)
+	}
+	toolReply, _ := messages[2].(map[string]any)
+	if toolReply["tool_call_id"] != "h1" {
+		t.Fatalf("tool reply must link its call: %v", toolReply)
+	}
+}
+
+func TestOpenAIOmitsToolsWhenNoneGiven(t *testing.T) {
+	var sent map[string]any
+	srv := serve(t, 200, `{"choices":[{"message":{"content":"hi"}}]}`, func(r *http.Request) { _ = json.NewDecoder(r.Body).Decode(&sent) })
+	if _, err := NewOpenAIProvider("openai", "k", srv.URL, "m").Complete(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := sent["tools"]; present {
+		t.Fatal("a request without tools must not send an empty tools field")
 	}
 }

@@ -19,7 +19,7 @@ type runTool struct {
 }
 
 func (runTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "process.run", Usage: "process.run(command)", Risk: port.RiskExecute, Approval: port.ApprovalConfirm, Timeout: 30 * time.Second}
+	return port.ToolSpec{Name: "process.run", Usage: "process.run(command)", Description: "Run one shell command in the workspace. Needs the user's approval and is denied in non-interactive runs; never use it to read or list files.", Risk: port.RiskExecute, Approval: port.ApprovalConfirm, Timeout: 30 * time.Second}
 }
 
 func (t runTool) Describe(arguments map[string]any) port.ToolPreview {
