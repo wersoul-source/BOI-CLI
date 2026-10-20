@@ -434,7 +434,12 @@ const (
 	maxConversationMessages = 12
 	maxConversationBytes    = 16 << 10
 	maxObservationBytes     = 16 << 10
-	maxObservationsBytes    = 48 << 10
+	// oversizedPreviewBytes is what stays in context of an output above
+	// maxObservationBytes. The full text is in the context store; a short
+	// head and tail plus a reference costs far less on every later turn than
+	// a 16 KB slice the model rarely needs whole.
+	oversizedPreviewBytes = 4 << 10
+	maxObservationsBytes  = 48 << 10
 )
 
 // trimConversation keeps the newest whole turns within the message and byte caps.
@@ -518,7 +523,11 @@ func collectObservations(input DecisionInput, store *contextStore) []observation
 			}
 			ref = store.put(key, tool, full)
 		}
-		if short := clipWithReference(full, maxObservationBytes, ref); short != full {
+		limit := maxObservationBytes
+		if ref != "" && len(full) > maxObservationBytes {
+			limit = oversizedPreviewBytes
+		}
+		if short := clipWithReference(full, limit, ref); short != full {
 			item.result.Output = wrap(short)
 		}
 		size := len(observationJSON(*item))

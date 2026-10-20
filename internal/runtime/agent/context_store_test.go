@@ -179,3 +179,18 @@ func TestContextExpandMatchAndOversizedRange(t *testing.T) {
 		t.Fatalf("prefix must fit and say where to continue: %d bytes", len(whole.Output))
 	}
 }
+
+func TestOversizedOutputKeepsOnlyAShortPreview(t *testing.T) {
+	store := newContextStore()
+	call := &ToolCall{ID: "c1", Tool: "workspace.read"}
+	input := DecisionInput{Step: 2, Steps: []AgentStep{{Number: 1, ToolCall: call, ToolResult: &ToolResult{CallID: "c1", Status: ToolSucceeded, Output: readOutput(t, numberedLines(3000))}}}}
+	shown := collectObservations(input, store)[0].result.Output
+	if len(shown) > oversizedPreviewBytes+1024 {
+		t.Fatalf("an oversized output must shrink to a short preview, got %d bytes", len(shown))
+	}
+	small := strings.Repeat("x", maxObservationBytes-100)
+	input.Steps[0].ToolResult = &ToolResult{CallID: "c2", Status: ToolSucceeded, Output: small}
+	if got := collectObservations(input, store)[0].result.Output; got != small {
+		t.Fatal("an output within the per-item budget must stay whole")
+	}
+}

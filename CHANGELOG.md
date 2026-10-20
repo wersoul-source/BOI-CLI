@@ -2,7 +2,16 @@
 
 All notable changes to BOI CLI.
 
-## v1.6.0 — Adaptive Execution (unreleased)
+## v1.7.0 — Fewer turns, smaller context (unreleased)
+
+Driven by the v1.6 benchmark on Cloudflare Workers AI: llama-3.3-70b never
+issued parallel tool calls, and `deep_read` spent 21k-35k tokens per task.
+
+- `workspace.read` accepts `paths` (up to 5) to read several files in one call, so batching no longer depends on the model emitting parallel tool calls; a missing file is reported on its own instead of failing the batch
+- An output above 16 KB keeps a 4 KB head and tail in context (was 16 KB); the full text stays in the context store for `context.expand`
+- `context.expand` returns at most 8 KB per call (was 16 KB)
+
+## v1.6.0 — Adaptive Execution
 
 ### Native tool calling
 - Providers can carry native tool definitions (`llm.ToolCaller`); the OpenAI-compatible adapter sends `tools` and reads `tool_calls`

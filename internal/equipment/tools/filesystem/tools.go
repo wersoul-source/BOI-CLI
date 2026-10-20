@@ -45,25 +45,91 @@ func (t listTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 
 type readTool struct{ reader *Reader }
 
+// maxReadPaths bounds one batched read.
+const maxReadPaths = 5
+
 func (readTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "workspace.read", Usage: "workspace.read(path)", Description: "Read one workspace text file. Use this, not process.run, to read files.", Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second}
+	return port.ToolSpec{
+		Name:        "workspace.read",
+		Usage:       "workspace.read(path | paths)",
+		Description: fmt.Sprintf("Read workspace text files. Give path for one file, or paths (up to %d) to read several files in one call. Use this, not process.run, to read files.", maxReadPaths),
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":  map[string]any{"type": "string", "description": "one workspace-relative file path"},
+				"paths": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "several workspace-relative file paths"},
+			},
+			"additionalProperties": false,
+		},
+		Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 5 * time.Second,
+	}
 }
 
 func (readTool) Describe(arguments map[string]any) port.ToolPreview {
-	path := port.OptionalString(arguments, "path")
-	return port.ToolPreview{Target: path, Preview: "Read workspace file: " + path}
+	paths, _ := readPaths(arguments)
+	target := strings.Join(paths, ", ")
+	return port.ToolPreview{Target: target, Preview: "Read workspace file: " + target}
+}
+
+// readPaths returns the requested paths: exactly one of path or paths.
+func readPaths(arguments map[string]any) ([]string, error) {
+	single := port.OptionalString(arguments, "path")
+	list, _ := arguments["paths"].([]any)
+	if (single == "") == (len(list) == 0) {
+		return nil, fmt.Errorf("give either path or paths")
+	}
+	if single != "" {
+		return []string{single}, nil
+	}
+	if len(list) > maxReadPaths {
+		return nil, fmt.Errorf("at most %d paths per call", maxReadPaths)
+	}
+	paths := make([]string, 0, len(list))
+	for _, item := range list {
+		path, ok := item.(string)
+		if !ok || strings.TrimSpace(path) == "" {
+			return nil, fmt.Errorf("paths must be non-empty strings")
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
+type readFailure struct {
+	Path  string
+	Error string
 }
 
 func (t readTool) Execute(_ context.Context, arguments map[string]any) (port.ToolOutput, error) {
-	path, err := port.StringArgument(arguments, "path")
+	paths, err := readPaths(arguments)
 	if err != nil {
 		return port.ToolOutput{}, err
 	}
-	read, err := t.reader.Read(path)
-	if err != nil {
-		return port.ToolOutput{}, err
+	if _, single := arguments["path"]; single {
+		read, err := t.reader.Read(paths[0])
+		if err != nil {
+			return port.ToolOutput{}, err
+		}
+		data, _ := json.Marshal(read)
+		return port.ToolOutput{Output: string(data)}, nil
 	}
-	data, _ := json.Marshal(read)
+	// A batch reports each file on its own, so one missing file does not hide
+	// the others; it fails only when no file could be read.
+	results := make([]any, 0, len(paths))
+	failures := 0
+	for _, path := range paths {
+		read, err := t.reader.Read(path)
+		if err != nil {
+			failures++
+			results = append(results, readFailure{Path: path, Error: err.Error()})
+			continue
+		}
+		results = append(results, read)
+	}
+	data, _ := json.Marshal(results)
+	if failures == len(paths) {
+		return port.ToolOutput{}, fmt.Errorf("no file could be read: %s", string(data))
+	}
 	return port.ToolOutput{Output: string(data)}, nil
 }
 
