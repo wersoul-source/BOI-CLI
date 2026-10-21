@@ -93,6 +93,15 @@ func (p CapabilityProfile) Validate() error {
 	return nil
 }
 
+// ProfileMaxAge is how long a qualification stays valid. A hosted model can
+// change behavior behind the same name, so a profile is re-earned monthly.
+const ProfileMaxAge = 30 * 24 * time.Hour
+
+// Expired reports whether the profile is older than ProfileMaxAge at now.
+func (p CapabilityProfile) Expired(now time.Time) bool {
+	return now.Sub(p.GeneratedAt) > ProfileMaxAge
+}
+
 func (p CapabilityProfile) Status(capability string) CapabilityStatus {
 	for _, result := range p.Results {
 		if result.Capability == capability {

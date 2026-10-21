@@ -168,6 +168,10 @@ func (s *Service) RegisterTool(tool port.Tool) error { return s.broker.Register(
 // RegisteredTools lists every Tool in the library.
 func (s *Service) RegisteredTools() []string { return s.broker.RegisteredNames() }
 
+// OfferedTools lists the Tools the model may request right now: active and
+// allowed by the Provider capability profile.
+func (s *Service) OfferedTools() []string { return s.broker.CapabilityNames() }
+
 type RuntimeEvent struct {
 	Approval *ApprovalEvent
 	Engine   *EngineEvent

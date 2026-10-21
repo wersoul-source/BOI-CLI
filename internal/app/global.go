@@ -1,9 +1,12 @@
 package app
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 )
@@ -46,10 +49,18 @@ func LoadProfile(boiDir string, target coreblock.ProviderTarget) (*coreblock.Cap
 	for _, dir := range profileDirs(boiDir) {
 		path := coreblock.CapabilityProfilePath(dir, target)
 		profile, err := coreblock.LoadCapabilityProfile(path)
+		if err == nil && profile.Expired(time.Now()) {
+			err = fmt.Errorf("qualification of %s/%s from %s is older than %d days; run 'boi provider qualify %s'",
+				target.Provider, target.Model, profile.GeneratedAt.Format("2006-01-02"), int(coreblock.ProfileMaxAge.Hours()/24), target.Provider)
+		}
 		if err == nil {
 			return profile, path, nil
 		}
-		lastErr = err
+		// Keep the most useful reason: a found-but-expired profile explains
+		// more than a missing copy in a later directory.
+		if lastErr == nil || !errors.Is(err, os.ErrNotExist) {
+			lastErr = err
+		}
 	}
 	return nil, "", lastErr
 }

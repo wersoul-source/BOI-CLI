@@ -2,7 +2,19 @@
 
 All notable changes to BOI CLI.
 
-## v1.9.0 — MCP Blocks (unreleased)
+## v1.10.0 — Composition report (unreleased)
+
+Roadmap step 3.
+
+- `boi env` (and `boi env --json`) composes the Agent exactly as `boi` and `boi ask` do and reports each Block from what the Runtime holds, not from the manifest:
+  - `active`: at least one of its Tools is offered to the model
+  - `loaded`: its Tools are registered, but none can be offered now (for example, no qualified Provider allows Tool calling)
+  - `declared`: listed in `environment.json` but not loaded, with the reason (not installed, MCP server did not answer, ...)
+- The report does not stop at the first problem: every Block is listed, and a missing required Block marks the Agent not ready (non-zero exit)
+- Runtime Tools such as `context.expand` are listed separately
+- Qualification now expires after 30 days; an expired Provider leaves the Router until `boi provider qualify` runs again. A change of model, Provider or endpoint already required a new qualification (it is part of the profile fingerprint)
+
+## v1.9.0 — MCP Blocks
 
 Roadmap step 2: capabilities can be added without building BOI.
 

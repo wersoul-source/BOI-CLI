@@ -133,6 +133,7 @@ Exit code: `0` สำเร็จ, `1` ภายใน, `2` input ผิด, `3`
 | `boi init` / `boi setup` | เตรียม workspace / ตั้งค่า Provider |
 | `boi provider list\|switch\|qualify` | จัดการและทดสอบ Provider |
 | `boi registry init\|list\|add` | จัดการ index ของ Tool และ Skill |
+| `boi env` | Agent ประกอบจาก Block อะไรบ้าง สถานะ active, loaded หรือ declared พร้อมเหตุผล |
 | `boi doctor` | ตรวจสุขภาพในเครื่อง |
 | `boi skill` / `boi memory` | จัดการ Skill และ memory |
 | `boi config` / `boi model` | ดูหรือเปลี่ยนการตั้งค่า |

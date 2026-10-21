@@ -48,20 +48,7 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 		return nil, fmt.Errorf("application runtime is not configured")
 	}
 	qualified := QualifiedProviders(r.BoiDir, configured)
-	var router *llm.Router
-	if len(qualified) > 0 {
-		providers := make([]llm.Provider, 0, len(qualified))
-		for _, item := range qualified {
-			providers = append(providers, item.Provider)
-		}
-		router = llm.NewRouter(providers)
-	}
-
-	var memoryHook agent.MemoryHook
-	if store, err := memory.Open(filepath.Join(r.BoiDir, "memory")); err == nil {
-		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
-	}
-
+	router := routerFor(qualified)
 	environment := ProviderEnvironment(r.BoiDir, qualified)
 	selected, err := LoadEnvironment(r.BoiDir)
 	if err != nil {
@@ -70,6 +57,27 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 	composition, err := Compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment)
 	if err != nil {
 		return nil, fmt.Errorf("compose Agent: %w", err)
+	}
+	return r.assemble(qualified, router, environment, composition)
+}
+
+// routerFor builds the failover Router of the qualified Providers, or nil.
+func routerFor(qualified []llmfactory.ConfiguredProvider) *llm.Router {
+	if len(qualified) == 0 {
+		return nil
+	}
+	providers := make([]llm.Provider, 0, len(qualified))
+	for _, item := range qualified {
+		providers = append(providers, item.Provider)
+	}
+	return llm.NewRouter(providers)
+}
+
+// assemble plugs a resolved composition into a new Runtime Service.
+func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *llm.Router, environment coreblock.AgentEnvironment, composition *Composition) (*Agent, error) {
+	var memoryHook agent.MemoryHook
+	if store, err := memory.Open(filepath.Join(r.BoiDir, "memory")); err == nil {
+		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
 	}
 
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)

@@ -172,6 +172,25 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 			t.Fatalf("a smaller composition must still work: exit=%d result=%+v stderr=%s", exit, result, stderr)
 		}
 
+		stdout, stderr, exit := runBuiltCLI(binary, root, providerEnv, "env", "--json")
+		var report struct {
+			Ready  bool `json:"ready"`
+			Blocks []struct {
+				ID    string `json:"id"`
+				State string `json:"state"`
+			} `json:"blocks"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &report); err != nil || exit != 0 || !report.Ready {
+			t.Fatalf("boi env: exit=%d err=%v stdout=%s stderr=%s", exit, err, stdout, stderr)
+		}
+		states := map[string]string{}
+		for _, item := range report.Blocks {
+			states[item.ID] = item.State
+		}
+		if states["workspace-tools"] != "active" || states["not-installed"] != "declared" || states["dead-mcp"] != "declared" {
+			t.Fatalf("boi env states = %v", states)
+		}
+
 		tasksBefore := countTaskFolders(t, root)
 		write(`{"schema_version":1,"name":"broken","blocks":[{"id":"not-installed","required":true}]}`)
 		result, exit, stderr = runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
