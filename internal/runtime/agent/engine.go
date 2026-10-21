@@ -265,7 +265,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		}
 		// A delegated child may have spent the shared budget since the last
 		// decision; never start a provider call on a spent budget.
-		if budget != nil && !budget.charge(0, 0) {
+		if budget != nil && !budget.charge(Usage{}) {
 			return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "task budget exhausted"), nil
 		}
 		setPlanPhase(plan, PhaseDecide, PlanRunning)
@@ -285,7 +285,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		if usage.TotalTokens() > limits.MaxTokens {
 			return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "token budget exhausted"), nil
 		}
-		if budget != nil && !budget.charge(decision.Usage.TotalTokens(), 0) {
+		if budget != nil && !budget.charge(decision.Usage) {
 			return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "task token budget exhausted"), nil
 		}
 		if err != nil {
@@ -369,7 +369,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		prefetched := e.prefetchReads(runCtx, calls)
 		retry := false
 		for index, call := range calls {
-			if budget != nil && !budget.charge(0, 1) {
+			if budget != nil && !budget.charge(Usage{ToolCalls: 1}) {
 				return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "task tool-call budget exhausted"), nil
 			}
 			toolCalls++

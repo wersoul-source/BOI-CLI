@@ -411,13 +411,23 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		engine.TaskID = taskSession.ID
 	}
 	runCtx := withContextStore(ctx, store)
-	if budgetFrom(runCtx) == nil {
-		runCtx = context.WithValue(runCtx, budgetKey{}, &sharedBudget{maxTokens: limits.MaxTokens, maxToolCalls: limits.MaxToolCalls})
+	budget := budgetFrom(runCtx)
+	ownBudget := budget == nil
+	if ownBudget {
+		budget = &sharedBudget{maxTokens: limits.MaxTokens, maxToolCalls: limits.MaxToolCalls}
+		runCtx = context.WithValue(runCtx, budgetKey{}, budget)
 	}
 	runCtx = context.WithValue(runCtx, runScopeKey{}, runScope{authorizer: authorizer, depth: depth})
 	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err
+	}
+	if ownBudget {
+		// Report what the whole task used, delegated children included.
+		total := budget.total()
+		result.Usage.InputTokens, result.Usage.OutputTokens = total.InputTokens, total.OutputTokens
+		result.Usage.ProviderCalls, result.Usage.ToolCalls = total.ProviderCalls, total.ToolCalls
+		result.Tokens = total.TotalTokens()
 	}
 	result.ProviderProfileRef = providerProfiles[providerProfileKey(result.Provider, result.Model)]
 	if idempotencyKey != "" {

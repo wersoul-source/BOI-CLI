@@ -15,22 +15,27 @@ const DelegateTool = "agent.delegate"
 
 // sharedBudget is the token and Tool-call budget of one top-level task. A
 // child run charges the same budget, so parent plus child never exceed the
-// parent's limits.
+// parent's limits, and the task reports what both really used.
 type sharedBudget struct {
 	mu           sync.Mutex
 	maxTokens    int
 	maxToolCalls int
-	tokens       int
-	toolCalls    int
+	used         Usage
 }
 
 // charge records use and reports whether the budget still holds.
-func (b *sharedBudget) charge(tokens, toolCalls int) bool {
+func (b *sharedBudget) charge(use Usage) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.tokens += tokens
-	b.toolCalls += toolCalls
-	return b.tokens <= b.maxTokens && b.toolCalls <= b.maxToolCalls
+	b.used = addUsage(b.used, use)
+	b.used.ToolCalls += use.ToolCalls
+	return b.used.TotalTokens() <= b.maxTokens && b.used.ToolCalls <= b.maxToolCalls
+}
+
+func (b *sharedBudget) total() Usage {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.used
 }
 
 type budgetKey struct{}

@@ -100,6 +100,9 @@ func TestReadOnlyDelegationRunsWithOnlyTheGrantedTools(t *testing.T) {
 	if err != nil || result.Response != "the helper found alpha" {
 		t.Fatalf("read-only delegation must work in non-interactive runs: err=%v result=%+v", err, result)
 	}
+	if result.Usage.ProviderCalls != 4 || result.Usage.ToolCalls != 2 {
+		t.Fatalf("the task must report parent and child use together: %+v", result.Usage)
+	}
 	child := provider.requests[1]
 	if got := strings.Join(toolNames(child), ","); got != "context__expand,workspace__read" {
 		t.Fatalf("the child may see only its granted Tools (and context.expand), got %s", got)
