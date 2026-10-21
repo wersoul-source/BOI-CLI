@@ -11,8 +11,8 @@ step, so every new piece of the contract is exercised by a real Block.
 
 | Step | Version | Change | Done when | Status |
 |---|---|---|---|---|
-| 0 | v1.7 | Gap analysis, this roadmap | Approved by the owner | Implemented (this PR) |
-| 1 | v1.8 | ADR-002 Block contract; `block.json` loader and resolver in `app`; built-in Tools described by a manifest | Removing the manifest's optional Tool Block leaves the rest working; a missing required Block fails before any task | Proposed |
+| 0 | v1.7 | Gap analysis, this roadmap; single-Agent stability (`workspace.search`) | Approved by the owner; `deep_read` 3/3 | Implemented |
+| 1 | v1.8 | ADR-002 Block contract; pack manifests (compiled in) and resolver in `app`; `.boi/environment.json` | Removing the manifest's optional Tool Block leaves the rest working; a missing required Block fails before any task | Implemented (ADR-002) |
 | 2 | v1.8 | MCP Block: an environment manifest entry starts an MCP server and registers its Tools | An MCP Block can be added and removed without code; its Tools are approval-gated; a dead server is reported and skipped | Proposed |
 | 3 | v1.9 | Composition report (`boi env` / doctor section): active, skipped and why | Report matches what the Broker actually registered in every test environment | Proposed |
 | 4 | v1.9 | Presets: Minimal, Coding, Research as environment manifests | Each preset starts and passes its benchmark subset | Proposed |

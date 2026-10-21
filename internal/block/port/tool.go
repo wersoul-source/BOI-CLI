@@ -30,6 +30,24 @@ func (r Risk) Valid() bool {
 	}
 }
 
+// Rank orders risks from least to most dangerous; 0 means unknown.
+func (r Risk) Rank() int {
+	switch r {
+	case RiskRead:
+		return 1
+	case RiskChange:
+		return 2
+	case RiskExecute:
+		return 3
+	case RiskExternal:
+		return 4
+	case RiskCritical:
+		return 5
+	default:
+		return 0
+	}
+}
+
 // Approval is the host approval a Tool requires before it may act.
 type Approval string
 

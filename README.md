@@ -42,6 +42,20 @@ The rules are enforced by `internal/architecture/deps_test.go`. A change that
 breaks them fails `go test ./...`. Full layout:
 [docs/architecture/BLOCK_ARCHITECTURE.md](docs/architecture/BLOCK_ARCHITECTURE.md).
 
+### Choose the Blocks of an Agent
+
+`.boi/environment.json` lists the Block packs a workspace's Agent uses and
+whether each is required. Without it, every built-in pack is used. A
+required pack that is missing or incompatible stops start-up with the reason.
+
+```json
+{"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
+```
+
+Built-in packs: `workspace-tools` (list, read, search, write) and
+`process-tools` (`process.run`). See
+[ADR-002](docs/architecture/ADR-002-block-packs.md).
+
 ### Two ways to plug in
 
 | Path | When | How |

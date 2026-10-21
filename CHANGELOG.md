@@ -2,7 +2,20 @@
 
 All notable changes to BOI CLI.
 
-## v1.7.0 — Fewer turns, smaller context (unreleased)
+## v1.8.0 — Composable Blocks, step 1 (unreleased)
+
+- Block packs: a pack manifest declares what a pack provides, the runtime version and Provider capabilities it needs, and its highest allowed risk (ADR-002)
+- `.boi/environment.json` chooses the packs of a workspace's Agent and marks each required or optional; without the file the Agent is composed exactly as in v1.7
+- Composition is checked before any task: a missing or incompatible required pack stops start-up with the reason (`boi ask` exit 5, shown in the TUI); an optional one is skipped and reported
+- Built-in packs: `workspace-tools` (list, read, search, write) and `process-tools` (`process.run`)
+
+Example, an Agent that cannot run commands:
+
+```json
+{"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
+```
+
+## v1.7.0 — Fewer turns, smaller context
 
 Driven by the v1.6 benchmark on Cloudflare Workers AI: llama-3.3-70b never
 issued parallel tool calls, and `deep_read` spent 21k-35k tokens per task.

@@ -8,22 +8,24 @@ import (
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/memory"
-	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
-	"github.com/boi-family/boi-cli/internal/equipment/tools/process"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
 
-// BuiltinTools is the compile-time Equipment wired into every Agent. Adding a
-// Tool means adding it here and to DefaultCapabilityIndexes; the Runtime is
-// not edited.
+// BuiltinTools are the Tools of every built-in pack, as composed by the
+// default environment. Adding a Tool means adding it to a pack in
+// BuiltinPacks and to DefaultCapabilityIndexes; the Runtime is not edited.
 func BuiltinTools(sandbox *workspace.Sandbox) []port.Tool {
 	if sandbox == nil {
 		return nil
 	}
-	return append(filesystem.Tools(sandbox), process.Tool(sandbox))
+	composition, err := Compose(DefaultEnvironment(), BuiltinPacks(), sandbox, "", coreblock.AgentEnvironment{})
+	if err != nil {
+		return nil
+	}
+	return composition.Tools
 }
 
 // Agent is one composed BOI Agent: the fixed Runtime Service plus the Blocks
@@ -33,6 +35,8 @@ type Agent struct {
 	Qualified   []llmfactory.ConfiguredProvider
 	Router      *llm.Router
 	Environment coreblock.AgentEnvironment
+	// Composition reports which Blocks were plugged in and why others were not.
+	Composition *Composition
 	boiDir      string
 }
 
@@ -58,8 +62,18 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 		memoryHook = memory.NewMemoryHook(store, &memory.SimpleExtractor{})
 	}
 
+	environment := ProviderEnvironment(r.BoiDir, qualified)
+	selected, err := LoadEnvironment(r.BoiDir)
+	if err != nil {
+		return nil, err
+	}
+	composition, err := Compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment)
+	if err != nil {
+		return nil, fmt.Errorf("compose Agent: %w", err)
+	}
+
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)
-	tools := BuiltinTools(r.Sandbox)
+	tools := composition.Tools
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {
 		if err := service.RegisterTool(tool); err != nil {
@@ -74,10 +88,9 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 		service.SetTaskRecorder(r.AgentFolder)
 	}
 	ConfigureProviderProfileReferences(service, r.WorkspaceRoot, r.BoiDir, qualified)
-	environment := ProviderEnvironment(r.BoiDir, qualified)
 	service.SetToolCallingAllowed(environment.ToolCalling)
 	service.SetNativeToolCalling(environment.NativeTools)
-	return &Agent{Service: service, Qualified: qualified, Router: router, Environment: environment, boiDir: r.BoiDir}, nil
+	return &Agent{Service: service, Qualified: qualified, Router: router, Environment: environment, Composition: composition, boiDir: r.BoiDir}, nil
 }
 
 // PrepareTask selects the bounded working set for one task and activates it.

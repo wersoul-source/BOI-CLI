@@ -46,6 +46,9 @@ type approvalDecisionSentMsg struct {
 type runtimeProgressMsg struct{ event agent.EngineEvent }
 
 type Model struct {
+	// composeErr explains why no Agent could be composed, e.g. a missing
+	// required Block; it is shown when the chat opens.
+	composeErr      error
 	splash          *SplashModel
 	chat            ChatModel
 	input           InputModel
@@ -128,6 +131,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		agent:           composed,
 		boiDir:          runtime.BoiDir,
 		environment:     environment,
+		composeErr:      composeErr,
 	}
 
 	return m
@@ -151,6 +155,9 @@ func (m *Model) transitionToChat() tea.Cmd {
 	m.chat.SetSize(m.width, m.chatHeight())
 	m.input.SetWidth(m.width)
 	m.chat.AddMessage("system", "BOI CLI ready. Type /help for commands.")
+	if m.composeErr != nil {
+		m.chat.AddMessage("system", "Agent unavailable: "+m.composeErr.Error())
+	}
 	return tickCmd()
 }
 

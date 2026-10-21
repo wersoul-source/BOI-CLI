@@ -34,6 +34,18 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 กฎเหล่านี้บังคับด้วย `internal/architecture/deps_test.go` ถ้ามีการแก้ที่ผิดกฎ `go test ./...` จะไม่ผ่าน
 โครงสร้างเต็มอยู่ที่ [docs/architecture/BLOCK_ARCHITECTURE.md](docs/architecture/BLOCK_ARCHITECTURE.md)
 
+### เลือก Block ให้ Agent
+
+ไฟล์ `.boi/environment.json` บอกว่า Agent ของโปรเจกต์นี้ใช้ Block pack อะไร และตัวไหนจำเป็น
+ถ้าไม่มีไฟล์ ระบบใช้ pack ในตัวทั้งหมด ถ้า pack ที่จำเป็นขาดหรือใช้ไม่ได้ ระบบจะหยุดก่อนเริ่มงานพร้อมบอกเหตุผล
+
+```json
+{"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
+```
+
+pack ในตัว: `workspace-tools` (list, read, search, write) และ `process-tools` (`process.run`)
+รายละเอียดที่ [ADR-002](docs/architecture/ADR-002-block-packs.md)
+
 ### สองทางในการเสียบความสามารถใหม่
 
 | ทาง | ใช้เมื่อ | วิธี |

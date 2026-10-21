@@ -66,7 +66,9 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 		}
 		composed, err := runtime.BuildAgent(configured)
 		if err != nil {
-			return finishAsk(cmd, nil, &CommandError{Code: ExitInternal, Class: "internal", Message: "compose Agent", Cause: err})
+			// A Block the environment requires is missing or incompatible: the
+			// Agent cannot be offered, and the reason is what the user must fix.
+			return finishAsk(cmd, nil, unavailable(err.Error(), err))
 		}
 		service, environment := composed.Service, composed.Environment
 		capabilities, err := composed.PrepareTask(query)
