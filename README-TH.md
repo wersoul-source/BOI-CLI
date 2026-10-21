@@ -44,6 +44,11 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 ```
 
 pack ในตัว: `workspace-tools` (list, read, search, write) และ `process-tools` (`process.run`)
+รายการที่มี `mcp` จะเสียบ tool ของ MCP server ในเครื่องเข้ามา ทุกตัวต้องขออนุญาตก่อนใช้ และไม่ต้อง build BOI ใหม่
+
+```json
+{"id": "github", "required": false, "mcp": {"command": "github-mcp-server", "args": ["stdio"]}}
+```
 รายละเอียดที่ [ADR-002](docs/architecture/ADR-002-block-packs.md)
 
 ### สองทางในการเสียบความสามารถใหม่
@@ -201,7 +206,7 @@ BASE_REF=<commit-หรือ-tag> bash scripts/acceptance/benchmark.sh
   ถ้าเป็นโปรเจกต์ที่ไม่คุ้นเคยให้รันใน VM ที่แยกไว้
 - Deny-list ของคำสั่งเป็นแค่ด่านกรองเบื้องต้น ไม่ใช่การแยก process ด่านจริงคือการอนุมัติของ Broker และขอบเขต path
 - SubAgent ยังปิดอยู่จนกว่าจะผ่านด่านประเมิน
-- ลงทะเบียน MCP Tool ได้แล้ว แต่การค้นหา MCP อัตโนมัติยังไม่ได้ต่อเข้าเส้นทางหลัก
+- MCP server รันเป็น process ในเครื่อง (stdio เท่านั้น) และเริ่มโดยไม่มีตัวแปร `PSC_*` นอกจากนั้นไม่ได้ถูกแยกสิทธิ์เพิ่ม
 - BOI ต้องใช้เครือข่ายเพื่อคุยกับ Provider ไม่ได้ออกแบบมาให้ทำงาน offline
 - ทดสอบครบวงจรแล้วเฉพาะ Linux แพลตฟอร์มอื่นตรวจแค่ว่าคอมไพล์ได้
 

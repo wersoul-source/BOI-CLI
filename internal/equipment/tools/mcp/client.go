@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -105,6 +106,7 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 		return err
 	}
 	cmd := exec.CommandContext(ctx, server.Command, server.Args...)
+	cmd.Env = serverEnvironment(os.Environ())
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("open MCP stdin: %w", err)
@@ -128,7 +130,7 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 	encoder := json.NewEncoder(stdin)
 	limited := &io.LimitedReader{R: stdout, N: c.maxResponseBytes + 1}
 	decoder := json.NewDecoder(limited)
-	initialize := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "boi-cli", "version": "1.8.0"}}}
+	initialize := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "boi-cli", "version": "1.9.0"}}}
 	if err := encoder.Encode(initialize); err != nil {
 		return fmt.Errorf("send MCP initialize: %w", err)
 	}
@@ -173,6 +175,20 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 		return fmt.Errorf("parse MCP %s response: %w", method, err)
 	}
 	return nil
+}
+
+// serverEnvironment is the environment an MCP server starts with: the
+// parent's, minus BOI Provider settings, so a third-party server never sees
+// the user's model API keys.
+func serverEnvironment(parent []string) []string {
+	env := make([]string, 0, len(parent))
+	for _, item := range parent {
+		if strings.HasPrefix(strings.ToUpper(item), "PSC_") {
+			continue
+		}
+		env = append(env, item)
+	}
+	return env
 }
 
 type rpcResponse struct {
@@ -223,13 +239,7 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 var _ io.Writer = (*limitedBuffer)(nil)
 
 type ToolDef struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	InputSchema struct {
-		Type       string `json:"type"`
-		Properties map[string]struct {
-			Type        string `json:"type"`
-			Description string `json:"description"`
-		} `json:"properties"`
-	} `json:"inputSchema"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	InputSchema map[string]any `json:"inputSchema"`
 }

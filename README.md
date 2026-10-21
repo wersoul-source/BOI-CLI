@@ -53,7 +53,14 @@ required pack that is missing or incompatible stops start-up with the reason.
 ```
 
 Built-in packs: `workspace-tools` (list, read, search, write) and
-`process-tools` (`process.run`). See
+`process-tools` (`process.run`). An entry with `mcp` plugs in a local MCP
+server's tools, approval-gated, without building BOI:
+
+```json
+{"id": "github", "required": false, "mcp": {"command": "github-mcp-server", "args": ["stdio"]}}
+```
+
+See
 [ADR-002](docs/architecture/ADR-002-block-packs.md).
 
 ### Two ways to plug in
@@ -227,8 +234,8 @@ BASE_REF=<commit-or-tag> bash scripts/acceptance/benchmark.sh
 - The command deny-list is a best-effort guard, not isolation. The real
   controls are the Broker approval step and the path boundary.
 - SubAgent execution is disabled until its evaluation gate is accepted.
-- MCP Tools can be registered, but automatic MCP discovery is not yet on the
-  main path.
+- MCP servers run as local processes (stdio only) and start with the
+  environment minus `PSC_*` variables; they are not sandboxed beyond that.
 - BOI needs the network to reach Providers; it is not offline-first.
 - Only Linux has been exercised end to end. Other platforms are compile
   checks.

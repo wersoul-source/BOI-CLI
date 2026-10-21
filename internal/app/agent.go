@@ -99,6 +99,17 @@ func (a *Agent) PrepareTask(task string) (*CapabilitySet, error) {
 	if err != nil {
 		return nil, err
 	}
+	// MCP Tools are chosen by the environment, not the Tool index, so every
+	// one an active MCP Block plugged in joins the working set while there is
+	// room under the active-Tool limit.
+	if a.Composition != nil && a.Environment.ToolCalling {
+		for _, name := range a.Composition.MCPTools() {
+			if len(capabilities.Tools.Active) >= agent.MaxActiveTools-1 {
+				break
+			}
+			capabilities.Tools.Active = append(capabilities.Tools.Active, name)
+		}
+	}
 	if err := a.Service.SetActiveTools(capabilities.Tools.Active); err != nil {
 		return nil, err
 	}
