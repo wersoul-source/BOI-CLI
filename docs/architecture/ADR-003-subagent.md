@@ -1,6 +1,7 @@
 # ADR-003: Single SubAgent as a Block
 
-Status: **proposed**, needs the owner's approval before code (roadmap step 5).
+Status: **accepted** by the owner; implemented in v2.0.0. Gates 1–5 pass;
+gate 6 (benchmark on the reference Provider) is deferred by the owner.
 Scope: a new Runtime port, a `subagent` pack in `app`, engine budget sharing.
 Core unchanged.
 

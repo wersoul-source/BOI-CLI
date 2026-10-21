@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/boi-family/boi-cli/internal/block/port"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
@@ -12,6 +13,7 @@ import (
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
+	"github.com/boi-family/boi-cli/internal/subagent"
 )
 
 // BuiltinTools are the Tools of every built-in pack, as composed by the
@@ -82,6 +84,11 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)
 	tools := composition.Tools
+	for _, tool := range tools {
+		if delegate, ok := tool.(interface{ Bind(subagent.Delegator) }); ok {
+			delegate.Bind(service)
+		}
+	}
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {
 		if err := service.RegisterTool(tool); err != nil {
@@ -107,11 +114,18 @@ func (a *Agent) PrepareTask(task string) (*CapabilitySet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// MCP Tools are chosen by the environment, not the Tool index, so every
-	// one an active MCP Block plugged in joins the working set while there is
-	// room under the active-Tool limit.
+	// Tools of Blocks the Tool index does not list (MCP servers, the
+	// SubAgent) are chosen by the environment, so each joins the working set
+	// while there is room under the active-Tool limit.
 	if a.Composition != nil && a.Environment.ToolCalling {
-		for _, name := range a.Composition.MCPTools() {
+		indexed := map[string]bool{}
+		for _, decision := range capabilities.Tools.Decisions {
+			indexed[decision.Name] = true
+		}
+		for _, name := range a.Composition.ToolNames() {
+			if indexed[name] || slices.Contains(capabilities.Tools.Active, name) {
+				continue
+			}
 			if len(capabilities.Tools.Active) >= agent.MaxActiveTools-1 {
 				break
 			}

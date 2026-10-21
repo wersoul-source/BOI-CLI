@@ -22,7 +22,7 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
                                    │ ports (block/port, llm.Provider, ...)
       ┌──────────────┬─────────────┼──────────────┬──────────────┐
   Equipment       Service      Agent Folder     SubAgent       (ของคุณ)
-  tools, skills,  providers,   bin / output     ยังปิดอยู่
+  tools, skills,  providers,   bin / output     agent.delegate (เสริม)
   memory, MCP     config       manifests
 ```
 
@@ -45,7 +45,7 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 
 ชุดสำเร็จรูป: ดูด้วย `boi env presets` แล้วเลือก `boi env use minimal` (อ่านอย่างเดียว) หรือ `boi env use coding` (อ่าน เขียน รันคำสั่ง โดยต้องขออนุญาต) แล้วดูผลด้วย `boi env`
 
-pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-read` (list, read, search) และ `process-tools` (`process.run`)
+pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-read` (list, read, search), `process-tools` (`process.run`) และ `subagent` (`agent.delegate`: ส่งงานย่อยให้ผู้ช่วยที่ใช้ได้เฉพาะ Tool ที่อนุญาต ดู [ADR-003](docs/architecture/ADR-003-subagent.md))
 รายการที่มี `mcp` จะเสียบ tool ของ MCP server ในเครื่องเข้ามา ทุกตัวต้องขออนุญาตก่อนใช้ และไม่ต้อง build BOI ใหม่
 
 ```json
@@ -208,7 +208,7 @@ BASE_REF=<commit-หรือ-tag> bash scripts/acceptance/benchmark.sh
 - Workspace sandbox บังคับขอบเขต path รวมถึง symlink แต่ไม่ใช่การแยกระดับ OS หรือ container
   ถ้าเป็นโปรเจกต์ที่ไม่คุ้นเคยให้รันใน VM ที่แยกไว้
 - Deny-list ของคำสั่งเป็นแค่ด่านกรองเบื้องต้น ไม่ใช่การแยก process ด่านจริงคือการอนุมัติของ Broker และขอบเขต path
-- SubAgent ยังปิดอยู่จนกว่าจะผ่านด่านประเมิน
+- SubAgent เป็นตัวเสริม ไม่อยู่ใน preset ใด และยังไม่ผ่านด่าน benchmark
 - MCP server รันเป็น process ในเครื่อง (stdio เท่านั้น) และเริ่มโดยไม่มีตัวแปร `PSC_*` นอกจากนั้นไม่ได้ถูกแยกสิทธิ์เพิ่ม
 - BOI ต้องใช้เครือข่ายเพื่อคุยกับ Provider ไม่ได้ออกแบบมาให้ทำงาน offline
 - ทดสอบครบวงจรแล้วเฉพาะ Linux แพลตฟอร์มอื่นตรวจแค่ว่าคอมไพล์ได้

@@ -2,7 +2,23 @@
 
 All notable changes to BOI CLI.
 
-## v1.11.0 — Presets (unreleased)
+## v2.0.0 — Single SubAgent (unreleased)
+
+Roadmap step 5 (ADR-003). Optional: no preset includes it.
+
+- New pack `subagent` adds `agent.delegate(task, tools)`: the parent hands a self-contained sub-task to a child Agent that may use only the listed Tools
+- The child never has more authority than the parent: only Tools the parent is offered, no further delegation, the parent's approval path (writes still ask the user; denied in `boi ask`), the parent's qualified Providers
+- A delegation is classified from the Tools it grants: automatic when all are automatic reads, otherwise it needs approval
+- Parent and child share one token and Tool-call budget; the engine checks it before every provider call
+- The child sees only its task (no conversation, memory or Skills); its answer returns as an untrusted observation, and its changed paths go into the parent's manifest
+- Requires a Provider qualified for Tool calling; `boi env` reports it like any Block
+- Benchmark of delegated tasks (ADR-003 gate 6) is deferred
+
+```json
+{"id": "subagent", "required": false}
+```
+
+## v1.11.0 — Presets
 
 Roadmap step 4.
 

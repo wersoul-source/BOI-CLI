@@ -5,7 +5,8 @@
 | 1 | Core/Runtime do not import optional Block implementations | Implemented | `internal/architecture/deps_test.go` `TestBlockDependencyRules` |
 | 2 | Removing a Tool Block does not crash the Runtime | Implemented | `app/composition_test.go` `TestRemovingAnOptionalPackKeepsTheRest`; acceptance "environment manifest composes the Agent" |
 | 3 | Removing MCP leaves other Tools usable | Implemented | `TestMCPBlockFailuresAreReportedNotFatal` (dead, hung, wrong tool, id clash); acceptance: dead MCP server skipped, task completes |
-| 4 | Removing SubAgent keeps single-Agent operation | Implemented (trivially) | SubAgent is disabled today; step 5 adds a with/without test |
+| 4 | Removing SubAgent keeps single-Agent operation | Implemented | The pack is optional and in no preset; `TestSubAgentPackIsOptionalAndReported`; every v1.11 test runs without it |
+| 15 | A SubAgent cannot exceed its parent | Implemented | `internal/subagent/subagent_test.go`: granted Tools only, no nested delegation, write needs approval, shared budget, no parent context |
 | 5 | Missing dependency detected before execution | Implemented | `TestCompositionRules` (unknown pack, runtime version, Provider capability); acceptance: required Block missing → exit 5, no task folder created |
 | 6 | Unqualified Provider never enters the Router | Implemented | acceptance "unqualified Provider fails before task creation"; `app/provider_environment_test.go` |
 | 7 | A Block cannot raise its own authority | Implemented | `ToolSpec.Validate`; Broker assigns risk; `TestCompositionRules` refuses a Tool above `max_risk` and a pack whose `provides` hides a Tool |

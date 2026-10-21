@@ -242,6 +242,16 @@ func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 	call := proposed
 	call.Risk = spec.Risk
 	call.Approval = spec.Approval
+	if classified, ok := tool.(port.ClassifiedTool); ok {
+		risk, approval, err := classified.Classify(call.Arguments)
+		if err != nil {
+			return ToolCall{}, err
+		}
+		if risk.Rank() == 0 || risk.Rank() > spec.Risk.Rank() || !approval.Valid() || (approval == ApprovalAuto && risk != RiskRead) {
+			return ToolCall{}, fmt.Errorf("Tool %s classified a call outside its spec", spec.Name)
+		}
+		call.Risk, call.Approval = risk, approval
+	}
 	call.Timeout = spec.Timeout
 	preview := tool.Describe(call.Arguments)
 	call.Target = preview.Target

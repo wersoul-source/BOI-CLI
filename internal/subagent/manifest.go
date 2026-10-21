@@ -1,4 +1,3 @@
-// Package subagent declares the disabled and gated SubAgent market boundary.
 package subagent
 
 import "github.com/boi-family/boi-cli/internal/block"
@@ -13,6 +12,6 @@ func Manifest() block.Manifest {
 			"SubAgent Skill", "SubAgent Index", "SubAgent packages", "delegation contracts", "delegated budgets",
 		},
 		DoesNotOwn: []string{"inherited ambient authority", "automatic loading", "unbounded delegation", "Core Persona"},
-		Status:     block.StatusDisabled,
+		Status:     block.StatusPartial,
 	}
 }

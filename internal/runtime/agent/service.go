@@ -230,6 +230,15 @@ func (s *Service) ResetConversation() {
 }
 
 func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, onEngine, idempotencyKey, remember, 0)
+}
+
+// runScoped runs a delegated child task at the given depth.
+func (s *Service) runScoped(ctx context.Context, query string, authorizer Authorizer, depth int) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, nil, "", false, depth)
+}
+
+func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool, depth int) (*AgentResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
@@ -401,7 +410,12 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID
 	}
-	result, err := engine.Run(withContextStore(ctx, store), query)
+	runCtx := withContextStore(ctx, store)
+	if budgetFrom(runCtx) == nil {
+		runCtx = context.WithValue(runCtx, budgetKey{}, &sharedBudget{maxTokens: limits.MaxTokens, maxToolCalls: limits.MaxToolCalls})
+	}
+	runCtx = context.WithValue(runCtx, runScopeKey{}, runScope{authorizer: authorizer, depth: depth})
+	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err
 	}

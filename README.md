@@ -25,8 +25,8 @@ are not yet release targets.
                                    │ ports (block/port, llm.Provider, ...)
       ┌──────────────┬─────────────┼──────────────┬──────────────┐
   Equipment       Service      Agent Folder     SubAgent       (yours)
-  tools, skills,  providers,   bin / output     gated,
-  memory, MCP     config       manifests        disabled
+  tools, skills,  providers,   bin / output     agent.delegate,
+  memory, MCP     config       manifests        optional
 ```
 
 - **Spine** (`internal/core`, `internal/runtime`): fixed. It defines the
@@ -57,7 +57,9 @@ Ready-made environments: `boi env presets`, then `boi env use minimal`
 approval). `boi env` shows what was composed.
 
 Built-in packs: `workspace-tools` (list, read, search, write),
-`workspace-read` (list, read, search) and `process-tools` (`process.run`). An entry with `mcp` plugs in a local MCP
+`workspace-read` (list, read, search), `process-tools` (`process.run`) and
+`subagent` (`agent.delegate`: hands a sub-task to a helper limited to the
+Tools you grant; see [ADR-003](docs/architecture/ADR-003-subagent.md)). An entry with `mcp` plugs in a local MCP
 server's tools, approval-gated, without building BOI:
 
 ```json
@@ -238,7 +240,8 @@ BASE_REF=<commit-or-tag> bash scripts/acceptance/benchmark.sh
   not OS or container isolation; run unfamiliar projects in an isolated VM.
 - The command deny-list is a best-effort guard, not isolation. The real
   controls are the Broker approval step and the path boundary.
-- SubAgent execution is disabled until its evaluation gate is accepted.
+- The SubAgent is optional and not in any preset; its benchmark gate is still
+  open.
 - MCP servers run as local processes (stdio only) and start with the
   environment minus `PSC_*` variables; they are not sandboxed beyond that.
 - BOI needs the network to reach Providers; it is not offline-first.

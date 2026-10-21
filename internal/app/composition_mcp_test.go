@@ -71,7 +71,7 @@ func TestMCPBlockPlugsInServerTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(composition.MCPTools(), ","); got != "mcp.fake.echo,mcp.fake.env" {
+	if got := strings.Join(composition.ToolNames()[4:], ","); got != "mcp.fake.echo,mcp.fake.env" {
 		t.Fatalf("MCP Tools = %s", got)
 	}
 	var echo, env = composition.Tools[4], composition.Tools[5]
