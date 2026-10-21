@@ -2,7 +2,33 @@
 
 All notable changes to BOI CLI.
 
-## v1.6.0 — Adaptive Execution (unreleased)
+## v1.8.0 — Composable Blocks, step 1 (unreleased)
+
+- Block packs: a pack manifest declares what a pack provides, the runtime version and Provider capabilities it needs, and its highest allowed risk (ADR-002)
+- `.boi/environment.json` chooses the packs of a workspace's Agent and marks each required or optional; without the file the Agent is composed exactly as in v1.7
+- Composition is checked before any task: a missing or incompatible required pack stops start-up with the reason (`boi ask` exit 5, shown in the TUI); an optional one is skipped and reported
+- Built-in packs: `workspace-tools` (list, read, search, write) and `process-tools` (`process.run`)
+
+Example, an Agent that cannot run commands:
+
+```json
+{"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
+```
+
+## v1.7.0 — Fewer turns, smaller context
+
+Driven by the v1.6 benchmark on Cloudflare Workers AI: llama-3.3-70b never
+issued parallel tool calls, and `deep_read` spent 21k-35k tokens per task.
+
+Result (llama-3.3-70b, 6 tasks x 3 runs, same day): v1.6 17/18, 57 provider
+calls, 191k tokens, 121 s; v1.7 18/18, 35 calls, 56k tokens, 50 s.
+`deep_read` dropped from 28k-65k tokens to 2.5k-16k.
+
+- New Tool `workspace.search(pattern, path)`: finds matching lines with file and line number in one file or a folder (skips `.git`, `.boi`, `agent-folder`, `node_modules`, binaries and symlinks; 50 matches max). In v1.6 the model paged through large files with `context.expand` instead of using `match`; a search Tool is the step models already know. Existing workspaces get it after adding it to `.boi/registry/tools.json` or re-creating the index
+- `workspace.read` accepts `paths` (up to 5) to read several files in one call, so batching no longer depends on the model emitting parallel tool calls; a missing file is reported on its own instead of failing the batch
+- Tried and reverted: shrinking the in-context preview of large outputs to 4 KB and `context.expand` to 8 KB. `deep_read` passed 1/3 (two runs hit the 64k token budget) against 2/3 for v1.6, because the model read more, smaller chunks
+
+## v1.6.0 — Adaptive Execution
 
 ### Native tool calling
 - Providers can carry native tool definitions (`llm.ToolCaller`); the OpenAI-compatible adapter sends `tools` and reads `tool_calls`

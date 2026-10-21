@@ -75,7 +75,7 @@ func TestNativeBatchReadsManyFilesInOneTurn(t *testing.T) {
 		t.Fatalf("result=%q usage=%+v", result.Response, result.Usage)
 	}
 	first := provider.requests[0]
-	if len(first.Tools) != 4 || strings.Contains(first.Messages[0].Content, "<boi-action>") {
+	if len(first.Tools) != 5 || strings.Contains(first.Messages[0].Content, "<boi-action>") {
 		t.Fatalf("native request must carry tool definitions instead of envelope instructions: %d tools", len(first.Tools))
 	}
 	if strings.Contains(first.Messages[0].Content, "Host Task Plan") {

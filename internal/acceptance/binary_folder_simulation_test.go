@@ -158,6 +158,31 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 		}
 	})
 
+	t.Run("environment manifest composes the Agent", func(t *testing.T) {
+		environmentPath := filepath.Join(root, ".boi", "environment.json")
+		t.Cleanup(func() { _ = os.Remove(environmentPath) })
+		write := func(body string) {
+			if err := os.WriteFile(environmentPath, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		write(`{"schema_version":1,"name":"read-only","blocks":[{"id":"workspace-tools","required":true},{"id":"not-installed","required":false}]}`)
+		result, exit, stderr := runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
+		if exit != 0 || result.Response != "FOLDER_OK" {
+			t.Fatalf("a smaller composition must still work: exit=%d result=%+v stderr=%s", exit, result, stderr)
+		}
+
+		tasksBefore := countTaskFolders(t, root)
+		write(`{"schema_version":1,"name":"broken","blocks":[{"id":"not-installed","required":true}]}`)
+		result, exit, stderr = runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
+		if exit != 5 || result.Status != "unavailable" || result.Error == nil || !strings.Contains(result.Error.Message, "required Block not-installed") {
+			t.Fatalf("a missing required Block must stop start-up: exit=%d result=%+v error=%+v stderr=%s", exit, result, result.Error, stderr)
+		}
+		if after := countTaskFolders(t, root); after != tasksBefore {
+			t.Fatalf("a failed composition created a task: %d -> %d", tasksBefore, after)
+		}
+	})
+
 	t.Run("qualification is shared across workspaces", func(t *testing.T) {
 		other := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(other, ".git"), 0o755); err != nil {
@@ -348,4 +373,17 @@ func assertSimulationManifest(t *testing.T, root, reference string) {
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(reference))); err != nil {
 		t.Fatalf("manifest %s unavailable: %v", reference, err)
 	}
+}
+
+func countTaskFolders(t *testing.T, root string) int {
+	t.Helper()
+	count := 0
+	for _, tray := range []string{"bin", "output"} {
+		entries, err := os.ReadDir(filepath.Join(root, "agent-folder", tray))
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		count += len(entries)
+	}
+	return count
 }

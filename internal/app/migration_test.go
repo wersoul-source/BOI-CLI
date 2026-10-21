@@ -63,7 +63,7 @@ func TestLegacyWorkspaceMigratesWithoutOverwritingUserFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(set.Tools.Active) != 4 || len(set.Skills.Active) != 0 {
+	if len(set.Tools.Active) != 5 || len(set.Skills.Active) != 0 {
 		t.Fatalf("migrated capabilities=%#v", set)
 	}
 	if persona.CorePersona().Name != coreblock.CorePersonaName {

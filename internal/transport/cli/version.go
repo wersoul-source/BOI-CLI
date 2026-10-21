@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Version   = "1.6.0"
+	Version   = "1.8.0"
 	BuildGo   = "1.24"
 	BuildArch = "Chimera"
 )

@@ -69,6 +69,7 @@ func DefaultCapabilityIndexes() (capability.Index, capability.Index) {
 	tools := capability.Index{SchemaVersion: capability.IndexSchemaVersion, Kind: capability.KindTool, Entries: []capability.Entry{
 		{Name: "workspace.list", Source: "builtin", Summary: "List files inside the workspace", Enabled: true, Priority: 100, Tags: []string{"list", "files"}},
 		{Name: "workspace.read", Source: "builtin", Summary: "Read a file inside the workspace", Enabled: true, Priority: 100, Tags: []string{"read", "file"}},
+		{Name: "workspace.search", Source: "builtin", Summary: "Find lines containing a text in workspace files", Enabled: true, Priority: 100, Tags: []string{"search", "find", "grep"}},
 		{Name: "workspace.write", Source: "builtin", Summary: "Write a file with approval", Enabled: true, Priority: 90, Tags: []string{"write", "file"}},
 		{Name: "process.run", Source: "builtin", Summary: "Run a bounded workspace process with approval", Enabled: true, Priority: 80, Tags: []string{"run", "command", "test"}},
 	}}

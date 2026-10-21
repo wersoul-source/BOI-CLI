@@ -434,7 +434,8 @@ const (
 	maxConversationMessages = 12
 	maxConversationBytes    = 16 << 10
 	maxObservationBytes     = 16 << 10
-	maxObservationsBytes    = 48 << 10
+
+	maxObservationsBytes = 48 << 10
 )
 
 // trimConversation keeps the newest whole turns within the message and byte caps.
