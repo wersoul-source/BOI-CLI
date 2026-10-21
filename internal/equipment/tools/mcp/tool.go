@@ -14,22 +14,6 @@ type Invoker interface {
 	CallTool(ctx context.Context, server, tool string, arguments map[string]any) (string, error)
 }
 
-// Tools adapts discovered MCP tools into Runtime Tools named
-// "mcp.<server>.<tool>". Every adapted Tool is external and approval-gated.
-func Tools(server string, names []string, invoker Invoker) ([]port.Tool, error) {
-	if strings.TrimSpace(server) == "" || invoker == nil {
-		return nil, fmt.Errorf("MCP server and invoker are required")
-	}
-	tools := make([]port.Tool, 0, len(names))
-	for _, name := range names {
-		if strings.TrimSpace(name) == "" {
-			return nil, fmt.Errorf("MCP tool name is empty")
-		}
-		tools = append(tools, externalTool{server: server, tool: name, invoker: invoker})
-	}
-	return tools, nil
-}
-
 // ToolsFromDefinitions adapts discovered MCP tools and keeps each one's
 // description and argument schema, so the model sees what the server
 // declared and the Broker validates arguments against it.

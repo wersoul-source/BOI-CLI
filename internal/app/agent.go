@@ -5,30 +5,14 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/boi-family/boi-cli/internal/block/port"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/memory"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
-	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/boi-family/boi-cli/internal/subagent"
 )
-
-// BuiltinTools are the Tools of every built-in pack, as composed by the
-// default environment. Adding a Tool means adding it to a pack in
-// BuiltinPacks and to DefaultCapabilityIndexes; the Runtime is not edited.
-func BuiltinTools(sandbox *workspace.Sandbox) []port.Tool {
-	if sandbox == nil {
-		return nil
-	}
-	composition, err := Compose(DefaultEnvironment(), BuiltinPacks(), sandbox, "", coreblock.AgentEnvironment{})
-	if err != nil {
-		return nil
-	}
-	return composition.Tools
-}
 
 // Agent is one composed BOI Agent: the fixed Runtime Service plus the Blocks
 // plugged into it for this workspace.

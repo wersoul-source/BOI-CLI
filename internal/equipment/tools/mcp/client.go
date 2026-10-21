@@ -67,9 +67,6 @@ func (c *Client) Get(name string) (*ServerConfig, error) {
 	return &copy, nil
 }
 
-func (c *Client) DiscoverTools(server string) ([]ToolDef, error) {
-	return c.DiscoverToolsContext(context.Background(), server)
-}
 func (c *Client) DiscoverToolsContext(ctx context.Context, server string) ([]ToolDef, error) {
 	var response struct {
 		Result struct {

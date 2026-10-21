@@ -161,7 +161,7 @@ func (f *fakeExternalInvoker) CallTool(context.Context, string, string, map[stri
 func TestMCPToolIsExternalAndApprovalGated(t *testing.T) {
 	b := testBroker(t)
 	invoker := &fakeExternalInvoker{}
-	tools, err := mcp.Tools("docs", []string{"search"}, invoker)
+	tools, err := mcp.ToolsFromDefinitions("docs", []mcp.ToolDef{{Name: "search"}}, invoker)
 	if err != nil {
 		t.Fatal(err)
 	}

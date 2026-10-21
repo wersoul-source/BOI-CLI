@@ -10,34 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LoadDir loads all .skill.md files from a directory
-func LoadDir(dir string) ([]*Skill, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read skill dir: %w", err)
-	}
-
-	var skills []*Skill
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if !strings.HasSuffix(entry.Name(), ".skill.md") {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
-		s, err := LoadFile(path)
-		if err != nil {
-			continue
-		}
-		skills = append(skills, s)
-	}
-	return skills, nil
-}
-
 // LoadFile loads a single SKILL.md file
 func LoadFile(path string) (*Skill, error) {
 	data, err := os.ReadFile(path)

@@ -90,18 +90,11 @@ func TestScanRepoSkipsToolingDirs(t *testing.T) {
 
 func TestMemoryFilesRoundTripAndSearchOrder(t *testing.T) {
 	root := t.TempDir()
-	if got, err := LoadMemoryFiles(root); err != nil || got != "" {
-		t.Fatalf("empty root: %q %v", got, err)
-	}
-	_ = os.WriteFile(filepath.Join(root, "BOI_MEMORY.md"), []byte("legacy"), 0o600)
-	if got, _ := LoadMemoryFiles(root); got != "legacy" {
-		t.Fatalf("fallback: %q", got)
-	}
 	if err := SaveMemoryFile(root, "primary"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := LoadMemoryFiles(root); got != "primary" {
-		t.Fatalf(".boi/memory.md must win: %q", got)
+	if got, err := os.ReadFile(filepath.Join(root, ".boi", "memory.md")); err != nil || string(got) != "primary" {
+		t.Fatalf("memory file not saved: %q %v", got, err)
 	}
 }
 
@@ -114,8 +107,5 @@ func TestEntityWeightsByType(t *testing.T) {
 	}
 	if (&MemoryEntry{Content: "x"}).Confidence() <= (&MemoryEntry{}).Confidence() {
 		t.Fatal("content must raise confidence")
-	}
-	if DefaultNudgeConfig().Interval <= 0 {
-		t.Fatal("nudge interval")
 	}
 }

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -108,9 +107,4 @@ func matchCommands(prefix string) []string {
 		result = availableCommands
 	}
 	return result
-}
-
-// For external use: returns a formatted command list
-func CommandList() string {
-	return fmt.Sprintf("▸ %s", strings.Join(availableCommands, "  "))
 }

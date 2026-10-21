@@ -94,15 +94,6 @@ func (s *Service) SetProviderProfileReference(provider, model, reference string)
 	s.mu.Unlock()
 }
 
-func (s *Service) SetPersona(activePersona *persona.Persona) {
-	if activePersona == nil {
-		return
-	}
-	s.mu.Lock()
-	s.persona = activePersona
-	s.mu.Unlock()
-}
-
 func (s *Service) SetLimits(limits EngineLimits) {
 	s.mu.Lock()
 	s.limits = normalizeEngineLimits(limits)
@@ -138,12 +129,6 @@ func containsName(names []string, want string) bool {
 		}
 	}
 	return false
-}
-
-func (s *Service) SetSkillSummaries(summary string) {
-	s.mu.Lock()
-	s.skillSummaries = strings.TrimSpace(summary)
-	s.mu.Unlock()
 }
 
 func (s *Service) SetSkills(skills []SkillDoc) {

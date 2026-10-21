@@ -255,4 +255,3 @@ func (r *Router) ActiveStats() *ProviderStats {
 	}
 	return nil
 }
-func ModelFor(name string) string { return "" }
