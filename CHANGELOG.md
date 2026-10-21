@@ -2,6 +2,11 @@
 
 All notable changes to BOI CLI.
 
+## v2.1.0 — Coding benchmark (unreleased)
+
+- `process.run` reports a non-zero exit as a result (`exit status: N` with stdout and stderr) instead of an error. Before, a failing `go test` ended the task, because a failed command is never retried, and its stdout never reached the model
+- `go run ./scripts/acceptance/codingbench -runs 3` runs four coding tasks (fix a bug, implement a function, edit a config file, rename across files) against the Provider in `PSC_1_*` under the `coding` preset. The host decides pass or fail by running the tests itself and checking that protected test files did not change; writes and commands are approved automatically, so the harness is never part of the `boi` binary
+
 ## v2.0.0 — Single SubAgent (unreleased)
 
 Roadmap step 5 (ADR-003). Optional: no preset includes it.

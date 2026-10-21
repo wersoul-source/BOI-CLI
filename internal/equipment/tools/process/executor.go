@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -94,6 +95,45 @@ func (e *Executor) RunContext(ctx context.Context, command string) (string, erro
 		return "", ctx.Err()
 	}
 	return output, err
+}
+
+// Result is what one command did: its combined output and exit code. A
+// command that runs and exits non-zero (a failing test) is a result, not an
+// error; errors are reserved for commands that could not run at all.
+type Result struct {
+	ExitCode  int
+	Stdout    string
+	Stderr    string
+	Truncated bool
+}
+
+// RunResult executes a command inside the workspace and reports its exit
+// code with both output streams.
+func (e *Executor) RunResult(ctx context.Context, command string) (Result, error) {
+	if err := e.sandbox.Allow(command); err != nil {
+		return Result{}, fmt.Errorf("sandbox blocked: %w", err)
+	}
+	dir := ""
+	if e.workspaceSandbox != nil {
+		dir = e.workspaceSandbox.Root()
+	}
+	cmd := e.buildCommandContext(ctx, command, dir)
+	var stdout, stderr limitedOutput
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		return Result{}, ctx.Err()
+	}
+	result := Result{Stdout: stdout.String(), Stderr: stderr.String(), Truncated: stdout.truncated || stderr.truncated}
+	var exitErr *exec.ExitError
+	switch {
+	case err == nil:
+	case errors.As(err, &exitErr):
+		result.ExitCode = exitErr.ExitCode()
+	default:
+		return Result{}, err
+	}
+	return result, nil
 }
 
 // RunWithDir executes a command in a specific directory

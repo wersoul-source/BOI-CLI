@@ -2,6 +2,8 @@ package process
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/block/port"
@@ -31,15 +33,22 @@ func (t runTool) Execute(ctx context.Context, arguments map[string]any) (port.To
 	if err != nil {
 		return port.ToolOutput{}, err
 	}
-	output, err := t.executor.RunContext(ctx, command)
+	result, err := t.executor.RunResult(ctx, command)
 	if err != nil {
 		return port.ToolOutput{}, err
+	}
+	// A non-zero exit is reported, not raised: a failing test run is exactly
+	// what a coding task needs to see, and must not end the task.
+	output := fmt.Sprintf("exit status: %d\n--- stdout ---\n%s\n--- stderr ---\n%s", result.ExitCode, result.Stdout, result.Stderr)
+	if result.Truncated {
+		output += "\n(output truncated)"
 	}
 	return port.ToolOutput{Output: output}, nil
 }
 
-// Verify records that the executor reported a zero exit status. A process
-// may legitimately print nothing, so empty output is not a failure.
-func (runTool) Verify(context.Context, map[string]any, port.ToolOutput) (port.Evidence, error) {
-	return port.Evidence{Kind: "process_exit", Summary: "process executor reported success"}, nil
+// Verify records that the command ran to completion. Its exit status is in
+// the output for the model to judge; empty output is not a failure.
+func (runTool) Verify(_ context.Context, _ map[string]any, output port.ToolOutput) (port.Evidence, error) {
+	status, _, _ := strings.Cut(output.Output, "\n")
+	return port.Evidence{Kind: "process_exit", Summary: "process ran to completion, " + status}, nil
 }
