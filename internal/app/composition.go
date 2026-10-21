@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,11 +9,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/boi-family/boi-cli/internal/block"
 	"github.com/boi-family/boi-cli/internal/block/port"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
+	"github.com/boi-family/boi-cli/internal/equipment/tools/mcp"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/process"
 	"github.com/boi-family/boi-cli/internal/platform/update"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
@@ -90,7 +93,9 @@ const (
 
 // CompositionEntry reports what happened to one pack named by the environment.
 type CompositionEntry struct {
-	ID       string
+	ID string
+	// Kind is "tool-pack" for a compiled-in pack or "mcp" for an MCP server.
+	Kind     string
 	Version  string
 	Required bool
 	Status   string
@@ -124,8 +129,15 @@ func Compose(environment block.Environment, packs map[string]Pack, sandbox *work
 	composition := &Composition{Environment: environment.Name}
 	owner := map[string]string{}
 	for _, item := range environment.Blocks {
-		entry := CompositionEntry{ID: item.ID, Required: item.Required}
-		tools, reason := resolvePack(item.ID, packs, sandbox, runtimeVersion, capabilities, &entry)
+		entry := CompositionEntry{ID: item.ID, Required: item.Required, Kind: string(block.ToolPack)}
+		var tools []port.Tool
+		var reason string
+		if item.MCP != nil {
+			entry.Kind = mcpKind
+			tools, reason = resolveMCP(item, packs)
+		} else {
+			tools, reason = resolvePack(item.ID, packs, sandbox, runtimeVersion, capabilities, &entry)
+		}
 		for _, tool := range tools {
 			if other, taken := owner[tool.Spec().Name]; taken && reason == "" {
 				reason = fmt.Sprintf("Tool %s is already provided by %s", tool.Spec().Name, other)
@@ -148,6 +160,70 @@ func Compose(environment block.Environment, packs map[string]Pack, sandbox *work
 		composition.Entries = append(composition.Entries, entry)
 	}
 	return composition, nil
+}
+
+const mcpKind = "mcp"
+
+// MCPDiscoveryTimeout bounds how long start-up waits for an MCP server to
+// list its tools.
+var MCPDiscoveryTimeout = 15 * time.Second
+
+// resolveMCP starts an MCP server once to list its tools and adapts them.
+// Every MCP Tool is external and needs approval; the server never receives
+// the user's Provider keys (see mcp.serverEnvironment).
+func resolveMCP(item block.EnvironmentBlock, packs map[string]Pack) ([]port.Tool, string) {
+	if _, builtin := packs[item.ID]; builtin {
+		return nil, "the id is already used by a built-in pack"
+	}
+	client := mcp.NewClient()
+	if err := client.Register(mcp.ServerConfig{Name: item.ID, Command: item.MCP.Command, Args: item.MCP.Args, Transport: "stdio"}); err != nil {
+		return nil, err.Error()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), MCPDiscoveryTimeout)
+	defer cancel()
+	definitions, err := client.DiscoverToolsContext(ctx, item.ID)
+	if err != nil {
+		return nil, "MCP server did not list its tools: " + err.Error()
+	}
+	if len(item.MCP.Tools) > 0 {
+		byName := make(map[string]mcp.ToolDef, len(definitions))
+		for _, definition := range definitions {
+			byName[definition.Name] = definition
+		}
+		selected := make([]mcp.ToolDef, 0, len(item.MCP.Tools))
+		for _, name := range item.MCP.Tools {
+			definition, ok := byName[name]
+			if !ok {
+				return nil, fmt.Sprintf("MCP server has no tool %q", name)
+			}
+			selected = append(selected, definition)
+		}
+		definitions = selected
+	}
+	if len(definitions) == 0 {
+		return nil, "MCP server offers no tools"
+	}
+	tools, err := mcp.ToolsFromDefinitions(item.ID, definitions, client)
+	if err != nil {
+		return nil, err.Error()
+	}
+	for _, tool := range tools {
+		if err := tool.Spec().Validate(); err != nil {
+			return nil, err.Error()
+		}
+	}
+	return tools, ""
+}
+
+// MCPTools lists the Tools that active MCP Blocks plugged in.
+func (c *Composition) MCPTools() []string {
+	var names []string
+	for _, entry := range c.Entries {
+		if entry.Kind == mcpKind && entry.Status == PackActive {
+			names = append(names, entry.Tools...)
+		}
+	}
+	return names
 }
 
 // resolvePack returns the pack's Tools, or the reason it cannot be used.

@@ -166,7 +166,7 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		write(`{"schema_version":1,"name":"read-only","blocks":[{"id":"workspace-tools","required":true},{"id":"not-installed","required":false}]}`)
+		write(`{"schema_version":1,"name":"read-only","blocks":[{"id":"workspace-tools","required":true},{"id":"not-installed","required":false},{"id":"dead-mcp","required":false,"mcp":{"command":"/nonexistent/boi-mcp-server"}}]}`)
 		result, exit, stderr := runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
 		if exit != 0 || result.Response != "FOLDER_OK" {
 			t.Fatalf("a smaller composition must still work: exit=%d result=%+v stderr=%s", exit, result, stderr)

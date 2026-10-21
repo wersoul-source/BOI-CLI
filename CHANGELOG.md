@@ -2,7 +2,25 @@
 
 All notable changes to BOI CLI.
 
-## v1.8.0 — Composable Blocks, step 1 (unreleased)
+## v1.9.0 — MCP Blocks (unreleased)
+
+Roadmap step 2: capabilities can be added without building BOI.
+
+- An `environment.json` entry with `mcp` starts a local MCP server at start-up, lists its tools and plugs them in as `mcp.<id>.<tool>`
+- Every MCP Tool is external and needs the user's approval; its description and argument schema come from the server, and the Broker validates arguments against that schema
+- `tools` limits which of the server's tools are plugged in
+- A server that cannot start, does not answer within 15 s, or lacks an allowlisted tool is skipped when optional and stops start-up when required
+- MCP servers start without `PSC_*` variables, so they never see Provider API keys
+- MCP Tools join each task's working set while there is room under the 15-Tool limit
+
+```json
+{"schema_version": 1, "name": "with-github", "blocks": [
+  {"id": "workspace-tools", "required": true},
+  {"id": "github", "required": false, "mcp": {"command": "github-mcp-server", "args": ["stdio"], "tools": ["search_issues"]}}
+]}
+```
+
+## v1.8.0 — Composable Blocks, step 1
 
 - Block packs: a pack manifest declares what a pack provides, the runtime version and Provider capabilities it needs, and its highest allowed risk (ADR-002)
 - `.boi/environment.json` chooses the packs of a workspace's Agent and marks each required or optional; without the file the Agent is composed exactly as in v1.7

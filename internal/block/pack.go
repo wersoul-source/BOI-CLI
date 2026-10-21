@@ -83,8 +83,19 @@ type Environment struct {
 // EnvironmentBlock selects one pack. A missing required pack stops start-up;
 // a missing optional pack is skipped and reported.
 type EnvironmentBlock struct {
-	ID       string `json:"id"`
-	Required bool   `json:"required"`
+	ID       string     `json:"id"`
+	Required bool       `json:"required"`
+	MCP      *MCPServer `json:"mcp,omitempty"`
+}
+
+// MCPServer makes an environment entry an MCP Block: a local server process
+// whose tools become approval-gated Tools named "mcp.<id>.<tool>". It adds
+// capabilities without building BOI.
+type MCPServer struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args,omitempty"`
+	// Tools limits which of the server's tools are plugged in; empty means all.
+	Tools []string `json:"tools,omitempty"`
 }
 
 func (e Environment) Validate() error {
@@ -98,6 +109,12 @@ func (e Environment) Validate() error {
 	for _, item := range e.Blocks {
 		if strings.TrimSpace(item.ID) == "" {
 			return fmt.Errorf("environment %q lists a Block without id", e.Name)
+		}
+		if item.MCP != nil && strings.TrimSpace(item.MCP.Command) == "" {
+			return fmt.Errorf("environment %q: MCP Block %q has no command", e.Name, item.ID)
+		}
+		if strings.ContainsAny(item.ID, ". /\\") {
+			return fmt.Errorf("environment %q: Block id %q may not contain dots, spaces or slashes", e.Name, item.ID)
 		}
 		if seen[item.ID] {
 			return fmt.Errorf("environment %q lists Block %q twice", e.Name, item.ID)
