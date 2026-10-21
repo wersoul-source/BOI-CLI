@@ -44,42 +44,56 @@ func (editTool) Describe(arguments map[string]any) port.ToolPreview {
 }
 
 func (t editTool) Execute(_ context.Context, arguments map[string]any) (port.ToolOutput, error) {
+	path := port.OptionalString(arguments, "path")
+	resolved, updated, mode, line, err := t.plan(arguments)
+	if err != nil {
+		// Nothing was written: the model may correct old and try again.
+		return port.ToolOutput{}, port.NoEffect(err)
+	}
+	if err := os.WriteFile(resolved, []byte(updated), mode); err != nil {
+		return port.ToolOutput{}, fmt.Errorf("write %s: %w", path, err)
+	}
+	return port.ToolOutput{Output: fmt.Sprintf("edited %s at line %d", path, line), ChangedPaths: []string{path}}, nil
+}
+
+// plan computes the edited content without touching the file.
+func (t editTool) plan(arguments map[string]any) (resolved, updated string, mode os.FileMode, line int, err error) {
 	path, err := port.StringArgument(arguments, "path")
 	if err != nil {
-		return port.ToolOutput{}, err
+		return "", "", 0, 0, err
 	}
 	old, err := port.StringArgument(arguments, "old")
 	if err != nil {
-		return port.ToolOutput{}, err
+		return "", "", 0, 0, err
 	}
 	replacement, ok := arguments["new"].(string)
 	if !ok {
-		return port.ToolOutput{}, fmt.Errorf("argument new must be a string")
+		return "", "", 0, 0, fmt.Errorf("argument new must be a string")
 	}
 	if IsSecretFile(path) {
-		return port.ToolOutput{}, fmt.Errorf("refusing to edit a credential file: %s", path)
+		return "", "", 0, 0, fmt.Errorf("refusing to edit a credential file: %s", path)
 	}
-	resolved, err := t.sandbox.ResolveExisting(path)
+	resolved, err = t.sandbox.ResolveExisting(path)
 	if err != nil {
-		return port.ToolOutput{}, err
+		return "", "", 0, 0, err
 	}
 	info, err := os.Stat(resolved)
 	if err != nil {
-		return port.ToolOutput{}, fmt.Errorf("stat %s: %w", path, err)
+		return "", "", 0, 0, fmt.Errorf("stat %s: %w", path, err)
 	}
 	if !info.Mode().IsRegular() {
-		return port.ToolOutput{}, fmt.Errorf("%s is not a regular file", path)
+		return "", "", 0, 0, fmt.Errorf("%s is not a regular file", path)
 	}
 	if info.Size() > maxEditBytes {
-		return port.ToolOutput{}, fmt.Errorf("%s is larger than %d bytes", path, maxEditBytes)
+		return "", "", 0, 0, fmt.Errorf("%s is larger than %d bytes", path, maxEditBytes)
 	}
 	data, err := os.ReadFile(resolved)
 	if err != nil {
-		return port.ToolOutput{}, fmt.Errorf("read %s: %w", path, err)
+		return "", "", 0, 0, fmt.Errorf("read %s: %w", path, err)
 	}
 	content := string(data)
 	if !utf8.ValidString(content) {
-		return port.ToolOutput{}, fmt.Errorf("%s is not a text file", path)
+		return "", "", 0, 0, fmt.Errorf("%s is not a text file", path)
 	}
 	// A model copies lines with \n; a file written on Windows uses \r\n.
 	if !strings.Contains(content, old) && strings.Contains(content, "\r\n") {
@@ -88,16 +102,12 @@ func (t editTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 	switch count := strings.Count(content, old); count {
 	case 1:
 	case 0:
-		return port.ToolOutput{}, fmt.Errorf("old text not found in %s; read the file and copy the text exactly", path)
+		return "", "", 0, 0, fmt.Errorf("old text not found in %s; read the file and copy the text exactly", path)
 	default:
-		return port.ToolOutput{}, fmt.Errorf("old text appears %d times in %s; include more surrounding lines so it appears once", count, path)
+		return "", "", 0, 0, fmt.Errorf("old text appears %d times in %s; include more surrounding lines so it appears once", count, path)
 	}
-	updated := strings.Replace(content, old, replacement, 1)
-	if err := os.WriteFile(resolved, []byte(updated), info.Mode().Perm()); err != nil {
-		return port.ToolOutput{}, fmt.Errorf("write %s: %w", path, err)
-	}
-	line := strings.Count(content[:strings.Index(content, old)], "\n") + 1
-	return port.ToolOutput{Output: fmt.Sprintf("edited %s at line %d", path, line), ChangedPaths: []string{path}}, nil
+	line = strings.Count(content[:strings.Index(content, old)], "\n") + 1
+	return resolved, strings.Replace(content, old, replacement, 1), info.Mode().Perm(), line, nil
 }
 
 // Verify reads the file back and requires the replacement to be present.

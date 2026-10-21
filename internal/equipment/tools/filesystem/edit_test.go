@@ -2,11 +2,13 @@ package filesystem
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/boi-family/boi-cli/internal/block/port"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
 
@@ -61,8 +63,9 @@ func TestEditRefusesAmbiguousOrMissingText(t *testing.T) {
 		"empty old":  {map[string]any{"path": "a.go", "old": "", "new": "y"}, ""},
 	}
 	for name, tc := range cases {
-		if _, err := tool.Execute(context.Background(), tc.arguments); err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%s: error = %v, want %q", name, err, tc.want)
+		_, err := tool.Execute(context.Background(), tc.arguments)
+		if err == nil || !strings.Contains(err.Error(), tc.want) || !errors.Is(err, port.ErrNoEffect) {
+			t.Errorf("%s: error = %v, want %q marked as no effect", name, err, tc.want)
 		}
 	}
 	if got, _ := os.ReadFile(filepath.Join(root, "a.go")); string(got) != "x := 1\nx := 1\n" {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 
+	"github.com/boi-family/boi-cli/internal/block/port"
 	logger "github.com/boi-family/boi-cli/internal/platform/logging"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
@@ -111,7 +112,7 @@ type Result struct {
 // code with both output streams.
 func (e *Executor) RunResult(ctx context.Context, command string) (Result, error) {
 	if err := e.sandbox.Allow(command); err != nil {
-		return Result{}, fmt.Errorf("sandbox blocked: %w", err)
+		return Result{}, port.NoEffect(fmt.Errorf("sandbox blocked: %w", err))
 	}
 	dir := ""
 	if e.workspaceSandbox != nil {

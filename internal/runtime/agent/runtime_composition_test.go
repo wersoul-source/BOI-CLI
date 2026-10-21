@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"github.com/boi-family/boi-cli/internal/block/port"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -67,6 +68,10 @@ func TestBoundedRecovererOnlyRetriesSafeClasses(t *testing.T) {
 	write.Risk = RiskChange
 	if recoverer.Recover(context.Background(), Failure{Phase: PhaseAct, Err: errors.New("failed"), ToolCall: write, Attempt: 1}).Retry {
 		t.Fatal("change action must not retry automatically")
+	}
+	unchanged := port.NoEffect(errors.New("old text not found"))
+	if !recoverer.Recover(context.Background(), Failure{Phase: PhaseAct, Err: unchanged, ToolCall: write, Attempt: 1}).Retry {
+		t.Fatal("a change action that changed nothing must go back to the model")
 	}
 }
 
