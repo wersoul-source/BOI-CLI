@@ -16,7 +16,7 @@ import (
 // Tools returns the workspace Tools bound to one workspace boundary.
 func Tools(sandbox *workspace.Sandbox) []port.Tool {
 	reader := NewReader(sandbox)
-	return []port.Tool{listTool{reader}, readTool{reader}, writeTool{sandbox}}
+	return []port.Tool{listTool{reader}, readTool{reader}, searchTool{reader}, writeTool{sandbox}}
 }
 
 type listTool struct{ reader *Reader }
@@ -130,6 +130,44 @@ func (t readTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 	if failures == len(paths) {
 		return port.ToolOutput{}, fmt.Errorf("no file could be read: %s", string(data))
 	}
+	return port.ToolOutput{Output: string(data)}, nil
+}
+
+type searchTool struct{ reader *Reader }
+
+func (searchTool) Spec() port.ToolSpec {
+	return port.ToolSpec{
+		Name:        "workspace.search",
+		Usage:       "workspace.search(pattern, path)",
+		Description: "Find the lines that contain a text, with file and line number, in one file or every text file under a folder. Use this before reading when you look for something specific in large or many files.",
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"pattern": map[string]any{"type": "string", "description": "text to find, case-insensitive"},
+				"path":    map[string]any{"type": "string", "description": "file or folder to search; defaults to the workspace root"},
+			},
+			"required":             []string{"pattern"},
+			"additionalProperties": false,
+		},
+		Risk: port.RiskRead, Approval: port.ApprovalAuto, Timeout: 10 * time.Second,
+	}
+}
+
+func (searchTool) Describe(arguments map[string]any) port.ToolPreview {
+	path := port.OptionalString(arguments, "path")
+	return port.ToolPreview{Target: path, Preview: fmt.Sprintf("Search %q in workspace %s", port.OptionalString(arguments, "pattern"), path)}
+}
+
+func (t searchTool) Execute(_ context.Context, arguments map[string]any) (port.ToolOutput, error) {
+	pattern, err := port.StringArgument(arguments, "pattern")
+	if err != nil {
+		return port.ToolOutput{}, err
+	}
+	result, err := t.reader.Search(pattern, port.OptionalString(arguments, "path"))
+	if err != nil {
+		return port.ToolOutput{}, err
+	}
+	data, _ := json.Marshal(result)
 	return port.ToolOutput{Output: string(data)}, nil
 }
 

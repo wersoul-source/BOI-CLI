@@ -7,6 +7,7 @@ All notable changes to BOI CLI.
 Driven by the v1.6 benchmark on Cloudflare Workers AI: llama-3.3-70b never
 issued parallel tool calls, and `deep_read` spent 21k-35k tokens per task.
 
+- New Tool `workspace.search(pattern, path)`: finds matching lines with file and line number in one file or a folder (skips `.git`, `.boi`, `agent-folder`, `node_modules`, binaries and symlinks; 50 matches max). In v1.6 the model paged through large files with `context.expand` instead of using `match`; a search Tool is the step models already know. Existing workspaces get it after adding it to `.boi/registry/tools.json` or re-creating the index
 - `workspace.read` accepts `paths` (up to 5) to read several files in one call, so batching no longer depends on the model emitting parallel tool calls; a missing file is reported on its own instead of failing the batch
 - Tried and reverted: shrinking the in-context preview of large outputs to 4 KB and `context.expand` to 8 KB. `deep_read` passed 1/3 (two runs hit the 64k token budget) against 2/3 for v1.6, because the model read more, smaller chunks
 

@@ -55,13 +55,13 @@ func TestDefaultToolIndexIsExplicitAndBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(index.Entries) != 4 {
+	if len(index.Entries) != 5 {
 		t.Fatalf("default Tool entries = %d", len(index.Entries))
 	}
 	set, err := SelectCapabilities(boiDir, "read files", coreblock.AgentEnvironment{ToolCalling: true}, builtinToolNames)
-	if err != nil || len(set.Tools.Active) != 4 {
+	if err != nil || len(set.Tools.Active) != 5 {
 		t.Fatalf("default active Tools: %#v %v", set, err)
 	}
 }
 
-var builtinToolNames = []string{"workspace.list", "workspace.read", "workspace.write", "process.run"}
+var builtinToolNames = []string{"workspace.list", "workspace.read", "workspace.search", "workspace.write", "process.run"}
