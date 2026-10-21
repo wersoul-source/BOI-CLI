@@ -177,8 +177,17 @@ func qualify(configured []llmfactory.ConfiguredProvider) {
 		if _, err := app.SaveProfile(filepath.Join(scratch, ".boi"), target, profile); err != nil {
 			fail(err.Error())
 		}
+		completed := false
 		for _, result := range profile.Results {
-			fmt.Printf("  %-20s %s\n", result.Capability, result.Status)
+			fmt.Printf("  %-20s %s\t%s\n", result.Capability, result.Status, oneLine(result.Detail))
+			if result.Capability == "completion" && result.Status == coreblock.CapabilityPassed {
+				completed = true
+			}
+		}
+		// Without one completed request no task can run; stop here so the
+		// Provider's reason is the last thing printed, not twelve failed tasks.
+		if !completed {
+			fail("provider " + item.Name + " did not complete a request; check PSC_1_BASE_URL, PSC_1_MODEL and the API key")
 		}
 	}
 }
@@ -235,6 +244,12 @@ func runTask(item task, configured []llmfactory.ConfiguredProvider, timeout time
 	if result != nil {
 		out.stop = string(result.StopReason)
 		out.providerCalls, out.toolCalls, out.tokens = result.Usage.ProviderCalls, result.Usage.ToolCalls, result.Usage.TotalTokens()
+	}
+	// The Agent could not run at all (no qualified Provider, provider error):
+	// its reason matters more than the unchanged workspace.
+	if result == nil && out.detail != "" {
+		out.detail = oneLine(out.detail)
+		return out
 	}
 	if len(item.protected) > 0 && digest(dir, item.protected) != before {
 		out.detail = "the Agent changed a file it was told not to change"
