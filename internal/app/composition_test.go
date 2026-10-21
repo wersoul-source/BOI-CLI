@@ -24,7 +24,7 @@ func testSandbox(t *testing.T) *workspace.Sandbox {
 }
 
 func environmentOf(blocks ...block.EnvironmentBlock) block.Environment {
-	return block.Environment{SchemaVersion: block.PackSchemaVersion, Name: "test", Blocks: blocks}
+	return block.Environment{SchemaVersion: block.PackSchemaVersion, Name: "test", Trusted: true, Blocks: blocks}
 }
 
 type riskyTool struct{ name string }

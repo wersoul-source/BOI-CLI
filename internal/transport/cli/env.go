@@ -144,9 +144,37 @@ afterwards to see the result.`,
 	},
 }
 
+var envTrustCmd = &cobra.Command{
+	Use:   "trust",
+	Short: "Allow this workspace's environment.json to start its MCP servers",
+	Long: `MCP servers listed in a workspace's .boi/environment.json start only after
+you trust that exact file. Review it first: each MCP entry is a command that
+runs on this machine. Any later edit to the file withdraws the trust.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		runtime, ok := app.RuntimeFromContext(cmd.Context())
+		if !ok || runtime == nil {
+			return fmt.Errorf("application runtime is not configured")
+		}
+		commands, err := app.TrustEnvironment(runtime.BoiDir)
+		if err != nil {
+			return err
+		}
+		if len(commands) == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "Trusted. This environment starts no MCP servers.")
+			return nil
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), "Trusted. These commands may now start when BOI starts:")
+		for _, line := range commands {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", line)
+		}
+		return nil
+	},
+}
+
 func init() {
 	envCmd.Flags().BoolVar(&envJSON, "json", false, "write the report as JSON")
 	envUseCmd.Flags().BoolVar(&envReplace, "replace", false, "back up and replace an existing environment.json")
-	envCmd.AddCommand(envPresetsCmd, envUseCmd)
+	envCmd.AddCommand(envPresetsCmd, envUseCmd, envTrustCmd)
 	rootCmd.AddCommand(envCmd)
 }

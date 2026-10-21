@@ -40,7 +40,9 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 	if err != nil {
 		return nil, err
 	}
-	composition, err := Compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment)
+	// Without a qualified Provider no task can run, and the TUI must still
+	// start to help the user set one up: report problems instead of failing.
+	composition, err := compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment, len(qualified) > 0)
 	if err != nil {
 		return nil, fmt.Errorf("compose Agent: %w", err)
 	}

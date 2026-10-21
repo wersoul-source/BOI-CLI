@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -120,5 +121,12 @@ func TestRouterRejectsNilSuccessfulResponseAndFailsOver(t *testing.T) {
 	}
 	if stats := r.Stats()[0]; stats.SuccessCount != 0 || stats.FailCount != 1 {
 		t.Fatalf("nil response stats=%+v", stats)
+	}
+}
+
+func TestProviderErrorBodyIsBounded(t *testing.T) {
+	err := NewHTTPError("p", 500, strings.Repeat("x", 5000), nil)
+	if len(err.Error()) > 700 {
+		t.Fatalf("a Provider error must not carry its whole body: %d bytes", len(err.Error()))
 	}
 }

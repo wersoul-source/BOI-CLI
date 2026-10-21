@@ -7,7 +7,7 @@ func Manifest() block.Manifest {
 	return block.Manifest{
 		ID:      block.SubAgentID,
 		Name:    "SubAgent",
-		Purpose: "Discover and load bounded SubAgent packages only through the block-specific Skill and gate.",
+		Purpose: "Delegate a self-contained sub-task to a child Agent limited to a subset of the parent's Tools (ADR-003).",
 		Owns: []string{
 			"SubAgent Skill", "SubAgent Index", "SubAgent packages", "delegation contracts", "delegated budgets",
 		},

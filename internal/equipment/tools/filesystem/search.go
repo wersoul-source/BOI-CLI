@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 )
 
 const (
+	maxSearchEntries = 20000
 	maxSearchFiles   = 2000
 	maxSearchMatches = 50
 	maxMatchLine     = 300
@@ -36,7 +38,7 @@ type SearchResult struct {
 // Search finds lines containing pattern, case-insensitively, in one file or
 // every text file under a directory. Symlinks are skipped so the walk never
 // leaves the workspace; reads use the same size cap and binary check as Read.
-func (r *Reader) Search(pattern, path string) (*SearchResult, error) {
+func (r *Reader) Search(ctx context.Context, pattern, path string) (*SearchResult, error) {
 	if r == nil || r.sandbox == nil {
 		return nil, fmt.Errorf("workspace reader is not configured")
 	}
@@ -56,9 +58,19 @@ func (r *Reader) Search(pattern, path string) (*SearchResult, error) {
 	}
 	result := &SearchResult{Pattern: pattern, Path: display}
 	needle := strings.ToLower(pattern)
+	visited := 0
 	walkErr := filepath.WalkDir(root, func(current string, entry fs.DirEntry, err error) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if err != nil {
 			return nil
+		}
+		// Count every entry, not only files, so a tree of empty folders
+		// cannot keep the walk going past its timeout.
+		if visited++; visited > maxSearchEntries {
+			result.Truncated = true
+			return filepath.SkipAll
 		}
 		if entry.IsDir() {
 			if current != root && skippedDirs[entry.Name()] {
@@ -66,7 +78,7 @@ func (r *Reader) Search(pattern, path string) (*SearchResult, error) {
 			}
 			return nil
 		}
-		if !entry.Type().IsRegular() {
+		if !entry.Type().IsRegular() || IsSecretFile(current) {
 			return nil
 		}
 		if result.FilesScanned >= maxSearchFiles || len(result.Matches) >= maxSearchMatches {

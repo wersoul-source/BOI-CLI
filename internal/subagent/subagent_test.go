@@ -202,3 +202,19 @@ func TestParentAndChildShareOneBudget(t *testing.T) {
 		t.Fatalf("spent %d tokens, more than one request past the %d budget", total, limits.MaxTokens)
 	}
 }
+
+func TestGrantingContextExpandIsHarmless(t *testing.T) {
+	provider := &script{responses: []llm.CompletionResponse{
+		call("agent__delegate", `{"task":"Read a.txt.","tools":["workspace.read","context.expand"]}`),
+		text("child done"),
+		text("parent done"),
+	}}
+	service, _ := parentService(t, provider)
+	if err := service.SetActiveTools([]string{"workspace.read", agent.DelegateTool}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Run(context.Background(), "delegate")
+	if err != nil || result.Response != "parent done" || result.Usage.ToolCalls != 1 {
+		t.Fatalf("granting context.expand must not break delegation: err=%v result=%+v", err, result)
+	}
+}

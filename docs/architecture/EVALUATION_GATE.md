@@ -14,6 +14,8 @@ automated checks:
 - tool output is returned to the model as untrusted observation data;
 - idempotency keys prevent duplicate side effects within one broker lifetime.
 
+> Superseded: ADR-003 replaced the `SubagentsEnabled` switch with an optional `subagent` pack.
+
 `SubagentsEnabled` remains false after this gate. Enabling delegation requires a
 separate owner decision, task isolation design, delegated budgets, and acceptance
 tests; passing the single-agent gate does not authorize that change.

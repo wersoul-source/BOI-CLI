@@ -137,8 +137,59 @@ func TestSearchStopsAtMatchLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := NewReader(sandbox).Search("hit", ".")
+	result, err := NewReader(sandbox).Search(context.Background(), "hit", ".")
 	if err != nil || len(result.Matches) != maxSearchMatches || !result.Truncated {
 		t.Fatalf("want %d matches and Truncated, got %d %v %v", maxSearchMatches, len(result.Matches), result.Truncated, err)
+	}
+}
+
+func TestCredentialFilesAreNeverRead(t *testing.T) {
+	root := t.TempDir()
+	for name, body := range map[string]string{".env": "PSC_1_API_KEY=secret", ".env.local": "TOKEN=secret", ".env.example": "PSC_1_API_KEY=", "notes.txt": "secret word"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := NewReader(sandbox)
+	for _, name := range []string{".env", ".env.local", "./.ENV"} {
+		if _, err := reader.Read(name); err == nil {
+			t.Errorf("%s must not be readable", name)
+		}
+	}
+	if _, err := reader.Read(".env.example"); err != nil {
+		t.Errorf("a template without values may be read: %v", err)
+	}
+	result, err := reader.Search(context.Background(), "secret", ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, match := range result.Matches {
+		if strings.HasPrefix(match.Path, ".env") {
+			t.Fatalf("search must skip credential files, found %+v", match)
+		}
+	}
+}
+
+func TestSearchStopsWhenItsTimeoutEnds(t *testing.T) {
+	sandbox, err := workspace.NewSandbox(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := NewReader(sandbox).Search(ctx, "x", "."); err == nil {
+		t.Fatal("a cancelled search must stop")
+	}
+}
+
+func TestEmptyPathWithPathsReadsEveryFile(t *testing.T) {
+	tool := readFixture(t)
+	output, err := tool.Execute(context.Background(), map[string]any{"path": "", "paths": []any{"a.txt", "b.txt"}})
+	if err != nil || !strings.Contains(output.Output, "amber") || !strings.Contains(output.Output, "birch") {
+		t.Fatalf("both files must be read: %v %s", err, output.Output)
 	}
 }

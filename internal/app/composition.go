@@ -83,7 +83,7 @@ func BuiltinPacks() map[string]Pack {
 // DefaultEnvironment is used when a workspace has no environment file. It
 // composes the same Tools as v1.7.
 func DefaultEnvironment() block.Environment {
-	return block.Environment{SchemaVersion: block.PackSchemaVersion, Name: "default", Blocks: []block.EnvironmentBlock{
+	return block.Environment{SchemaVersion: block.PackSchemaVersion, Name: "default", Trusted: true, Blocks: []block.EnvironmentBlock{
 		{ID: "workspace-tools", Required: true},
 		{ID: "process-tools", Required: false},
 	}}
@@ -109,6 +109,7 @@ func LoadEnvironment(boiDir string) (block.Environment, error) {
 	if err := environment.Validate(); err != nil {
 		return block.Environment{}, fmt.Errorf("%s: %w", EnvironmentFile, err)
 	}
+	environment.Trusted = environmentTrusted(boiDir, data)
 	return environment, nil
 }
 
@@ -168,7 +169,13 @@ func compose(environment block.Environment, packs map[string]Pack, sandbox *work
 		var reason string
 		if item.MCP != nil {
 			entry.Kind = mcpKind
-			tools, reason = resolveMCP(item, packs)
+			if environment.Trusted {
+				tools, reason = resolveMCP(item, packs, runtimeVersion)
+			} else {
+				// A cloned repository may ship this file; starting its
+				// commands unasked would run untrusted code.
+				reason = "MCP servers in this environment.json are not trusted yet; review the file, then run 'boi env trust'"
+			}
 		} else {
 			tools, reason = resolvePack(item.ID, packs, sandbox, runtimeVersion, capabilities, &entry)
 		}
@@ -205,11 +212,12 @@ var MCPDiscoveryTimeout = 15 * time.Second
 // resolveMCP starts an MCP server once to list its tools and adapts them.
 // Every MCP Tool is external and needs approval; the server never receives
 // the user's Provider keys (see mcp.serverEnvironment).
-func resolveMCP(item block.EnvironmentBlock, packs map[string]Pack) ([]port.Tool, string) {
+func resolveMCP(item block.EnvironmentBlock, packs map[string]Pack, runtimeVersion string) ([]port.Tool, string) {
 	if _, builtin := packs[item.ID]; builtin {
 		return nil, "the id is already used by a built-in pack"
 	}
 	client := mcp.NewClient()
+	client.Version = runtimeVersion
 	if err := client.Register(mcp.ServerConfig{Name: item.ID, Command: item.MCP.Command, Args: item.MCP.Args, Transport: "stdio"}); err != nil {
 		return nil, err.Error()
 	}

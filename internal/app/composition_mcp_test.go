@@ -146,6 +146,9 @@ func TestPrepareTaskActivatesMCPTools(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(boiDir, EnvironmentFile), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := TrustEnvironment(boiDir); err != nil {
+		t.Fatal(err)
+	}
 	runtime := &Runtime{Version: "1.9.0", WorkspaceRoot: root, BoiDir: boiDir, Sandbox: sandbox}
 	agent, err := runtime.BuildAgent(nil)
 	if err != nil {
@@ -158,5 +161,47 @@ func TestPrepareTaskActivatesMCPTools(t *testing.T) {
 	}
 	if !slices.Contains(capabilities.Tools.Active, "mcp.fake.echo") || !slices.Contains(capabilities.Tools.Active, "workspace.read") {
 		t.Fatalf("MCP and workspace Tools must both be active: %v", capabilities.Tools.Active)
+	}
+}
+
+func TestUntrustedWorkspaceNeverStartsMCPServers(t *testing.T) {
+	boiDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "started")
+	server := fakeMCP()
+	server.Command, server.Args = "sh", []string{"-c", "touch " + marker}
+	environment := environmentOf(block.EnvironmentBlock{ID: "workspace-tools", Required: true}, block.EnvironmentBlock{ID: "cloned", MCP: server})
+	data, _ := json.Marshal(environment)
+	path := filepath.Join(boiDir, EnvironmentFile)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := LoadEnvironment(boiDir)
+	if err != nil || loaded.Trusted {
+		t.Fatalf("a file nobody trusted must load untrusted: %+v %v", loaded, err)
+	}
+	composition, err := Compose(loaded, BuiltinPacks(), testSandbox(t), "2.0.0", coreblock.AgentEnvironment{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := composition.Entries[len(composition.Entries)-1]
+	if last.Status != PackSkipped || !strings.Contains(last.Reason, "boi env trust") {
+		t.Fatalf("an untrusted MCP entry must be skipped with the way to trust it: %+v", last)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("an untrusted MCP command was executed")
+	}
+
+	if _, err := TrustEnvironment(boiDir); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _ = LoadEnvironment(boiDir); !loaded.Trusted {
+		t.Fatal("trusting the file must be remembered")
+	}
+	if err := os.WriteFile(path, append(data, ' '), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _ = LoadEnvironment(boiDir); loaded.Trusted {
+		t.Fatal("any edit must withdraw the trust")
 	}
 }

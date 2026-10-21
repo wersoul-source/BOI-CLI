@@ -351,6 +351,13 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			// A model may still answer with a text envelope; it is accepted
 			// as a fallback in both modes.
 			decision, err = ParseDecision(response.Content)
+			if err == nil && decision.ToolCall != nil {
+				// Never trust a model-chosen call ID: models copy the prompt's
+				// example, and a repeated ID would make the Broker replay an
+				// earlier result instead of running the call, or hand back
+				// another call's stored output from the context store.
+				decision.ToolCall.ID = fmt.Sprintf("call_%s_%d_0", runNonce, input.Step)
+			}
 		}
 		if err != nil {
 			// Keep usage and identity so a rejected reply is still counted.

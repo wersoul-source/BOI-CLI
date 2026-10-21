@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -45,9 +46,18 @@ func (t externalTool) Spec() port.ToolSpec {
 	return port.ToolSpec{Name: name, Usage: name + "(server-defined arguments)", Description: description, Parameters: t.schema, Risk: port.RiskExternal, Approval: port.ApprovalConfirm, Timeout: 30 * time.Second}
 }
 
-func (t externalTool) Describe(map[string]any) port.ToolPreview {
-	return port.ToolPreview{Target: t.server, Preview: "Call MCP tool " + t.tool + " on server " + t.server}
+// Describe shows the exact arguments, because the approval prompt is the
+// user's only view of what leaves this machine.
+func (t externalTool) Describe(arguments map[string]any) port.ToolPreview {
+	data, _ := json.Marshal(arguments)
+	text := string(data)
+	if len(text) > maxPreviewArguments {
+		text = text[:maxPreviewArguments] + "...(truncated)"
+	}
+	return port.ToolPreview{Target: t.server, Preview: "Call MCP tool " + t.tool + " on server " + t.server + " with " + text}
 }
+
+const maxPreviewArguments = 2000
 
 func (t externalTool) Execute(ctx context.Context, arguments map[string]any) (port.ToolOutput, error) {
 	output, err := t.invoker.CallTool(ctx, t.server, t.tool, arguments)

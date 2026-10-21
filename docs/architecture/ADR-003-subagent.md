@@ -7,7 +7,7 @@ Core unchanged.
 
 ## Context
 
-`internal/subagent` is a disabled stub. The directive asks for SubAgents
+`internal/subagent` was a disabled stub. The directive asks for SubAgents
 that range from one helper to whole Agent organizations, removable without
 touching the Runtime, never able to grant themselves authority. The first
 step is one SubAgent, with the authority and budget rules fixed before any

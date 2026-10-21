@@ -53,7 +53,7 @@ internal/
   service/provider/                              PLUG   adapters, catalog, factory
   service/config/                                PLUG   config and .env loading
   agentfolder/               Block 5 AgentFolder PLUG   bin/output tray, manifests
-  subagent/                  Block 6 SubAgent    GATED  disabled until evaluation gate
+  subagent/                  Block 6 SubAgent    PLUG   optional pack, agent.delegate (ADR-003)
 
   app/                       composition root (the only wiring point)
   transport/cli, tui         input and rendering
@@ -95,7 +95,7 @@ idempotency and verification do not change. One turn may carry up to
 ### Adding a Tool
 
 1. Create a package under `equipment/tools/` that implements `port.Tool`.
-2. Register it in `app.BuiltinTools` (or adapt it through MCP).
+2. Add it to a pack in `app.BuiltinPacks` (or plug it in as an MCP server).
 3. Add an index entry in `app.DefaultCapabilityIndexes`.
 
 The Broker, Engine and Service are not edited.

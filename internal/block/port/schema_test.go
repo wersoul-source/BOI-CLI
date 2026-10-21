@@ -70,3 +70,15 @@ func TestValidateArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestEnumOfArraysDoesNotPanic(t *testing.T) {
+	spec := ToolSpec{Name: "x", Parameters: map[string]any{"type": "object", "properties": map[string]any{
+		"pair": map[string]any{"enum": []any{[]any{1.0, 2.0}}},
+	}}}
+	if err := spec.ValidateArguments(map[string]any{"pair": []any{1.0, 2.0}}); err != nil {
+		t.Fatalf("an equal array must match: %v", err)
+	}
+	if err := spec.ValidateArguments(map[string]any{"pair": []any{3.0}}); err == nil {
+		t.Fatal("a different array must not match")
+	}
+}

@@ -78,7 +78,8 @@ func (s *Service) DelegableSpecs(names []string) ([]port.ToolSpec, error) {
 		if name == DelegateTool {
 			return nil, fmt.Errorf("a SubAgent cannot delegate further")
 		}
-		if seen[name] {
+		// Every child has its own context.expand; granting it again adds nothing.
+		if seen[name] || name == ContextExpandTool {
 			continue
 		}
 		seen[name] = true

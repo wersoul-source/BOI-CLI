@@ -1,4 +1,4 @@
-# BOI Agent Suite v1.6
+# BOI Agent Suite v2.0
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
@@ -7,8 +7,7 @@ BOI คือ Agent สำหรับทำงานใน workspace ผ่า�
 
 v1.5 วางโครงใหม่ทั้งหมดบนหลักเดียว: **แกนตายตัว + Block ที่ถอดประกอบได้**
 แกนของ Agent คงเดิมเสมอ ส่วนความสามารถใหม่เสียบเข้ามาได้โดยไม่ต้องแก้แกน
-v1.6 ปรับวิธีคุยกับแต่ละโมเดล: ใช้ native tool calling เมื่อโมเดลพิสูจน์ได้ว่าใช้เป็น
-เรียกได้หลาย Tool ต่อรอบ และคัดกรองโมเดลจากพฤติกรรมแทนการเทียบข้อความตรงตัว
+หลังจากนั้นระบบคุยกับแต่ละโมเดลแบบ native เมื่อโมเดลพิสูจน์ได้ว่าใช้เป็น อ่านและค้นไฟล์ได้ในจำนวนรอบที่น้อยลง และประกอบ Agent จาก Block pack ต่อโปรเจกต์ได้ (Tool ในตัว, MCP server, SubAgent แบบเสริม) และ `boi env` รายงานตามสิ่งที่โหลดจริง
 
 Linux คือแพลตฟอร์มแรกที่รองรับ ส่วน Windows, macOS และ Android คอมไพล์ได้แต่ยังไม่ใช่เป้าหมาย release
 
@@ -47,6 +46,7 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 
 pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-read` (list, read, search), `process-tools` (`process.run`) และ `subagent` (`agent.delegate`: ส่งงานย่อยให้ผู้ช่วยที่ใช้ได้เฉพาะ Tool ที่อนุญาต ดู [ADR-003](docs/architecture/ADR-003-subagent.md))
 รายการที่มี `mcp` จะเสียบ tool ของ MCP server ในเครื่องเข้ามา ทุกตัวต้องขออนุญาตก่อนใช้ และไม่ต้อง build BOI ใหม่
+แต่ MCP คือคำสั่งที่รันบนเครื่องคุณ จึงเริ่มทำงานก็ต่อเมื่อคุณตรวจไฟล์แล้วสั่ง `boi env trust` ถ้าไฟล์ถูกแก้ภายหลัง trust จะถูกถอนอัตโนมัติ
 
 ```json
 {"id": "github", "required": false, "mcp": {"command": "github-mcp-server", "args": ["stdio"]}}
@@ -57,7 +57,7 @@ pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-
 
 | ทาง | ใช้เมื่อ | วิธี |
 |---|---|---|
-| ตอนคอมไพล์ | Tool ที่เขียนด้วย Go | ทำตาม `port.Tool` แล้วเพิ่มใน `app.BuiltinTools` และใน capability index โดยไม่ต้องแก้ Broker |
+| ตอนคอมไพล์ | Tool ที่เขียนด้วย Go | ทำตาม `port.Tool` แล้วเพิ่มใน pack ของ `app.BuiltinPacks` และใน `app.DefaultCapabilityIndexes` โดยไม่ต้องแก้ Broker |
 | ตอนรัน | อะไรก็ได้ที่อยู่นอก binary | เปิดเป็น MCP server แล้ว `equipment/tools/mcp` จะแปลงแต่ละ tool เป็น Tool ที่ต้องขออนุมัติ |
 
 ## งานหนึ่งงานทำงานอย่างไร
@@ -102,7 +102,7 @@ boi                             # เปิด TUI
 
 Provider ที่ยังไม่ผ่าน `boi provider qualify` จะไม่ถูกใช้งาน และ BOI จะไม่ตอบแบบจำลองแทน
 ผล qualify ยังตัดสินว่าจะใช้ native tool calling หรือไม่ (`native_tool_schema`)
-ผล qualify ของ v1.5 ใช้กับ v1.6 ไม่ได้ ต้อง qualify ใหม่หลังอัปเกรด
+ผล qualify ของ v1.5 ใช้กับ v1.6 ขึ้นไปไม่ได้ และผลทุกชุดหมดอายุใน 30 วัน ถ้า `boi env` บอกว่าไม่มีโมเดลที่ผ่าน ให้ qualify ใหม่
 
 ### งานแรก
 
@@ -136,6 +136,7 @@ Exit code: `0` สำเร็จ, `1` ภายใน, `2` input ผิด, `3`
 | `boi provider list\|switch\|qualify` | จัดการและทดสอบ Provider |
 | `boi registry init\|list\|add` | จัดการ index ของ Tool และ Skill |
 | `boi env` | Agent ประกอบจาก Block อะไรบ้าง สถานะ active, loaded หรือ declared พร้อมเหตุผล |
+| `boi env presets\|use\|trust` | ดูและใช้ preset, trust MCP server ใน environment ของ workspace |
 | `boi doctor` | ตรวจสุขภาพในเครื่อง |
 | `boi skill` / `boi memory` | จัดการ Skill และ memory |
 | `boi config` / `boi model` | ดูหรือเปลี่ยนการตั้งค่า |

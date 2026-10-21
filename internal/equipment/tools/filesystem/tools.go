@@ -105,7 +105,7 @@ func (t readTool) Execute(_ context.Context, arguments map[string]any) (port.Too
 	if err != nil {
 		return port.ToolOutput{}, err
 	}
-	if _, single := arguments["path"]; single {
+	if port.OptionalString(arguments, "path") != "" {
 		read, err := t.reader.Read(paths[0])
 		if err != nil {
 			return port.ToolOutput{}, err
@@ -158,12 +158,12 @@ func (searchTool) Describe(arguments map[string]any) port.ToolPreview {
 	return port.ToolPreview{Target: path, Preview: fmt.Sprintf("Search %q in workspace %s", port.OptionalString(arguments, "pattern"), path)}
 }
 
-func (t searchTool) Execute(_ context.Context, arguments map[string]any) (port.ToolOutput, error) {
+func (t searchTool) Execute(ctx context.Context, arguments map[string]any) (port.ToolOutput, error) {
 	pattern, err := port.StringArgument(arguments, "pattern")
 	if err != nil {
 		return port.ToolOutput{}, err
 	}
-	result, err := t.reader.Search(pattern, port.OptionalString(arguments, "path"))
+	result, err := t.reader.Search(ctx, pattern, port.OptionalString(arguments, "path"))
 	if err != nil {
 		return port.ToolOutput{}, err
 	}

@@ -43,3 +43,4 @@ obj/
 .env
 !.env.example
 benchmark-results.tsv
+outputs/
