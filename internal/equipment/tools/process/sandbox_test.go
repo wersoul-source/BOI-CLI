@@ -1,6 +1,13 @@
 package process
 
-import "testing"
+import (
+	"context"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
+)
 
 func TestSandboxBlocksDestructiveCommands(t *testing.T) {
 	s := NewSandbox()
@@ -74,5 +81,22 @@ func TestSandboxKnownLimitsAreDocumentedNotClaimed(t *testing.T) {
 		if s.IsBlocked(cmd) {
 			t.Logf("deny-list now catches %q; update the documented limits", cmd)
 		}
+	}
+}
+
+func TestFailingCommandIsReportedNotRaised(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell")
+	}
+	sandbox, err := workspace.NewSandbox(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := Tool(sandbox).Execute(context.Background(), map[string]any{"command": "echo FAIL: TestAdd; exit 1"})
+	if err != nil {
+		t.Fatalf("a command that ran must not be an error: %v", err)
+	}
+	if !strings.HasPrefix(output.Output, "exit status: 1") || !strings.Contains(output.Output, "FAIL: TestAdd") {
+		t.Fatalf("the exit code and stdout must reach the model: %q", output.Output)
 	}
 }
