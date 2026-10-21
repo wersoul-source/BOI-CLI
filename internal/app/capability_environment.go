@@ -47,9 +47,17 @@ func (set *CapabilitySet) SkillDocs() []agent.SkillDoc {
 	if set == nil {
 		return nil
 	}
+	missing := map[string][]string{}
+	for _, decision := range set.Skills.Decisions {
+		missing[decision.Name] = decision.Missing
+	}
 	docs := make([]agent.SkillDoc, 0, len(set.LoadedSkills))
 	for _, item := range set.LoadedSkills {
-		docs = append(docs, agent.SkillDoc{Name: item.Name, Description: item.Description, Instructions: item.Prompt})
+		description := item.Description
+		if tools := missing[item.Name]; len(tools) > 0 {
+			description += " (Tools it names are not available here: " + strings.Join(tools, ", ") + "; use its guidance without them)"
+		}
+		docs = append(docs, agent.SkillDoc{Name: item.Name, Description: description, Instructions: item.Prompt})
 	}
 	return docs
 }
@@ -59,6 +67,7 @@ func DefaultCapabilityIndexes() (capability.Index, capability.Index) {
 		{Name: "workspace.list", Source: "builtin", Summary: "List files inside the workspace", Enabled: true, Priority: 100, Tags: []string{"list", "files"}},
 		{Name: "workspace.read", Source: "builtin", Summary: "Read a file inside the workspace", Enabled: true, Priority: 100, Tags: []string{"read", "file"}},
 		{Name: "workspace.search", Source: "builtin", Summary: "Find lines containing a text in workspace files", Enabled: true, Priority: 100, Tags: []string{"search", "find", "grep"}},
+		{Name: "workspace.edit", Source: "builtin", Summary: "Change part of a file with approval", Enabled: true, Priority: 90, Tags: []string{"edit", "change", "fix", "file"}},
 		{Name: "workspace.write", Source: "builtin", Summary: "Write a file with approval", Enabled: true, Priority: 90, Tags: []string{"write", "file"}},
 		{Name: "process.run", Source: "builtin", Summary: "Run a bounded workspace process with approval", Enabled: true, Priority: 80, Tags: []string{"run", "command", "test"}},
 	}}

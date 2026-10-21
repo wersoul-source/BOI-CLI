@@ -2,6 +2,13 @@
 
 All notable changes to BOI CLI.
 
+## v2.2.0 — Edit in place, Skills always offered (unreleased)
+
+Driven by the first coding benchmark on Cloudflare Workers AI (llama-3.3-70b, 5/12): every failed `implement` and `edit_config` run rewrote a whole file to change one line and lost or invented the lines around it (a changed `package` name, config keys dropped or made up).
+
+- New Tool `workspace.edit(path, old, new)` replaces one exact piece of text in an existing file; `old` must appear exactly once, so every other byte stays as it was. It keeps the file mode, matches Windows line endings, refuses credential files and needs approval like `workspace.write`. `workspace.write` now says it is for new files or whole-file replacement. Existing workspaces get the Tool without editing `.boi/registry/tools.json`
+- Skills and Tools are independent: a Skill is offered whether or not the Tools it names are active (its description then says which are missing), and keyword overlap with the task only orders Skills instead of hiding them, so a Thai task no longer loses every English-tagged Skill. The model decides whether a Skill applies; a task needs neither a Skill nor a Tool to run
+
 ## v2.1.0 — Coding benchmark (unreleased)
 
 - `process.run` reports a non-zero exit as a result (`exit status: N` with stdout and stderr) instead of an error. Before, a failing `go test` ended the task, because a failed command is never retried, and its stdout never reached the model

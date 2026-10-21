@@ -14,7 +14,7 @@ import (
 func TestPresetsComposeFromRealBlocks(t *testing.T) {
 	want := map[string][]string{
 		"minimal": {"workspace.list", "workspace.read", "workspace.search"},
-		"coding":  {"workspace.list", "workspace.read", "workspace.search", "workspace.write", "process.run"},
+		"coding":  {"workspace.list", "workspace.read", "workspace.search", "workspace.edit", "workspace.write", "process.run"},
 	}
 	for name, preset := range Presets() {
 		composition, err := Compose(preset.Environment, BuiltinPacks(), testSandbox(t), "1.11.0", coreblock.AgentEnvironment{})

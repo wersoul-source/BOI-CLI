@@ -71,10 +71,10 @@ func TestMCPBlockPlugsInServerTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(composition.ToolNames()[4:], ","); got != "mcp.fake.echo,mcp.fake.env" {
+	if got := strings.Join(composition.ToolNames()[5:], ","); got != "mcp.fake.echo,mcp.fake.env" {
 		t.Fatalf("MCP Tools = %s", got)
 	}
-	var echo, env = composition.Tools[4], composition.Tools[5]
+	var echo, env = composition.Tools[5], composition.Tools[6]
 	spec := echo.Spec()
 	if spec.Approval != "confirm" || spec.Risk != "external" || !strings.Contains(spec.Description, "Echo text back") {
 		t.Fatalf("MCP Tool must be external, approval-gated and keep its description: %+v", spec)
@@ -112,7 +112,7 @@ func TestMCPBlockFailuresAreReportedNotFatal(t *testing.T) {
 			t.Fatalf("%s: an optional MCP Block must never stop start-up: %v", name, err)
 		}
 		last := composition.Entries[len(composition.Entries)-1]
-		if last.Status != PackSkipped || !strings.Contains(last.Reason, tc.reason) || len(composition.Tools) != 4 {
+		if last.Status != PackSkipped || !strings.Contains(last.Reason, tc.reason) || len(composition.Tools) != 5 {
 			t.Errorf("%s: entry %+v tools %v, want skipped with %q and the workspace Tools intact", name, last, composition.ToolNames(), tc.reason)
 		}
 		required := environmentOf(block.EnvironmentBlock{ID: tc.id, Required: true, MCP: tc.server})

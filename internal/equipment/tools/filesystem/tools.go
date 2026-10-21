@@ -16,7 +16,7 @@ import (
 // Tools returns the workspace Tools bound to one workspace boundary.
 func Tools(sandbox *workspace.Sandbox) []port.Tool {
 	reader := NewReader(sandbox)
-	return []port.Tool{listTool{reader}, readTool{reader}, searchTool{reader}, writeTool{sandbox}}
+	return []port.Tool{listTool{reader}, readTool{reader}, searchTool{reader}, editTool{sandbox}, writeTool{sandbox}}
 }
 
 type listTool struct{ reader *Reader }
@@ -174,7 +174,7 @@ func (t searchTool) Execute(ctx context.Context, arguments map[string]any) (port
 type writeTool struct{ sandbox *workspace.Sandbox }
 
 func (writeTool) Spec() port.ToolSpec {
-	return port.ToolSpec{Name: "workspace.write", Usage: "workspace.write(path, content)", Description: "Create or replace one workspace file. Needs the user's approval.", Risk: port.RiskChange, Approval: port.ApprovalConfirm, Timeout: 10 * time.Second}
+	return port.ToolSpec{Name: "workspace.write", Usage: "workspace.write(path, content)", Description: "Create a new workspace file, or replace a whole file. To change part of an existing file use workspace.edit. Needs the user's approval.", Risk: port.RiskChange, Approval: port.ApprovalConfirm, Timeout: 10 * time.Second}
 }
 
 func (writeTool) Describe(arguments map[string]any) port.ToolPreview {

@@ -157,7 +157,7 @@ func TestReportShowsEveryProblemInsteadOfStopping(t *testing.T) {
 	if missing := blockByID(t, report, "missing-one"); missing.State != StateDeclared || missing.Reason != "no such Block is installed" {
 		t.Fatalf("missing Block: %+v", missing)
 	}
-	if len(blockByID(t, report, "workspace-tools").Tools) != 4 {
+	if len(blockByID(t, report, "workspace-tools").Tools) != 5 {
 		t.Fatal("the report must still list the Blocks after the failing one")
 	}
 
