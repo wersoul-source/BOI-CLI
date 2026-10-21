@@ -2,7 +2,30 @@
 
 All notable changes to BOI CLI.
 
-## v1.9.0 — MCP Blocks (unreleased)
+## v1.11.0 — Presets (unreleased)
+
+Roadmap step 4.
+
+- `boi env presets` lists ready-made environments; `boi env use <preset>` writes one as `.boi/environment.json` (an existing file is kept unless `--replace`, which backs it up first)
+- `minimal`: read-only, `workspace-read` (list, read, search); nothing is written or run
+- `coding`: `workspace-tools` and `process-tools`, both required; writes and commands need approval
+- New built-in pack `workspace-read`: the read-only part of `workspace-tools`
+- No `research` preset yet: research needs web search, which BOI does not ship. Add an MCP search server to an environment instead
+- `PRESET=<name> scripts/acceptance/benchmark.sh` runs the benchmark under a preset
+
+## v1.10.0 — Composition report
+
+Roadmap step 3.
+
+- `boi env` (and `boi env --json`) composes the Agent exactly as `boi` and `boi ask` do and reports each Block from what the Runtime holds, not from the manifest:
+  - `active`: at least one of its Tools is offered to the model
+  - `loaded`: its Tools are registered, but none can be offered now (for example, no qualified Provider allows Tool calling)
+  - `declared`: listed in `environment.json` but not loaded, with the reason (not installed, MCP server did not answer, ...)
+- The report does not stop at the first problem: every Block is listed, and a missing required Block marks the Agent not ready (non-zero exit)
+- Runtime Tools such as `context.expand` are listed separately
+- Qualification now expires after 30 days; an expired Provider leaves the Router until `boi provider qualify` runs again. A change of model, Provider or endpoint already required a new qualification (it is part of the profile fingerprint)
+
+## v1.9.0 — MCP Blocks
 
 Roadmap step 2: capabilities can be added without building BOI.
 

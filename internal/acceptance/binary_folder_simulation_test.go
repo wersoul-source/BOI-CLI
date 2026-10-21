@@ -172,6 +172,25 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 			t.Fatalf("a smaller composition must still work: exit=%d result=%+v stderr=%s", exit, result, stderr)
 		}
 
+		stdout, stderr, exit := runBuiltCLI(binary, root, providerEnv, "env", "--json")
+		var report struct {
+			Ready  bool `json:"ready"`
+			Blocks []struct {
+				ID    string `json:"id"`
+				State string `json:"state"`
+			} `json:"blocks"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &report); err != nil || exit != 0 || !report.Ready {
+			t.Fatalf("boi env: exit=%d err=%v stdout=%s stderr=%s", exit, err, stdout, stderr)
+		}
+		states := map[string]string{}
+		for _, item := range report.Blocks {
+			states[item.ID] = item.State
+		}
+		if states["workspace-tools"] != "active" || states["not-installed"] != "declared" || states["dead-mcp"] != "declared" {
+			t.Fatalf("boi env states = %v", states)
+		}
+
 		tasksBefore := countTaskFolders(t, root)
 		write(`{"schema_version":1,"name":"broken","blocks":[{"id":"not-installed","required":true}]}`)
 		result, exit, stderr = runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
@@ -180,6 +199,22 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 		}
 		if after := countTaskFolders(t, root); after != tasksBefore {
 			t.Fatalf("a failed composition created a task: %d -> %d", tasksBefore, after)
+		}
+	})
+
+	t.Run("minimal preset is read-only and works", func(t *testing.T) {
+		environmentPath := filepath.Join(root, ".boi", "environment.json")
+		t.Cleanup(func() { _ = os.Remove(environmentPath) })
+		if stdout, stderr, exit := runBuiltCLI(binary, root, providerEnv, "env", "use", "minimal"); exit != 0 {
+			t.Fatalf("env use: exit=%d stdout=%s stderr=%s", exit, stdout, stderr)
+		}
+		stdout, _, exit := runBuiltCLI(binary, root, providerEnv, "env", "--json")
+		if exit != 0 || !strings.Contains(stdout, `"id": "workspace-read"`) || strings.Contains(stdout, "workspace.write") || strings.Contains(stdout, "process.run") {
+			t.Fatalf("minimal must hold only read Tools: exit=%d %s", exit, stdout)
+		}
+		result, exit, stderr := runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
+		if exit != 0 || result.Response != "FOLDER_OK" {
+			t.Fatalf("exit=%d result=%+v stderr=%s", exit, result, stderr)
 		}
 	})
 

@@ -10,7 +10,7 @@
 | 6 | Unqualified Provider never enters the Router | Implemented | acceptance "unqualified Provider fails before task creation"; `app/provider_environment_test.go` |
 | 7 | A Block cannot raise its own authority | Implemented | `ToolSpec.Validate`; Broker assigns risk; `TestCompositionRules` refuses a Tool above `max_risk` and a pack whose `provides` hides a Tool |
 | 8 | A removed Block leaves no task or resource behind | Partial | MCP servers run one process per request and are killed when it ends (`mcp/client.go`, `TestClientCancellationStopsServer`); no long-lived Block resources exist yet |
-| 9 | Capability report matches reality | Proposed | Step 3: report vs `Broker.CapabilityNames()` per environment |
+| 9 | Capability report matches reality | Implemented | `TestReportMatchesWhatTheBrokerHolds`, `TestReportSeparatesDeclaredLoadedAndActive`; acceptance: `boi env --json` states |
 | 10 | Benchmark does not regress | Implemented | `scripts/acceptance/benchmark.sh` with `BASE_REF`; gate: success ≥ previous, `RUNS=3` |
 | 11 | Native, envelope and fallback share one execution path | Implemented | `native_test.go` |
 | 12 | Invalid arguments never reach authorization | Implemented | `TestInvalidNativeArgumentsAreRejectedBeforeAuthorization` |

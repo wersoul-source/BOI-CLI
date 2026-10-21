@@ -43,7 +43,9 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 {"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
 ```
 
-pack ในตัว: `workspace-tools` (list, read, search, write) และ `process-tools` (`process.run`)
+ชุดสำเร็จรูป: ดูด้วย `boi env presets` แล้วเลือก `boi env use minimal` (อ่านอย่างเดียว) หรือ `boi env use coding` (อ่าน เขียน รันคำสั่ง โดยต้องขออนุญาต) แล้วดูผลด้วย `boi env`
+
+pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-read` (list, read, search) และ `process-tools` (`process.run`)
 รายการที่มี `mcp` จะเสียบ tool ของ MCP server ในเครื่องเข้ามา ทุกตัวต้องขออนุญาตก่อนใช้ และไม่ต้อง build BOI ใหม่
 
 ```json
@@ -133,6 +135,7 @@ Exit code: `0` สำเร็จ, `1` ภายใน, `2` input ผิด, `3`
 | `boi init` / `boi setup` | เตรียม workspace / ตั้งค่า Provider |
 | `boi provider list\|switch\|qualify` | จัดการและทดสอบ Provider |
 | `boi registry init\|list\|add` | จัดการ index ของ Tool และ Skill |
+| `boi env` | Agent ประกอบจาก Block อะไรบ้าง สถานะ active, loaded หรือ declared พร้อมเหตุผล |
 | `boi doctor` | ตรวจสุขภาพในเครื่อง |
 | `boi skill` / `boi memory` | จัดการ Skill และ memory |
 | `boi config` / `boi model` | ดูหรือเปลี่ยนการตั้งค่า |

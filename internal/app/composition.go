@@ -42,6 +42,22 @@ func BuiltinPacks() map[string]Pack {
 			},
 			Tools: filesystem.Tools,
 		},
+		"workspace-read": {
+			Manifest: block.PackManifest{
+				SchemaVersion: block.PackSchemaVersion, ID: "workspace-read", Kind: block.ToolPack, Version: "1.0.0",
+				Provides: []string{"workspace.list", "workspace.read", "workspace.search"},
+				MaxRisk:  string(port.RiskRead),
+			},
+			Tools: func(sandbox *workspace.Sandbox) []port.Tool {
+				var readOnly []port.Tool
+				for _, tool := range filesystem.Tools(sandbox) {
+					if tool.Spec().Risk == port.RiskRead {
+						readOnly = append(readOnly, tool)
+					}
+				}
+				return readOnly
+			},
+		},
 		"process-tools": {
 			Manifest: block.PackManifest{
 				SchemaVersion: block.PackSchemaVersion, ID: "process-tools", Kind: block.ToolPack, Version: "1.0.0",
@@ -123,6 +139,13 @@ func (c *Composition) ToolNames() []string {
 // task runs. A required pack that is unknown, incompatible or broken stops
 // composition with its reason; an optional one is skipped and reported.
 func Compose(environment block.Environment, packs map[string]Pack, sandbox *workspace.Sandbox, runtimeVersion string, capabilities coreblock.AgentEnvironment) (*Composition, error) {
+	return compose(environment, packs, sandbox, runtimeVersion, capabilities, true)
+}
+
+// compose resolves every pack. With strict, a refused required pack stops
+// composition; without it (for reports) the pack is recorded as skipped and
+// composition goes on, so a report can show every problem at once.
+func compose(environment block.Environment, packs map[string]Pack, sandbox *workspace.Sandbox, runtimeVersion string, capabilities coreblock.AgentEnvironment, strict bool) (*Composition, error) {
 	if err := environment.Validate(); err != nil {
 		return nil, err
 	}
@@ -144,7 +167,7 @@ func Compose(environment block.Environment, packs map[string]Pack, sandbox *work
 			}
 		}
 		if reason != "" {
-			if item.Required {
+			if item.Required && strict {
 				return nil, fmt.Errorf("required Block %s: %s", item.ID, reason)
 			}
 			entry.Status, entry.Reason = PackSkipped, reason
