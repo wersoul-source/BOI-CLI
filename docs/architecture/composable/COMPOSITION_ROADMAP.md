@@ -15,7 +15,7 @@ step, so every new piece of the contract is exercised by a real Block.
 | 1 | v1.8 | ADR-002 Block contract; pack manifests (compiled in) and resolver in `app`; `.boi/environment.json` | Removing the manifest's optional Tool Block leaves the rest working; a missing required Block fails before any task | Implemented (ADR-002) |
 | 2 | v1.8 | MCP Block: an environment manifest entry starts an MCP server and registers its Tools | An MCP Block can be added and removed without code; its Tools are approval-gated; a dead server is reported and skipped | Implemented (v1.9) |
 | 3 | v1.9 | Composition report (`boi env` / doctor section): active, skipped and why | Report matches what the Broker actually registered in every test environment | Implemented (v1.10, `boi env`) |
-| 4 | v1.9 | Presets: Minimal, Coding, Research as environment manifests | Each preset starts and passes its benchmark subset | Proposed |
+| 4 | v1.11 | Presets: Minimal, Coding as environment manifests (`boi env use`) | Each preset starts and passes its benchmark subset | Implemented (minimal, coding); Research waits for a web search Block |
 | 5 | v2.0 | SubAgent port, single SubAgent behind it | Removing the Block returns to single-Agent; child cannot exceed parent authority or budget | Proposed |
 | 6 | v2.x | Agent packs, coordination | Requires step 5 security gate | Blocked |
 | 7 | v2.x | Organization, factory, watchdogs | Requires a product spec | Blocked |

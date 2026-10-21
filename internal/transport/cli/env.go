@@ -108,7 +108,45 @@ func yesNo(value bool) string {
 	return "no"
 }
 
+var envReplace bool
+
+var envPresetsCmd = &cobra.Command{
+	Use:   "presets",
+	Short: "List ready-made environments",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		presets := app.Presets()
+		for _, name := range app.PresetNames() {
+			fmt.Fprintf(cmd.OutOrStdout(), "%-9s %s\n", name, presets[name].Description)
+		}
+		return nil
+	},
+}
+
+var envUseCmd = &cobra.Command{
+	Use:   "use <preset>",
+	Short: "Write a preset as this workspace's .boi/environment.json",
+	Long: `Writes the preset as .boi/environment.json. An existing file is kept unless
+--replace is given; then it is backed up next to itself first. Run 'boi env'
+afterwards to see the result.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		runtime, ok := app.RuntimeFromContext(cmd.Context())
+		if !ok || runtime == nil {
+			return fmt.Errorf("application runtime is not configured")
+		}
+		path, err := app.UsePreset(runtime.BoiDir, args[0], envReplace)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Environment %q written to %s\n", args[0], path)
+		return nil
+	},
+}
+
 func init() {
 	envCmd.Flags().BoolVar(&envJSON, "json", false, "write the report as JSON")
+	envUseCmd.Flags().BoolVar(&envReplace, "replace", false, "back up and replace an existing environment.json")
+	envCmd.AddCommand(envPresetsCmd, envUseCmd)
 	rootCmd.AddCommand(envCmd)
 }

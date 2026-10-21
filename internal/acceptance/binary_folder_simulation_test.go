@@ -202,6 +202,22 @@ func TestBuiltBinarySimulatesWholeFolderWorkflows(t *testing.T) {
 		}
 	})
 
+	t.Run("minimal preset is read-only and works", func(t *testing.T) {
+		environmentPath := filepath.Join(root, ".boi", "environment.json")
+		t.Cleanup(func() { _ = os.Remove(environmentPath) })
+		if stdout, stderr, exit := runBuiltCLI(binary, root, providerEnv, "env", "use", "minimal"); exit != 0 {
+			t.Fatalf("env use: exit=%d stdout=%s stderr=%s", exit, stdout, stderr)
+		}
+		stdout, _, exit := runBuiltCLI(binary, root, providerEnv, "env", "--json")
+		if exit != 0 || !strings.Contains(stdout, `"id": "workspace-read"`) || strings.Contains(stdout, "workspace.write") || strings.Contains(stdout, "process.run") {
+			t.Fatalf("minimal must hold only read Tools: exit=%d %s", exit, stdout)
+		}
+		result, exit, stderr := runAutomation(t, binary, root, providerEnv, "SIM_LIST_FULL_FOLDER")
+		if exit != 0 || result.Response != "FOLDER_OK" {
+			t.Fatalf("exit=%d result=%+v stderr=%s", exit, result, stderr)
+		}
+	})
+
 	t.Run("qualification is shared across workspaces", func(t *testing.T) {
 		other := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(other, ".git"), 0o755); err != nil {

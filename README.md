@@ -52,8 +52,12 @@ required pack that is missing or incompatible stops start-up with the reason.
 {"schema_version": 1, "name": "no-shell", "blocks": [{"id": "workspace-tools", "required": true}]}
 ```
 
-Built-in packs: `workspace-tools` (list, read, search, write) and
-`process-tools` (`process.run`). An entry with `mcp` plugs in a local MCP
+Ready-made environments: `boi env presets`, then `boi env use minimal`
+(read-only) or `boi env use coding` (read, write, run commands with
+approval). `boi env` shows what was composed.
+
+Built-in packs: `workspace-tools` (list, read, search, write),
+`workspace-read` (list, read, search) and `process-tools` (`process.run`). An entry with `mcp` plugs in a local MCP
 server's tools, approval-gated, without building BOI:
 
 ```json

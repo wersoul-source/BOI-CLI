@@ -5,6 +5,7 @@
 #   bash scripts/acceptance/benchmark.sh                  # this checkout only
 #   BASE_REF=v1.5.0 bash scripts/acceptance/benchmark.sh  # baseline vs this checkout
 #   RUNS=3 bash scripts/acceptance/benchmark.sh           # repeat each task
+#   PRESET=minimal bash scripts/acceptance/benchmark.sh   # run under a preset (v1.11+)
 #
 # The Provider comes from PSC_1_NAME/PSC_1_API_KEY/PSC_1_MODEL[/PSC_1_BASE_URL].
 # When they are not set, the script asks for a Cloudflare Workers AI account
@@ -76,6 +77,9 @@ measure() { # $1 = label, $2 = binary
 	export BOI_CONFIG_DIR="$config"
 	"$bin" init </dev/null >/dev/null
 	"$bin" registry init </dev/null >/dev/null
+	if [ -n "${PRESET:-}" ]; then
+		"$bin" env use "$PRESET" </dev/null >/dev/null 2>&1 || echo "note: $label cannot use preset $PRESET; running its default"
+	fi
 	echo "== $label: $("$bin" version | head -1)"
 	"$bin" provider qualify "$PSC_1_NAME" </dev/null || { echo "FAIL: $label qualification" >&2; return 1; }
 	for entry in "${tasks[@]}"; do

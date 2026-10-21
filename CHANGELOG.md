@@ -2,7 +2,18 @@
 
 All notable changes to BOI CLI.
 
-## v1.10.0 — Composition report (unreleased)
+## v1.11.0 — Presets (unreleased)
+
+Roadmap step 4.
+
+- `boi env presets` lists ready-made environments; `boi env use <preset>` writes one as `.boi/environment.json` (an existing file is kept unless `--replace`, which backs it up first)
+- `minimal`: read-only, `workspace-read` (list, read, search); nothing is written or run
+- `coding`: `workspace-tools` and `process-tools`, both required; writes and commands need approval
+- New built-in pack `workspace-read`: the read-only part of `workspace-tools`
+- No `research` preset yet: research needs web search, which BOI does not ship. Add an MCP search server to an environment instead
+- `PRESET=<name> scripts/acceptance/benchmark.sh` runs the benchmark under a preset
+
+## v1.10.0 — Composition report
 
 Roadmap step 3.
 

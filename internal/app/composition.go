@@ -42,6 +42,22 @@ func BuiltinPacks() map[string]Pack {
 			},
 			Tools: filesystem.Tools,
 		},
+		"workspace-read": {
+			Manifest: block.PackManifest{
+				SchemaVersion: block.PackSchemaVersion, ID: "workspace-read", Kind: block.ToolPack, Version: "1.0.0",
+				Provides: []string{"workspace.list", "workspace.read", "workspace.search"},
+				MaxRisk:  string(port.RiskRead),
+			},
+			Tools: func(sandbox *workspace.Sandbox) []port.Tool {
+				var readOnly []port.Tool
+				for _, tool := range filesystem.Tools(sandbox) {
+					if tool.Spec().Risk == port.RiskRead {
+						readOnly = append(readOnly, tool)
+					}
+				}
+				return readOnly
+			},
+		},
 		"process-tools": {
 			Manifest: block.PackManifest{
 				SchemaVersion: block.PackSchemaVersion, ID: "process-tools", Kind: block.ToolPack, Version: "1.0.0",
