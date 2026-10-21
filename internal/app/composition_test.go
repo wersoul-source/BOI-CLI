@@ -56,7 +56,7 @@ func TestDefaultEnvironmentComposesTheV17ToolSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.Join(composition.ToolNames(), ",")
-	want := "workspace.list,workspace.read,workspace.search,workspace.write,process.run"
+	want := "workspace.list,workspace.read,workspace.search,workspace.edit,workspace.write,process.run"
 	if got != want {
 		t.Fatalf("default Tools = %s, want %s", got, want)
 	}
@@ -78,7 +78,7 @@ func TestRemovingAnOptionalPackKeepsTheRest(t *testing.T) {
 			t.Fatal("a pack left out of the environment must not be registered")
 		}
 	}
-	if len(composition.Tools) != 4 {
+	if len(composition.Tools) != 5 {
 		t.Fatalf("workspace Tools missing: %v", composition.ToolNames())
 	}
 }
@@ -115,7 +115,7 @@ func TestCompositionRules(t *testing.T) {
 		if last.Status != PackSkipped || !strings.Contains(last.Reason, reason) {
 			t.Errorf("%s: entry %+v, want skipped with %q", id, last, reason)
 		}
-		if len(composition.Tools) != 4 {
+		if len(composition.Tools) != 5 {
 			t.Errorf("%s: a skipped pack must not add or remove other Tools: %v", id, composition.ToolNames())
 		}
 

@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"errors"
 
+	"github.com/boi-family/boi-cli/internal/block/port"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 )
 
@@ -21,6 +23,11 @@ func (BoundedRecoverer) Recover(_ context.Context, failure Failure) Recovery {
 	case PhaseAct:
 		if failure.ToolCall != nil && failure.ToolCall.Risk == RiskRead {
 			return Recovery{Retry: true, Reason: "retry idempotent read action"}
+		}
+		// A change or command that failed before doing anything (edit text
+		// not found, command blocked) is shown to the model to correct.
+		if errors.Is(failure.Err, port.ErrNoEffect) {
+			return Recovery{Retry: true, Reason: "re-plan after a Tool call that changed nothing"}
 		}
 	case PhaseVerify:
 		return Recovery{Retry: true, Reason: "re-plan after failed verification"}

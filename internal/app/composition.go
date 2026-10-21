@@ -39,7 +39,7 @@ func BuiltinPacks() map[string]Pack {
 		"workspace-tools": {
 			Manifest: block.PackManifest{
 				SchemaVersion: block.PackSchemaVersion, ID: "workspace-tools", Kind: block.ToolPack, Version: "1.0.0",
-				Provides: []string{"workspace.list", "workspace.read", "workspace.search", "workspace.write"},
+				Provides: []string{"workspace.list", "workspace.read", "workspace.search", "workspace.edit", "workspace.write"},
 				MaxRisk:  string(port.RiskChange),
 			},
 			Tools: filesystem.Tools,

@@ -125,7 +125,7 @@ func digest(dir string, names []string) string {
 }
 
 type row struct {
-	task, result, stop, detail                      string
+	task, result, stop, detail, trace               string
 	providerCalls, toolCalls, approvals, tokens, ms int
 }
 
@@ -150,7 +150,7 @@ func main() {
 		for index := 0; index < *runs; index++ {
 			result := runTask(item, configured, *timeout)
 			rows = append(rows, result)
-			fmt.Printf("%s\t%s\tcalls=%d\ttools=%d\tapprovals=%d\ttokens=%d\t%dms\t%s\t%s\n", result.task, result.result, result.providerCalls, result.toolCalls, result.approvals, result.tokens, result.ms, result.stop, result.detail)
+			fmt.Printf("%s\t%s\tcalls=%d\ttools=%d\tapprovals=%d\ttokens=%d\t%dms\t%s\t%s\t%s\n", result.task, result.result, result.providerCalls, result.toolCalls, result.approvals, result.tokens, result.ms, result.stop, result.trace, result.detail)
 		}
 	}
 	passed, calls, tokens, ms := 0, 0, 0, 0
@@ -235,6 +235,18 @@ func runTask(item task, configured []llmfactory.ConfiguredProvider, timeout time
 		}
 		if event.Result != nil {
 			result = event.Result
+		}
+		if event.Engine != nil && event.Engine.Kind == "tool_result" && event.Engine.ToolCall != nil {
+			// The order of Tool calls, "!" after one that failed, shows how
+			// the model worked, not only whether it got there.
+			step := strings.TrimPrefix(event.Engine.ToolCall.Tool, "workspace.")
+			if event.Engine.ToolResult != nil && event.Engine.ToolResult.Status != agent.ToolSucceeded {
+				step += "!"
+			}
+			if out.trace != "" {
+				step = ">" + step
+			}
+			out.trace += step
 		}
 		if event.Err != nil && out.detail == "" {
 			out.detail = event.Err.Error()

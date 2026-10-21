@@ -58,7 +58,10 @@ type Decision struct {
 	Disabled  bool   `json:"disabled"`
 	Rejected  bool   `json:"rejected"`
 	Reason    string `json:"reason"`
-	Score     int    `json:"score"`
+	// Missing lists required Tools that are not active. A Skill stays usable
+	// without them: its guidance still applies, the model just cannot call them.
+	Missing []string `json:"missing,omitempty"`
+	Score   int      `json:"score"`
 }
 
 type Selection struct {
@@ -169,17 +172,19 @@ func Select(index Index, input SelectionInput) Selection {
 			d.Rejected, d.Reason = true, "indexed source is not installed"
 		case !input.ProviderAllows:
 			d.Rejected, d.Reason = true, "Provider profile does not allow capability kind"
-		case missingRequirement(entry.Requires, input.AvailableRequirements) != "":
+		case index.Kind == KindTool && missingRequirement(entry.Requires, input.AvailableRequirements) != "":
 			d.Rejected, d.Reason = true, "missing requirement: "+missingRequirement(entry.Requires, input.AvailableRequirements)
 		default:
-			relevance := matchScore(taskWords, entry)
-			if index.Kind == KindSkill && len(taskWords) > 0 && relevance == 0 {
-				d.Rejected, d.Reason = true, "not relevant to task"
-			} else {
-				d.Eligible = true
-				d.Score = entry.Priority*100 + relevance
-				candidates = append(candidates, candidate{entry, d})
+			// Skills are offered by summary and the model decides whether one
+			// applies; keyword overlap only orders them. Matching words cannot
+			// judge relevance (a Thai task shares none with English tags), so
+			// it must not hide a Skill.
+			if index.Kind == KindSkill {
+				d.Missing = missingRequirements(entry.Requires, input.AvailableRequirements)
 			}
+			d.Eligible = true
+			d.Score = entry.Priority*100 + matchScore(taskWords, entry)
+			candidates = append(candidates, candidate{entry, d})
 		}
 		if !d.Eligible {
 			result.Decisions = append(result.Decisions, d)
@@ -201,6 +206,9 @@ func Select(index Index, input SelectionInput) Selection {
 			d.Rejected, d.Reason = true, "Context budget exceeded"
 		} else {
 			d.Active, d.Reason = true, "selected deterministically"
+			if len(d.Missing) > 0 {
+				d.Reason = "selected; without Tools " + strings.Join(d.Missing, ", ")
+			}
 			remaining -= item.entry.ContextCost
 			result.Active = append(result.Active, item.entry.Name)
 		}
@@ -234,4 +242,14 @@ func missingRequirement(requirements []string, available map[string]bool) string
 		}
 	}
 	return ""
+}
+
+func missingRequirements(requirements []string, available map[string]bool) []string {
+	var missing []string
+	for _, requirement := range requirements {
+		if !available[requirement] {
+			missing = append(missing, requirement)
+		}
+	}
+	return missing
 }
