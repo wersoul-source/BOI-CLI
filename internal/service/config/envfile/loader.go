@@ -32,29 +32,6 @@ func Load(path string) error {
 	return scanner.Err()
 }
 
-func HasProviders(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "#") || line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "PSC_1_NAME=") || strings.HasPrefix(line, "PSC_1_API_KEY=") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // unquote removes one pair of matching surrounding quotes, as written by
 // users copying from shell snippets (KEY="value" or KEY='value').
 func unquote(value string) string {

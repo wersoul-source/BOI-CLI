@@ -30,17 +30,6 @@ func Load(embeddedJSON []byte) (*Registry, error) {
 	return &Registry{Providers: providers}, nil
 }
 
-// LoadFromPath loads the registry from a cache file, falling back to embedded.
-func LoadFromPath(cachePath string, embeddedJSON []byte) (*Registry, error) {
-	if data, err := os.ReadFile(cachePath); err == nil {
-		var providers []ProviderEntry
-		if json.Unmarshal(data, &providers) == nil && len(providers) > 0 {
-			return &Registry{Providers: providers}, nil
-		}
-	}
-	return Load(embeddedJSON)
-}
-
 // SaveTo writes the registry to a cache file.
 func (r *Registry) SaveTo(path string) error {
 	r.mu.RLock()

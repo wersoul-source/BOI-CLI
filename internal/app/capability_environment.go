@@ -18,17 +18,6 @@ type CapabilitySet struct {
 	LoadedSkills []*skill.Skill
 }
 
-func (set *CapabilitySet) SkillSummaryPrompt() string {
-	if set == nil || len(set.LoadedSkills) == 0 {
-		return ""
-	}
-	var lines []string
-	for _, item := range set.LoadedSkills {
-		lines = append(lines, "- "+item.Name+": "+item.Description)
-	}
-	return strings.Join(lines, "\n")
-}
-
 // Skill returns full instructions only for a Skill in the task's active set.
 // Skill content remains untrusted context and cannot expand Tool authority.
 func (set *CapabilitySet) Skill(name string) (*skill.Skill, error) {

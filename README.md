@@ -1,4 +1,4 @@
-# BOI Agent Suite v1.6
+# BOI Agent Suite v2.0
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
@@ -8,9 +8,10 @@ did, and leaves a manifest of the result.
 
 v1.5 rebuilt the codebase around one idea: **a fixed spine with pluggable
 Blocks**. The Agent's core stays the same, and new capabilities plug in
-without editing it. v1.6 adapts how the Agent talks to each model: native
-tool calling where the model proves it works, several calls per turn, and
-behavioral qualification.
+without editing it. Since then the Agent talks to each model natively where
+the model proves it can, reads and searches files in fewer turns, and is
+composed per workspace from Block packs (built-in Tools, MCP servers, an
+optional SubAgent) that `boi env` reports from what is really loaded.
 
 Linux is the first supported platform. Windows, macOS and Android compile but
 are not yet release targets.
@@ -25,8 +26,8 @@ are not yet release targets.
                                    │ ports (block/port, llm.Provider, ...)
       ┌──────────────┬─────────────┼──────────────┬──────────────┐
   Equipment       Service      Agent Folder     SubAgent       (yours)
-  tools, skills,  providers,   bin / output     gated,
-  memory, MCP     config       manifests        disabled
+  tools, skills,  providers,   bin / output     agent.delegate,
+  memory, MCP     config       manifests        optional
 ```
 
 - **Spine** (`internal/core`, `internal/runtime`): fixed. It defines the
@@ -57,21 +58,27 @@ Ready-made environments: `boi env presets`, then `boi env use minimal`
 approval). `boi env` shows what was composed.
 
 Built-in packs: `workspace-tools` (list, read, search, write),
-`workspace-read` (list, read, search) and `process-tools` (`process.run`). An entry with `mcp` plugs in a local MCP
-server's tools, approval-gated, without building BOI:
+`workspace-read` (list, read, search), `process-tools` (`process.run`) and
+`subagent` (`agent.delegate`: hands a sub-task to a helper limited to the
+Tools you grant; see [ADR-003](docs/architecture/ADR-003-subagent.md)).
+
+An entry with `mcp` plugs in a local MCP server's tools, approval-gated,
+without building BOI:
 
 ```json
 {"id": "github", "required": false, "mcp": {"command": "github-mcp-server", "args": ["stdio"]}}
 ```
 
-See
+MCP entries are commands that run on your machine, so a workspace's MCP
+servers start only after you review `environment.json` and run
+`boi env trust`. Editing the file withdraws the trust. See
 [ADR-002](docs/architecture/ADR-002-block-packs.md).
 
 ### Two ways to plug in
 
 | Path | When | How |
 |---|---|---|
-| Compile time | A Tool written in Go | Implement `port.Tool`, add it to `app.BuiltinTools` and to the capability index. The Broker is not edited. |
+| Compile time | A Tool written in Go | Implement `port.Tool`, add it to a pack in `app.BuiltinPacks` and to `app.DefaultCapabilityIndexes`. The Broker is not edited. |
 | Run time | Anything outside the binary | Expose it as an MCP server. `equipment/tools/mcp` adapts each MCP tool into an approval-gated Tool. |
 
 ## How a task runs
@@ -124,7 +131,7 @@ On first launch the TUI asks for your Agent's name. The Core Persona is always
 A Provider that has not passed `boi provider qualify` never enters the Agent
 Router. BOI does not fall back to simulated answers. Qualification also
 decides whether native tool calling is used (`native_tool_schema`).
-Profiles from v1.5 do not load in v1.6; qualify again after upgrading.
+Profiles from v1.5 do not load in v1.6 or later, and every profile expires after 30 days; qualify again when `boi env` reports none.
 
 ### First task
 
@@ -161,8 +168,12 @@ awaited. Exit codes: `0` completed, `1` internal, `2` invalid input,
 | `boi registry init\|list\|add` | Manage the explicit Tool and Skill index |
 | `boi doctor` | Local health checks |
 | `boi env` | Which Blocks the Agent is composed of: active, loaded or declared, and why |
+| `boi env presets\|use\|trust` | List and apply presets; trust a workspace environment's MCP servers |
 | `boi skill` / `boi memory` | Manage Skills and local memory |
 | `boi config` / `boi model` | Inspect or change configuration |
+| `boi persona` / `boi weight` | Show the Core Persona / memory weights |
+| `boi run` | Run one approved shell command in the workspace |
+| `boi uninstall` | Remove BOI from this machine |
 | `boi version` / `boi upgrade` | Show version / checksum-verified upgrade |
 
 ### TUI keys
@@ -238,7 +249,8 @@ BASE_REF=<commit-or-tag> bash scripts/acceptance/benchmark.sh
   not OS or container isolation; run unfamiliar projects in an isolated VM.
 - The command deny-list is a best-effort guard, not isolation. The real
   controls are the Broker approval step and the path boundary.
-- SubAgent execution is disabled until its evaluation gate is accepted.
+- The SubAgent is optional and not in any preset; its benchmark gate is still
+  open.
 - MCP servers run as local processes (stdio only) and start with the
   environment minus `PSC_*` variables; they are not sandboxed beyond that.
 - BOI needs the network to reach Providers; it is not offline-first.

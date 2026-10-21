@@ -13,6 +13,7 @@ import (
 
 	"github.com/boi-family/boi-cli/internal/agentfolder"
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
@@ -77,8 +78,12 @@ func newService(t *testing.T, provider llm.Provider) (*agent.Service, string) {
 		t.Fatal(err)
 	}
 	service := agent.NewService(persona.CorePersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	composition, err := app.Compose(app.DefaultEnvironment(), app.BuiltinPacks(), sandbox, "", coreblock.AgentEnvironment{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	var names []string
-	for _, tool := range app.BuiltinTools(sandbox) {
+	for _, tool := range composition.Tools {
 		if err := service.RegisterTool(tool); err != nil {
 			t.Fatal(err)
 		}

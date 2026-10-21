@@ -94,15 +94,6 @@ func (s *Service) SetProviderProfileReference(provider, model, reference string)
 	s.mu.Unlock()
 }
 
-func (s *Service) SetPersona(activePersona *persona.Persona) {
-	if activePersona == nil {
-		return
-	}
-	s.mu.Lock()
-	s.persona = activePersona
-	s.mu.Unlock()
-}
-
 func (s *Service) SetLimits(limits EngineLimits) {
 	s.mu.Lock()
 	s.limits = normalizeEngineLimits(limits)
@@ -138,12 +129,6 @@ func containsName(names []string, want string) bool {
 		}
 	}
 	return false
-}
-
-func (s *Service) SetSkillSummaries(summary string) {
-	s.mu.Lock()
-	s.skillSummaries = strings.TrimSpace(summary)
-	s.mu.Unlock()
 }
 
 func (s *Service) SetSkills(skills []SkillDoc) {
@@ -230,6 +215,15 @@ func (s *Service) ResetConversation() {
 }
 
 func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, onEngine, idempotencyKey, remember, 0)
+}
+
+// runScoped runs a delegated child task at the given depth.
+func (s *Service) runScoped(ctx context.Context, query string, authorizer Authorizer, depth int) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, nil, "", false, depth)
+}
+
+func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool, depth int) (*AgentResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
@@ -357,6 +351,13 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 			// A model may still answer with a text envelope; it is accepted
 			// as a fallback in both modes.
 			decision, err = ParseDecision(response.Content)
+			if err == nil && decision.ToolCall != nil {
+				// Never trust a model-chosen call ID: models copy the prompt's
+				// example, and a repeated ID would make the Broker replay an
+				// earlier result instead of running the call, or hand back
+				// another call's stored output from the context store.
+				decision.ToolCall.ID = fmt.Sprintf("call_%s_%d_0", runNonce, input.Step)
+			}
 		}
 		if err != nil {
 			// Keep usage and identity so a rejected reply is still counted.
@@ -401,9 +402,24 @@ func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, 
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID
 	}
-	result, err := engine.Run(withContextStore(ctx, store), query)
+	runCtx := withContextStore(ctx, store)
+	budget := budgetFrom(runCtx)
+	ownBudget := budget == nil
+	if ownBudget {
+		budget = &sharedBudget{maxTokens: limits.MaxTokens, maxToolCalls: limits.MaxToolCalls}
+		runCtx = context.WithValue(runCtx, budgetKey{}, budget)
+	}
+	runCtx = context.WithValue(runCtx, runScopeKey{}, runScope{authorizer: authorizer, depth: depth})
+	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err
+	}
+	if ownBudget {
+		// Report what the whole task used, delegated children included.
+		total := budget.total()
+		result.Usage.InputTokens, result.Usage.OutputTokens = total.InputTokens, total.OutputTokens
+		result.Usage.ProviderCalls, result.Usage.ToolCalls = total.ProviderCalls, total.ToolCalls
+		result.Tokens = total.TotalTokens()
 	}
 	result.ProviderProfileRef = providerProfiles[providerProfileKey(result.Provider, result.Model)]
 	if idempotencyKey != "" {

@@ -3,6 +3,7 @@ package memory
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -74,14 +75,14 @@ func (m *RepoMap) Summary() string {
 	sb.WriteString(filepath.Base(m.Root))
 	sb.WriteString("\n")
 	sb.WriteString("Files: ")
-	sb.WriteString(itoa(m.FileCount))
+	sb.WriteString(strconv.Itoa(m.FileCount))
 
 	if len(extCount) > 0 {
 		sb.WriteString(" | ")
 		for ext, count := range extCount {
 			sb.WriteString(ext)
 			sb.WriteString(":")
-			sb.WriteString(itoa(count))
+			sb.WriteString(strconv.Itoa(count))
 			sb.WriteString(" ")
 		}
 	}

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,22 +13,6 @@ import (
 // Invoker calls one tool on one MCP server. *Client satisfies it.
 type Invoker interface {
 	CallTool(ctx context.Context, server, tool string, arguments map[string]any) (string, error)
-}
-
-// Tools adapts discovered MCP tools into Runtime Tools named
-// "mcp.<server>.<tool>". Every adapted Tool is external and approval-gated.
-func Tools(server string, names []string, invoker Invoker) ([]port.Tool, error) {
-	if strings.TrimSpace(server) == "" || invoker == nil {
-		return nil, fmt.Errorf("MCP server and invoker are required")
-	}
-	tools := make([]port.Tool, 0, len(names))
-	for _, name := range names {
-		if strings.TrimSpace(name) == "" {
-			return nil, fmt.Errorf("MCP tool name is empty")
-		}
-		tools = append(tools, externalTool{server: server, tool: name, invoker: invoker})
-	}
-	return tools, nil
 }
 
 // ToolsFromDefinitions adapts discovered MCP tools and keeps each one's
@@ -61,9 +46,18 @@ func (t externalTool) Spec() port.ToolSpec {
 	return port.ToolSpec{Name: name, Usage: name + "(server-defined arguments)", Description: description, Parameters: t.schema, Risk: port.RiskExternal, Approval: port.ApprovalConfirm, Timeout: 30 * time.Second}
 }
 
-func (t externalTool) Describe(map[string]any) port.ToolPreview {
-	return port.ToolPreview{Target: t.server, Preview: "Call MCP tool " + t.tool + " on server " + t.server}
+// Describe shows the exact arguments, because the approval prompt is the
+// user's only view of what leaves this machine.
+func (t externalTool) Describe(arguments map[string]any) port.ToolPreview {
+	data, _ := json.Marshal(arguments)
+	text := string(data)
+	if len(text) > maxPreviewArguments {
+		text = text[:maxPreviewArguments] + "...(truncated)"
+	}
+	return port.ToolPreview{Target: t.server, Preview: "Call MCP tool " + t.tool + " on server " + t.server + " with " + text}
 }
+
+const maxPreviewArguments = 2000
 
 func (t externalTool) Execute(ctx context.Context, arguments map[string]any) (port.ToolOutput, error) {
 	output, err := t.invoker.CallTool(ctx, t.server, t.tool, arguments)

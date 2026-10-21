@@ -234,3 +234,14 @@ func TestOpenAIOmitsToolsWhenNoneGiven(t *testing.T) {
 		t.Fatal("a request without tools must not send an empty tools field")
 	}
 }
+
+func TestOpenAISendsTemperatureZero(t *testing.T) {
+	var sent map[string]any
+	srv := serve(t, 200, `{"choices":[{"message":{"content":"hi"}}]}`, func(r *http.Request) { _ = json.NewDecoder(r.Body).Decode(&sent) })
+	if _, err := NewOpenAIProvider("openai", "k", srv.URL, "m").Complete(context.Background(), llm.CompletionRequest{Messages: req.Messages, Temperature: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if value, present := sent["temperature"]; !present || value != 0.0 {
+		t.Fatalf("temperature 0 must be sent, got %v (present=%v)", value, present)
+	}
+}

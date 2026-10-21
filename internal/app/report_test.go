@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,5 +166,33 @@ func TestReportShowsEveryProblemInsteadOfStopping(t *testing.T) {
 	}
 	if report, err = runtime.Report(nil); err != nil || report.Ready || report.Problem == "" {
 		t.Fatalf("an unreadable environment must be reported, not crash: %+v %v", report, err)
+	}
+}
+
+func TestSubAgentPackIsOptionalAndReported(t *testing.T) {
+	environment := environmentOf(
+		block.EnvironmentBlock{ID: "workspace-tools", Required: true},
+		block.EnvironmentBlock{ID: "subagent"},
+	)
+	runtime := reportRuntime(t, &environment)
+	report, err := runtime.Report(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sub := blockByID(t, report, "subagent"); sub.State != StateDeclared || !strings.Contains(sub.Reason, "tool_calling") {
+		t.Fatalf("without Tool calling the SubAgent cannot load: %+v", sub)
+	}
+
+	runtime = reportRuntime(t, &environment)
+	report, err = runtime.Report(qualifiedFake(t, runtime.BoiDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub := blockByID(t, report, "subagent")
+	if sub.State != StateActive || len(sub.Tools) != 1 || sub.Tools[0].Name != "agent.delegate" || !sub.Tools[0].Offered {
+		t.Fatalf("with a qualified Provider the SubAgent is offered: %+v", sub)
+	}
+	if blockByID(t, report, "workspace-tools").State != StateActive {
+		t.Fatal("adding the SubAgent must not change the other Blocks")
 	}
 }

@@ -8,11 +8,6 @@ import (
 //go:embed providers.json
 var embeddedProviders []byte
 
-// Embedded returns the bundled provider registry data.
-func Embedded() []byte {
-	return embeddedProviders
-}
-
 // LoadEmbedded loads the embedded registry (always available).
 func LoadEmbedded() *Registry {
 	r, err := Load(embeddedProviders)

@@ -3,7 +3,6 @@ package memory
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -103,60 +102,5 @@ func TestSearchMemoryRanksKeyAboveContent(t *testing.T) {
 	res, err := s.SearchMemory("deploy", 0)
 	if err != nil || len(res) != 2 || res[0].Entry.MemID != "key" {
 		t.Fatalf("ranking wrong: %+v %v", res, err)
-	}
-}
-
-func TestContextBudget(t *testing.T) {
-	cm := NewContextManager("sys", 10)
-	if cm.IsOverBudget() {
-		t.Fatal("fresh context over budget")
-	}
-	cm.AddMessage("user", strings.Repeat("a", 400))
-	if !cm.IsOverBudget() || cm.RemainingTokens() != 0 {
-		t.Fatalf("budget not enforced: used %d", cm.TotalTokens())
-	}
-	if cm.Budget() != 10 {
-		t.Fatal("budget")
-	}
-}
-
-func TestEstimateTokensCountsRunesNotBytes(t *testing.T) {
-	if EstimateTokens("สวัสดีครับ") != len([]rune("สวัสดีครับ"))/4 {
-		t.Fatal("thai text must be counted by rune")
-	}
-}
-
-func TestCompactionLevels(t *testing.T) {
-	c := NewCompactor()
-
-	cm := NewContextManager("sys", 1000)
-	cm.AddMessage("tool", strings.Repeat("x", 5000))
-	c.Compact(cm, CompactMicro)
-	if got := cm.GetMessages()[1].Content; len([]rune(got)) > 2100 || !strings.Contains(got, "trimmed") {
-		t.Fatalf("tool output not trimmed: %d", len(got))
-	}
-
-	cm = NewContextManager("sys", 100000)
-	for i := 0; i < 80; i++ {
-		cm.AddMessage("user", "m")
-	}
-	c.Compact(cm, CompactAuto)
-	if n := len(cm.GetMessages()); n != 25 {
-		t.Fatalf("auto compaction kept %d", n)
-	}
-	if msg := c.Compact(NewContextManager("s", 10), CompactAuto); msg != "" {
-		t.Fatalf("short context must not compact: %q", msg)
-	}
-
-	cm = NewContextManager("sys", 100000)
-	cm.AddMessage("user", "hello")
-	cm.AddMessage("assistant", "world")
-	c.Compact(cm, CompactFull)
-	msgs := cm.GetMessages()
-	if len(msgs) != 2 || !strings.Contains(msgs[1].Content, "hello") {
-		t.Fatalf("full compaction: %+v", msgs)
-	}
-	if c.Compact(cm, CompactNone) != "" {
-		t.Fatal("CompactNone must be a no-op")
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
@@ -56,6 +58,9 @@ func (r *Reader) Read(path string) (*ReadResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if IsSecretFile(resolved) {
+		return nil, fmt.Errorf("%s holds credentials and is never read by the Agent", filepath.Base(resolved))
+	}
 	info, err := os.Stat(resolved)
 	if err != nil {
 		return nil, fmt.Errorf("stat workspace file: %w", err)
@@ -93,6 +98,22 @@ func (r *Reader) Read(path string) (*ReadResult, error) {
 		Size:      info.Size(),
 		Truncated: truncated,
 	}, nil
+}
+
+// IsSecretFile reports files that hold credentials, such as the .env that
+// stores Provider API keys. A prompt-injected task must not be able to read
+// them and pass them on. Templates such as .env.example are allowed.
+func IsSecretFile(path string) bool {
+	name := strings.ToLower(filepath.Base(path))
+	if name != ".env" && !strings.HasPrefix(name, ".env.") {
+		return false
+	}
+	for _, suffix := range []string{".example", ".sample", ".template"} {
+		if strings.HasSuffix(name, suffix) {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Reader) List(path string) (*ListResult, error) {

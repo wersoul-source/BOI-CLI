@@ -27,7 +27,7 @@ func TestLooseSkillFileIsNotExposedUntilIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(set.Skills.Active) != 0 || set.SkillSummaryPrompt() != "" {
+	if len(set.Skills.Active) != 0 || len(set.SkillDocs()) != 0 {
 		t.Fatal("unindexed Skill was exposed")
 	}
 	entry := capability.Entry{Name: "loose", Source: "loose.skill.md", Summary: "Loose skill", Enabled: true, Tags: []string{"loose"}, ContextCost: 100}

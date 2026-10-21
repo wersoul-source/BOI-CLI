@@ -157,6 +157,15 @@ type Tool interface {
 	Execute(ctx context.Context, arguments map[string]any) (ToolOutput, error)
 }
 
+// ClassifiedTool is optionally implemented by a Tool whose risk depends on
+// its arguments, such as a delegation that grants a subset of Tools. The
+// Broker uses the classification only when it is no riskier than the
+// Tool's spec, which stays the ceiling.
+type ClassifiedTool interface {
+	Tool
+	Classify(arguments map[string]any) (Risk, Approval, error)
+}
+
 // StringArgument returns a non-empty string argument or an error.
 func StringArgument(arguments map[string]any, name string) (string, error) {
 	value, ok := arguments[name].(string)

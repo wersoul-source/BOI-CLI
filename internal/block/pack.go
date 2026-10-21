@@ -78,6 +78,9 @@ type Environment struct {
 	SchemaVersion int                `json:"schema_version"`
 	Name          string             `json:"name"`
 	Blocks        []EnvironmentBlock `json:"blocks"`
+	// Trusted is set by the host, never read from the file: only a trusted
+	// environment may start MCP server processes.
+	Trusted bool `json:"-"`
 }
 
 // EnvironmentBlock selects one pack. A missing required pack stops start-up;

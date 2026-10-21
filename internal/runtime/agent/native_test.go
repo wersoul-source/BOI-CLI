@@ -284,3 +284,38 @@ func TestInvalidNativeArgumentsAreRejectedBeforeAuthorization(t *testing.T) {
 		}
 	}
 }
+
+func TestModelChosenCallIDsAreReplaced(t *testing.T) {
+	envelope := func(path string) llm.CompletionResponse {
+		return llm.CompletionResponse{Content: `<boi-action>{"id":"unique-id","tool":"workspace.read","purpose":"read","arguments":{"path":"` + path + `"}}</boi-action>`}
+	}
+	provider := &scriptedNativeProvider{responses: []llm.CompletionResponse{envelope("a.txt"), envelope("b.txt"), {Content: "both read"}}}
+	service, root := nativeService(t, provider)
+	for name, body := range map[string]string{"a.txt": "alpha", "b.txt": "bravo"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := service.Run(context.Background(), "read both")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, step := range result.Trace {
+		if step.ToolCall == nil {
+			continue
+		}
+		if step.ToolCall.ID == "unique-id" || seen[step.ToolCall.ID] {
+			t.Fatalf("a repeated model ID reached the Broker: %q", step.ToolCall.ID)
+		}
+		seen[step.ToolCall.ID] = true
+	}
+	last := provider.requests[2].Messages
+	transcript := ""
+	for _, message := range last {
+		transcript += message.Content
+	}
+	if !strings.Contains(transcript, "alpha") || !strings.Contains(transcript, "bravo") {
+		t.Fatal("each call must keep its own observation")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ErrorClass string
@@ -54,7 +55,22 @@ func NewHTTPError(provider string, status int, body string, header http.Header) 
 	if seconds, err := strconv.Atoi(header.Get("Retry-After")); err == nil && seconds >= 0 {
 		retryAfter = time.Duration(seconds) * time.Second
 	}
-	return &ProviderError{Provider: provider, StatusCode: status, Class: classForStatus(status), RetryAfter: retryAfter, Message: body}
+	return &ProviderError{Provider: provider, StatusCode: status, Class: classForStatus(status), RetryAfter: retryAfter, Message: clipBody(body)}
+}
+
+// maxErrorBody bounds the Provider error text kept in memory, shown to the
+// model on retry and written to task records; the start says what failed.
+const maxErrorBody = 500
+
+func clipBody(body string) string {
+	if len(body) <= maxErrorBody {
+		return body
+	}
+	cut := maxErrorBody
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	return body[:cut] + "...(truncated)"
 }
 
 func classForStatus(status int) ErrorClass {

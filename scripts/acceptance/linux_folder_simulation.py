@@ -30,13 +30,13 @@ def provider_reply(value: str) -> str:
             return response
 
     if value.startswith("HOST TOOL OBSERVATION"):
-        if '"CallID":"escape-1"' in value and '"Status":"failed"' in value:
+        if '"path":"../outside-simulation.txt"' in value and '"Status":"failed"' in value:
             return "TRAVERSAL_BLOCKED"
-        if '"CallID":"symlink-1"' in value and '"Status":"failed"' in value:
+        if '"path":"dataset/outside-link.txt"' in value and '"Status":"failed"' in value:
             return "SYMLINK_BLOCKED"
-        if '"CallID":"binary-1"' in value and '"Status":"failed"' in value:
+        if '"path":"dataset/binary.bin"' in value and '"Status":"failed"' in value:
             return "BINARY_BLOCKED"
-        if '"CallID":"missing-1"' in value and '"Status":"failed"' in value:
+        if '"path":"dataset/missing.txt"' in value and '"Status":"failed"' in value:
             return "MISSING_HANDLED"
         if '\\"Truncated\\":true' in value:
             return "TRUNCATED_OK"

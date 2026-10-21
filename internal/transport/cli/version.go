@@ -2,13 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	Version   = "1.11.0"
-	BuildGo   = "1.24"
+	Version   = "2.0.0"
+	BuildGo   = runtime.Version()
 	BuildArch = "Chimera"
 )
 

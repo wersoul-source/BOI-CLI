@@ -25,6 +25,8 @@ type ServerConfig struct {
 }
 
 type Client struct {
+	// Version is the BOI version announced to servers; empty means "dev".
+	Version          string
 	mu               sync.RWMutex
 	servers          map[string]*ServerConfig
 	maxResponseBytes int64
@@ -67,9 +69,6 @@ func (c *Client) Get(name string) (*ServerConfig, error) {
 	return &copy, nil
 }
 
-func (c *Client) DiscoverTools(server string) ([]ToolDef, error) {
-	return c.DiscoverToolsContext(context.Background(), server)
-}
 func (c *Client) DiscoverToolsContext(ctx context.Context, server string) ([]ToolDef, error) {
 	var response struct {
 		Result struct {
@@ -130,7 +129,7 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 	encoder := json.NewEncoder(stdin)
 	limited := &io.LimitedReader{R: stdout, N: c.maxResponseBytes + 1}
 	decoder := json.NewDecoder(limited)
-	initialize := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "boi-cli", "version": "1.11.0"}}}
+	initialize := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "boi-cli", "version": c.clientVersion()}}}
 	if err := encoder.Encode(initialize); err != nil {
 		return fmt.Errorf("send MCP initialize: %w", err)
 	}
@@ -175,6 +174,13 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 		return fmt.Errorf("parse MCP %s response: %w", method, err)
 	}
 	return nil
+}
+
+func (c *Client) clientVersion() string {
+	if c.Version == "" {
+		return "dev"
+	}
+	return c.Version
 }
 
 // serverEnvironment is the environment an MCP server starts with: the

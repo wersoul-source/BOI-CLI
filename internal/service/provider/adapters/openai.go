@@ -68,12 +68,14 @@ type openAITool struct {
 }
 
 type openAIRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Tools       []openAITool    `json:"tools,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-	Stream      bool            `json:"stream"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	Tools     []openAITool    `json:"tools,omitempty"`
+	MaxTokens int             `json:"max_tokens,omitempty"`
+	// Temperature is a pointer so 0 (deterministic probes) is sent, not
+	// dropped in favor of the provider's default.
+	Temperature *float64 `json:"temperature,omitempty"`
+	Stream      bool     `json:"stream"`
 }
 
 type openAIResponse struct {
@@ -96,7 +98,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		Messages:    toOpenAIMessages(req.Messages),
 		Tools:       toOpenAITools(req.Tools),
 		MaxTokens:   req.MaxTokens,
-		Temperature: req.Temperature,
+		Temperature: &req.Temperature,
 		Stream:      false,
 	}
 

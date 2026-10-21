@@ -295,11 +295,11 @@ func simulatedProviderReply(input string) string {
 	}
 	if strings.HasPrefix(input, "HOST TOOL OBSERVATION") {
 		switch {
-		case strings.Contains(input, `"CallID":"escape-1"`) && strings.Contains(input, `"Status":"failed"`):
+		case strings.Contains(input, `"path":"../outside-simulation.txt"`) && strings.Contains(input, `"Status":"failed"`):
 			return "TRAVERSAL_BLOCKED"
-		case strings.Contains(input, `"CallID":"binary-1"`) && strings.Contains(input, `"Status":"failed"`):
+		case strings.Contains(input, `"path":"dataset/binary.bin"`) && strings.Contains(input, `"Status":"failed"`):
 			return "BINARY_BLOCKED"
-		case strings.Contains(input, `"CallID":"missing-1"`) && strings.Contains(input, `"Status":"failed"`):
+		case strings.Contains(input, `"path":"dataset/missing.txt"`) && strings.Contains(input, `"Status":"failed"`):
 			return "MISSING_HANDLED"
 		case strings.Contains(input, `\"Truncated\":true`):
 			return "TRUNCATED_OK"

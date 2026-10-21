@@ -3,6 +3,7 @@ package port
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 )
 
@@ -165,7 +166,7 @@ func requiredNames(value any) []string {
 
 func containsValue(values []any, want any) bool {
 	for _, value := range values {
-		if value == want {
+		if reflect.DeepEqual(value, want) {
 			return true
 		}
 	}

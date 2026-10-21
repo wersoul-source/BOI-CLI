@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,5 +92,22 @@ func TestMCPHelperProcess(t *testing.T) {
 			_ = encoder.Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": map[string]any{"content": []map[string]any{content}}})
 			return
 		}
+	}
+}
+
+type nopInvoker struct{}
+
+func (nopInvoker) CallTool(context.Context, string, string, map[string]any) (string, error) {
+	return "", nil
+}
+
+func TestApprovalPreviewShowsTheArguments(t *testing.T) {
+	tools, err := ToolsFromDefinitions("hub", []ToolDef{{Name: "post"}}, nopInvoker{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := tools[0].Describe(map[string]any{"body": "PSC_1_API_KEY=sk-123"})
+	if !strings.Contains(preview.Preview, "sk-123") {
+		t.Fatalf("the user must see what leaves the machine: %s", preview.Preview)
 	}
 }

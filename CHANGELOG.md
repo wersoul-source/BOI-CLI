@@ -2,7 +2,37 @@
 
 All notable changes to BOI CLI.
 
-## v1.11.0 — Presets (unreleased)
+## v2.0.0 — Single SubAgent (unreleased)
+
+Roadmap step 5 (ADR-003). Optional: no preset includes it.
+
+- New pack `subagent` adds `agent.delegate(task, tools)`: the parent hands a self-contained sub-task to a child Agent that may use only the listed Tools
+- The child never has more authority than the parent: only Tools the parent is offered, no further delegation, the parent's approval path (writes still ask the user; denied in `boi ask`), the parent's qualified Providers
+- A delegation is classified from the Tools it grants: automatic when all are automatic reads, otherwise it needs approval
+- Parent and child share one token and Tool-call budget; the engine checks it before every provider call
+- The child sees only its task (no conversation, memory or Skills); its answer returns as an untrusted observation, and its changed paths go into the parent's manifest
+- Requires a Provider qualified for Tool calling; `boi env` reports it like any Block
+- Benchmark of delegated tasks (ADR-003 gate 6) is deferred
+
+### Security and correctness (final audit)
+- **MCP servers in a workspace `environment.json` no longer start until the user runs `boi env trust`.** Before, opening a cloned repository with `boi` ran any command its environment file named. Trust is stored per user, outside the repository, for the exact file content; any edit withdraws it
+- The Agent never reads `.env` or `.env.*` files (templates such as `.env.example` excepted), and `workspace.search` skips them, so a prompt-injected task cannot pick up Provider keys
+- MCP approval prompts show the exact arguments that will be sent
+- Call IDs written by the model in text envelopes are replaced with host IDs; a copied example ID made approved commands replay an earlier result and could make `context.expand` return another call's output
+- `boi` starts even when a required Block needs a qualified Provider that is not set up yet; the reason is shown instead
+- `workspace.search` stops at its timeout and caps the entries it visits
+- Granting `context.expand` to a SubAgent no longer fails; enum checks on array values no longer panic; temperature 0 is sent to OpenAI-compatible Providers; `{"path":"","paths":[...]}` reads every listed file; Provider error bodies are cut to 500 bytes
+- MCP servers are told the real BOI version; `boi version` shows the real Go version
+
+### Cleanup
+- Removed about 1,200 lines of code nothing called (old compaction and context managers, Skill and Persona registries, streaming helper, unused TUI renderers and Thai string helpers)
+- README, architecture docs and the winget manifest updated to v2.0; a stray worksheet file removed
+
+```json
+{"id": "subagent", "required": false}
+```
+
+## v1.11.0 — Presets
 
 Roadmap step 4.
 

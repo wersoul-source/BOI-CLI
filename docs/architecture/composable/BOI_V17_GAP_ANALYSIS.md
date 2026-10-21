@@ -1,5 +1,8 @@
 # BOI v1.7 Gap Analysis
 
+> Historical: the state at v1.7. MCP, the composition report, presets and the
+> SubAgent have since shipped (v1.8–v2.0); see `COMPOSITION_ROADMAP.md`.
+
 Baseline: branch `agent-suite-v1.7` (commit `9f571d7`, on top of master `497b229`).
 Status keys: **Implemented** (code + test), **Partial** (some code, not on the
 main path or not general), **Proposed** (no code), **Blocked** (intentionally off).

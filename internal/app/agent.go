@@ -3,30 +3,16 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 
-	"github.com/boi-family/boi-cli/internal/block/port"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/memory"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
-	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
+	"github.com/boi-family/boi-cli/internal/subagent"
 )
-
-// BuiltinTools are the Tools of every built-in pack, as composed by the
-// default environment. Adding a Tool means adding it to a pack in
-// BuiltinPacks and to DefaultCapabilityIndexes; the Runtime is not edited.
-func BuiltinTools(sandbox *workspace.Sandbox) []port.Tool {
-	if sandbox == nil {
-		return nil
-	}
-	composition, err := Compose(DefaultEnvironment(), BuiltinPacks(), sandbox, "", coreblock.AgentEnvironment{})
-	if err != nil {
-		return nil
-	}
-	return composition.Tools
-}
 
 // Agent is one composed BOI Agent: the fixed Runtime Service plus the Blocks
 // plugged into it for this workspace.
@@ -54,7 +40,9 @@ func (r *Runtime) BuildAgent(configured []llmfactory.ConfiguredProvider) (*Agent
 	if err != nil {
 		return nil, err
 	}
-	composition, err := Compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment)
+	// Without a qualified Provider no task can run, and the TUI must still
+	// start to help the user set one up: report problems instead of failing.
+	composition, err := compose(selected, BuiltinPacks(), r.Sandbox, r.Version, environment, len(qualified) > 0)
 	if err != nil {
 		return nil, fmt.Errorf("compose Agent: %w", err)
 	}
@@ -82,6 +70,11 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)
 	tools := composition.Tools
+	for _, tool := range tools {
+		if delegate, ok := tool.(interface{ Bind(subagent.Delegator) }); ok {
+			delegate.Bind(service)
+		}
+	}
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {
 		if err := service.RegisterTool(tool); err != nil {
@@ -107,11 +100,18 @@ func (a *Agent) PrepareTask(task string) (*CapabilitySet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// MCP Tools are chosen by the environment, not the Tool index, so every
-	// one an active MCP Block plugged in joins the working set while there is
-	// room under the active-Tool limit.
+	// Tools of Blocks the Tool index does not list (MCP servers, the
+	// SubAgent) are chosen by the environment, so each joins the working set
+	// while there is room under the active-Tool limit.
 	if a.Composition != nil && a.Environment.ToolCalling {
-		for _, name := range a.Composition.MCPTools() {
+		indexed := map[string]bool{}
+		for _, decision := range capabilities.Tools.Decisions {
+			indexed[decision.Name] = true
+		}
+		for _, name := range a.Composition.ToolNames() {
+			if indexed[name] || slices.Contains(capabilities.Tools.Active, name) {
+				continue
+			}
 			if len(capabilities.Tools.Active) >= agent.MaxActiveTools-1 {
 				break
 			}
