@@ -248,6 +248,13 @@ func runTask(item task, configured []llmfactory.ConfiguredProvider, timeout time
 			}
 			out.trace += step
 		}
+		if event.Engine != nil && event.Engine.Kind == "verification" && event.Engine.Verification != nil && !event.Engine.Verification.Passed {
+			// The host sent an answer back (no Tool was used).
+			if out.trace != "" {
+				out.trace += ">"
+			}
+			out.trace += "answer?"
+		}
 		if event.Err != nil && out.detail == "" {
 			out.detail = event.Err.Error()
 		}

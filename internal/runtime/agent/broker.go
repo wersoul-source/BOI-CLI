@@ -318,6 +318,17 @@ func (b *Broker) Act(ctx context.Context, call ToolCall, authorization Authoriza
 	return result, nil
 }
 
+// CanChange reports whether an offered Tool can change files, run commands
+// or reach outside the workspace.
+func (b *Broker) CanChange() bool {
+	for _, name := range b.CapabilityNames() {
+		if tool, ok := b.Tool(name); ok && tool.Spec().Risk != port.RiskRead {
+			return true
+		}
+	}
+	return false
+}
+
 // Tool returns a registered Tool by name.
 func (b *Broker) Tool(name string) (port.Tool, bool) {
 	b.registryMu.RLock()

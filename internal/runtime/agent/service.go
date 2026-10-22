@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -149,6 +150,20 @@ func (s *Service) SetSkills(skills []SkillDoc) {
 // RegisterTool adds a Tool to the library. It stays inactive until a task's
 // registry selection activates it.
 func (s *Service) RegisterTool(tool port.Tool) error { return s.broker.Register(tool) }
+
+// workspaceFileExists reports whether path names an existing regular file
+// inside the workspace.
+func (s *Service) workspaceFileExists(path string) bool {
+	if s.sandbox == nil {
+		return false
+	}
+	resolved, err := s.sandbox.ResolveExisting(path)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(resolved)
+	return err == nil && info.Mode().IsRegular()
+}
 
 // RegisteredTools lists every Tool in the library.
 func (s *Service) RegisteredTools() []string { return s.broker.RegisteredNames() }
@@ -303,7 +318,8 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	}
 	runNonce := fmt.Sprintf("%x", time.Now().UnixNano())
 	store := newContextStore()
-	if _, interactive := authorizer.(*InteractiveAuthorizer); !interactive {
+	_, interactive := authorizer.(*InteractiveAuthorizer)
+	if !interactive {
 		systemPrompt += "\n\nThis run is non-interactive: any capability that needs approval will be denied and ends the task. Use read-only capabilities."
 	}
 	decider := decisionFunc(func(decideCtx context.Context, input DecisionInput) (Decision, error) {
@@ -398,7 +414,9 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			onEngine(event)
 		}
 	}
-	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader}
+	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Ungrounded: func(task, response string) bool {
+		return interactive && s.broker.CanChange() && namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists)
+	}}
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID
 	}

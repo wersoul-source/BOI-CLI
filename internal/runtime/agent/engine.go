@@ -208,6 +208,19 @@ type Engine struct {
 	Plan        *TaskPlan
 	SkillLoader SkillLoader
 	TaskID      string
+	// Ungrounded reports whether an answer given without any Tool call is
+	// suspect: the model could act and the task or the answer names a
+	// workspace file it never touched. Such an answer is challenged once.
+	Ungrounded func(task, response string) bool
+}
+
+const (
+	noToolReason = "you answered without using any Tool, so nothing was changed or run. If the task needs a file changed or a command run, call the Tool now. If it only needs an answer, say so and answer again."
+	noToolNotice = "No Tool ran in this task: no file was changed and no command was run."
+)
+
+func (e *Engine) ungrounded(task, response string) bool {
+	return e.Ungrounded != nil && e.Ungrounded(task, response)
 }
 
 func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
@@ -257,6 +270,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	toolCalls := 0
 	skillCalls := 0
 	recoveries := 0
+	challenged := false
 	provider, model := "", ""
 
 	for step := 1; step <= limits.MaxSteps; step++ {
@@ -338,6 +352,18 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			if err := e.transition(state, PhaseVerify, step); err != nil {
 				return e.invalidStateResult(state, started, err), nil
 			}
+			// A model that could act, and answers about a workspace file with
+			// no Tool call, may be claiming work it never did. The host cannot
+			// read the claim in any language, so it asks once and the model
+			// decides.
+			if toolCalls == 0 && !challenged && e.ungrounded(task, decision.Response) {
+				challenged = true
+				e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &Verification{Passed: false, Reason: noToolReason}})
+				if e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: errors.New(noToolReason), Attempt: recoveries + 1}, &recoveries, limits, step) {
+					lastError = noToolReason
+					continue
+				}
+			}
 			verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, Response: decision.Response})
 			e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &verification})
 			if verifyErr != nil || !verification.Passed {
@@ -356,6 +382,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			setPlanPhase(plan, PhaseStopped, PlanCompleted)
 			result := e.stop(state, started, usage, provider, model, StopCompleted, "")
 			result.Response = decision.Response
+			if toolCalls == 0 && e.ungrounded(task, decision.Response) {
+				result.Notice = noToolNotice
+			}
 			return result, nil
 		}
 

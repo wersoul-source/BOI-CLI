@@ -242,3 +242,71 @@ func TestEngineVerificationFailureStops(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 }
+
+func ungrounded(suspect bool) func(string, string) bool {
+	return func(string, string) bool { return suspect }
+}
+
+func TestEngineChallengesAnAnswerWithoutAnyToolOnce(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionRespond, Response: "I fixed it"},
+		{Kind: DecisionRespond, Response: "I fixed it"},
+	}}
+	engine := &Engine{Decider: decider, Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(true)}
+	result, err := engine.Run(context.Background(), "fix the bug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decider.calls != 2 || decider.inputs[1].LastError != noToolReason {
+		t.Fatalf("the model was not asked again: calls=%d inputs=%+v", decider.calls, decider.inputs)
+	}
+	if result.StopReason != StopCompleted || result.Response != "I fixed it" || result.Notice != noToolNotice {
+		t.Fatalf("a repeated answer must complete with the notice: %#v", result)
+	}
+}
+
+func TestEngineAcceptsAToolCallAfterTheChallenge(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionRespond, Response: "done"},
+		{Kind: DecisionUseTool, ToolCall: readCall()},
+		{Kind: DecisionRespond, Response: "fixed"},
+	}}
+	engine := &Engine{Decider: decider, Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(true),
+		Actor: actorFunc(func(_ context.Context, call ToolCall, _ Authorization) (ToolResult, error) {
+			return successfulToolResult(call.ID), nil
+		})}
+	result, err := engine.Run(context.Background(), "fix the bug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.StopReason != StopCompleted || result.Response != "fixed" || result.Notice != "" || result.Usage.ToolCalls != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestEngineLeavesAnswersAloneWhenNothingIsSuspect(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{{Kind: DecisionRespond, Response: "READY"}}}
+	engine := &Engine{Decider: decider, Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(false)}
+	result, err := engine.Run(context.Background(), "say ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decider.calls != 1 || result.Notice != "" || result.StopReason != StopCompleted {
+		t.Fatalf("calls=%d result=%#v", decider.calls, result)
+	}
+}
+
+func TestEngineDoesNotChallengeAnAnswerAfterATool(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionUseTool, ToolCall: readCall()},
+		{Kind: DecisionRespond, Response: "answer"},
+	}}
+	engine := &Engine{Decider: decider, Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(true),
+		Actor: actorFunc(func(_ context.Context, call ToolCall, _ Authorization) (ToolResult, error) {
+			return successfulToolResult(call.ID), nil
+		})}
+	result, err := engine.Run(context.Background(), "read then answer")
+	if err != nil || decider.calls != 2 || result.Notice != "" {
+		t.Fatalf("calls=%d result=%#v err=%v", decider.calls, result, err)
+	}
+}
