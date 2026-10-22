@@ -4,7 +4,7 @@ builds:
   - id: boi
     main: ./cmd/boi
     binary: boi
-    goos: [windows, linux, darwin]
+    goos: [windows, linux]
     goarch: [amd64, arm64]
     env:
       - CGO_ENABLED=0

@@ -160,3 +160,9 @@ func isProviderEnvAssignment(line string) bool {
 		return false
 	}
 }
+
+// SaveProviders writes providers into the workspace .env, in the managed block
+// the wizard uses, and returns the file and the backup of the previous one.
+func SaveProviders(providers []ConfiguredProvider) (envPath, backup string, err error) {
+	return writeProviderEnv(providers)
+}

@@ -1,5 +1,5 @@
 ﻿# BOI CLI Installer for Windows
-# Usage: irm https://raw.githubusercontent.com/wersoul-source/BOI-CLI/main/scripts/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.ps1 | iex
 
 $BOI_HOME = "$env:USERPROFILE\.boi"
 $BOI_BIN = "$BOI_HOME\bin"
@@ -17,7 +17,8 @@ New-Item -ItemType Directory -Force -Path $BOI_BIN | Out-Null
 Write-Host "Install location: $BOI_BIN"
 
 # 2. Download latest binary
-$assetName = "boi_${VERSION}_windows_amd64.tar.gz"
+$arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+$assetName = "boi_${VERSION}_windows_${arch}.tar.gz"
 $asset = $release.assets | Where-Object { $_.name -eq $assetName }
 if (-not $asset) {
   Write-Host "ERROR: No asset found for $assetName" -ForegroundColor Red
@@ -41,11 +42,8 @@ if ($path -notlike "*$BOI_BIN*") {
     Write-Host "Added to PATH"
 }
 
-# 5. Initialize
-Write-Host "Initializing BOI CLI..."
-& "$BOI_BIN\boi.exe" init
-
 Write-Host ""
-Write-Host "BOI CLI installed! Run 'boi' to start." -ForegroundColor Green
-Write-Host "   Next: boi setup    - configure AI providers"
-Write-Host "         boi          - launch TUI"
+Write-Host "BOI CLI installed!" -ForegroundColor Green
+Write-Host "   Next, in your project folder (open a new terminal first if 'boi' is not found):"
+Write-Host "         boi quickstart   - find a model and check it (local Ollama / LM Studio, or an API key)"
+Write-Host "         boi              - chat and work on the project"

@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env bash
 # BOI CLI -- Unix Installer Script (macOS / Linux)
-# Usage: curl -fsSL https://boi.sh/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.sh | bash
 
 set -euo pipefail
 
@@ -319,15 +319,11 @@ echo -e "  Version:  ${CYAN}$VERSION_TAG${NC}"
 echo -e "  Binary:   ${CYAN}$BINARY_PATH${NC}"
 echo -e "  Config:   ${CYAN}$HOME/.boi${NC}"
 echo ""
-echo -e "  ${WHITE}Quick start:${NC}"
-echo -e "    ${GRAY}boi              Launch TUI${NC}"
-echo -e "    ${GRAY}boi ask 'hello'  Test AI${NC}"
-echo -e "    ${GRAY}boi --help        All commands${NC}"
+echo -e "  ${WHITE}Next -- two commands, in your project folder:${NC}"
+echo -e "    ${GRAY}boi quickstart   Find a model and check it (local Ollama / LM Studio, or an API key)${NC}"
+echo -e "    ${GRAY}boi              Chat and work on the project${NC}"
 echo ""
-echo -e "  ${WHITE}Next -- Set up LLM providers:${NC}"
-echo -e "    ${GRAY}cd to your project${NC}"
-echo -e "    ${GRAY}cp .env.example .env${NC}"
-echo -e "    ${GRAY}nano .env  # Add PSC_1_API_KEY=...${NC}"
+echo -e "  ${GRAY}If 'boi' is not found, open a new terminal.${NC}"
 echo ""
 echo -e "  ${GRAY}Docs: https://github.com/wersoul-source/BOI-CLI${NC}"
 echo ""

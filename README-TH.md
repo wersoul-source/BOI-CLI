@@ -1,4 +1,4 @@
-# BOI Agent Suite v2.0
+# BOI Agent Suite
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
@@ -9,7 +9,49 @@ v1.5 วางโครงใหม่ทั้งหมดบนหลักเ
 แกนของ Agent คงเดิมเสมอ ส่วนความสามารถใหม่เสียบเข้ามาได้โดยไม่ต้องแก้แกน
 หลังจากนั้นระบบคุยกับแต่ละโมเดลแบบ native เมื่อโมเดลพิสูจน์ได้ว่าใช้เป็น อ่านและค้นไฟล์ได้ในจำนวนรอบที่น้อยลง และประกอบ Agent จาก Block pack ต่อโปรเจกต์ได้ (Tool ในตัว, MCP server, SubAgent แบบเสริม) และ `boi env` รายงานตามสิ่งที่โหลดจริง
 
-Linux คือแพลตฟอร์มแรกที่รองรับ ส่วน Windows, macOS และ Android คอมไพล์ได้แต่ยังไม่ใช่เป้าหมาย release
+มี release สำหรับ Linux และ Windows (amd64, arm64) ส่วน macOS และ Android คอมไพล์ได้แต่ยังไม่ใช่เป้าหมาย release
+
+## เริ่มเร็ว
+
+**1. ติดตั้ง** ไม่ต้องมีอย่างอื่น เปิด terminal ใหม่หลังติดตั้งเพื่อให้เรียก `boi` ได้
+
+Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.ps1 | iex
+```
+
+ยังไม่มี release สำหรับเครื่องคุณ? ดู [build จากซอร์ส](#build-จากซอร์ส)
+
+**2. เตรียมให้พร้อม** ในโฟลเดอร์ของโปรเจกต์ที่อยากให้ Agent ทำงาน:
+
+```text
+boi quickstart
+```
+
+คำสั่งนี้หาโมเดลให้และตรวจว่าโมเดลทำอะไรได้บ้าง:
+
+- โมเดลที่รันในเครื่อง (Ollama, LM Studio, llama.cpp) จะถูกตรวจเจอและเสนอเป็นรายชื่อ ไม่ต้องพิมพ์อะไร ไม่ต้องมี API key
+- หรือเลือก provider แบบเสียเงิน (OpenAI, Anthropic, Cloudflare ฯลฯ) แล้วใส่ API key
+- ค่าที่ตั้งจะเก็บใน `.env` ของโปรเจกต์ และไม่ถูกส่งเข้า Git
+
+ยังไม่มีโมเดล? วิธีเริ่มฟรีที่เร็วที่สุดคือ [Ollama](https://ollama.com): ติดตั้ง รัน `ollama pull qwen2.5-coder:7b` แล้วสั่ง `boi quickstart`
+
+**3. ใช้งาน**
+
+```text
+boi                                 คุยและทำงานกับโปรเจกต์นี้
+boi ask "main.go ทำอะไร?"             ถามหนึ่งคำถาม อ่านอย่างเดียว
+```
+
+ทุกการแก้ไฟล์และทุกคำสั่งจะถามคุณก่อนเสมอ พร้อมแสดงสิ่งที่จะทำ
+ติดปัญหา? `boi doctor` ตรวจการตั้งค่า และ `boi env` แสดงว่า Agent ใช้อะไรได้บ้าง รายละเอียดอยู่ใน [GET_STARTED.md](GET_STARTED.md)
 
 ## สถาปัตยกรรม
 
@@ -77,24 +119,23 @@ Observe → Decide → Authorize → Act → Verify → Recover
 5. Tool ตรวจผลของตัวเอง เช่น อ่านไฟล์ที่เพิ่งเขียนกลับมาเทียบ ก่อนจะนับว่าขั้นนั้นสำเร็จ
 6. งานที่เสร็จจะอยู่ใน `agent-folder/output/<task-id>/` พร้อม manifest ส่วนงานที่ล้มเหลวหรือถูกยกเลิกอยู่ใน `agent-folder/bin/<task-id>/`
 
-## เริ่มต้นใช้งาน (Linux)
+## Build จากซอร์ส
 
-ต้องมี Go 1.24.2 ขึ้นไป และ API key ของ Provider ที่รองรับ
+ต้องมี Go 1.24.2 ขึ้นไป
 
 ```bash
 git clone https://github.com/wersoul-source/BOI-CLI.git
 cd BOI-CLI
-go build -trimpath -o boi ./cmd/boi
-sudo install boi /usr/local/bin/      # หรือใช้ ./boi ก็ได้
+go build -trimpath -o boi ./cmd/boi      # Windows: go build -o boi.exe ./cmd/boi
+sudo install boi /usr/local/bin/         # หรือใช้ ./boi ก็ได้
 ```
 
-ในโปรเจกต์ที่ต้องการให้ Agent ทำงาน:
+จากนั้นสั่ง `boi quickstart` ในโปรเจกต์ ขั้นตอนที่คำสั่งนั้นทำให้ ถ้าอยากทำทีละขั้น:
 
 ```bash
 boi init                        # สร้าง state ใน .boi (ไม่ลบของเดิม)
-boi registry init               # สร้าง index ของ Tool/Skill
-boi setup                       # เลือก Provider และใส่ API key
-boi provider qualify <name>     # ทดสอบพฤติกรรมจริง (เสีย token)
+boi setup                       # เลือก Provider (wizard)
+boi provider qualify <name>     # ทดสอบพฤติกรรมจริง (โมเดลแบบเสียเงินจะเสีย token)
 boi doctor                      # ตรวจสุขภาพ
 boi                             # เปิด TUI
 ```
