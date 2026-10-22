@@ -388,7 +388,7 @@ func (m *Model) handleSlashCommand(input string) (string, bool) {
 
 func (m *Model) providerListMsg() string {
 	if m.router == nil {
-		return "No providers configured. Run 'boi setup'."
+		return "No providers configured. Run 'boi quickstart'."
 	}
 	stats := m.router.Stats()
 	var sb strings.Builder
@@ -489,7 +489,7 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 	}
 	if msg.err != nil {
 		if errors.Is(msg.err, agent.ErrNoProvider) {
-			m.chat.AddMessage("error", "No AI providers configured. Run 'boi setup' to configure a provider.")
+			m.chat.AddMessage("error", "No AI providers configured. Run 'boi quickstart' in a terminal to set one up.")
 		} else {
 			m.chat.AddMessage("error", fmt.Sprintf("Agent error: %v", msg.err))
 		}

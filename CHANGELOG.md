@@ -2,6 +2,16 @@
 
 All notable changes to BOI CLI.
 
+## v2.5.0 — Easier first run (unreleased)
+
+Using BOI took a Go toolchain, six commands in the right order, and knowing the environment variables. v2.5 gives it one guided step and a real download.
+
+- New `boi quickstart`: finds a model server on this computer (Ollama, LM Studio, llama.cpp on their usual ports) and lists its chat models to pick with Enter; or offers a hosted provider (the existing wizard) or a server at another address; saves the choice in `.env` (kept out of Git); checks the model; and says in plain words what the Agent can now do. Run again to change the model; a model already checked is not checked again
+- The first launch of `boi` in a project does the same instead of the arrow-key wizard, and asks to check the model with the right timeout (3 minutes per step for a local model, which used to get 30 seconds on this path) and without calling a free local model "paid"
+- README starts with a three-step Quick start (install, `boi quickstart`, `boi`) for Linux and Windows PowerShell; `GET_STARTED.md` is trimmed to match
+- Install scripts: the PowerShell script pointed at a branch that does not exist (`main`; the branch is `master`) and the shell script at a domain that is not ours; both are fixed. The PowerShell script picks the ARM64 build on ARM64 Windows and no longer runs `boi init` in whatever folder it was started from. Both end with the two commands to run next
+- Release builds are Linux and Windows (amd64, arm64); macOS is no longer built. Pushing a `v*` tag publishes them (`.github/workflows/release.yml`)
+
 ## v2.4.0 — Skill packs (unreleased)
 
 ADR-004. Skills and Tools are independent Blocks; until now only Tools could be chosen in `environment.json`.

@@ -7,10 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 	term "github.com/boi-family/boi-cli/internal/platform/terminal"
 	"github.com/boi-family/boi-cli/internal/service/config/envfile"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
@@ -33,13 +32,12 @@ func offerQualification(runtime *app.Runtime, in io.Reader, out io.Writer) {
 	}
 	item := configured[0]
 	fmt.Fprintf(out, "\n🔎 Provider %s (%s) is configured but not qualified yet.\n", item.Name, item.Model)
-	fmt.Fprint(out, "   Run the qualification probes now? This sends a few small paid requests. [Y/n] ")
-	answer, _ := bufio.NewReader(in).ReadString('\n')
-	if answer = strings.ToLower(strings.TrimSpace(answer)); answer != "" && answer != "y" && answer != "yes" {
+	reader := bufio.NewReader(in)
+	if !confirmQualification(item, reader, out) {
 		fmt.Fprintf(out, "   Skipped. Run 'boi provider qualify %s' before asking the Agent.\n", item.Name)
 		return
 	}
-	if err := qualifyProvider(context.Background(), runtime, item, out, 30*time.Second); err != nil {
+	if err := qualifyProvider(context.Background(), runtime, item, out, coreblock.DefaultProbeTimeout(item.EndpointClass)); err != nil {
 		fmt.Fprintf(out, "   Qualification failed: %v\n", err)
 	}
 }
@@ -86,10 +84,7 @@ func RunFirstRun(runtime *app.Runtime) {
 		fmt.Println()
 		fmt.Println("⚡ Quick Setup — let's get BOI ready:")
 		fmt.Println()
-		fmt.Println("  Step 1: Configure AI Providers")
-		fmt.Println("  (TUI wizard — arrow keys, model picker)")
-		fmt.Println()
-		if err := RunSetupWizard(false); err != nil {
+		if err := chooseProvider(context.Background(), runtime, bufio.NewReader(os.Stdin), os.Stdout); err != nil {
 			fmt.Printf("  Warning: provider setup failed: %v\n", err)
 		}
 		loadEnvFiles(envPath)

@@ -53,7 +53,7 @@ var providerListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		providers, err := llmfactory.LoadProvidersFromEnv()
 		if err != nil {
-			fmt.Println("No providers configured. Run 'boi setup'.")
+			fmt.Println("No providers configured. Run 'boi quickstart'.")
 			return nil
 		}
 		fmt.Println("Configured providers:")

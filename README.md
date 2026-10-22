@@ -1,4 +1,4 @@
-# BOI Agent Suite v2.0
+# BOI Agent Suite
 
 [English](README.md) | [ภาษาไทย](README-TH.md)
 
@@ -13,8 +13,54 @@ the model proves it can, reads and searches files in fewer turns, and is
 composed per workspace from Block packs (built-in Tools, MCP servers, an
 optional SubAgent) that `boi env` reports from what is really loaded.
 
-Linux is the first supported platform. Windows, macOS and Android compile but
-are not yet release targets.
+Release binaries are built for Linux and Windows (amd64 and arm64). macOS and
+Android compile but are not release targets.
+
+## Quick start
+
+**1. Install.** Nothing else is needed. Open a new terminal afterwards so `boi` is on your PATH.
+
+Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/wersoul-source/BOI-CLI/master/scripts/install.ps1 | iex
+```
+
+No release for your system yet? [Build from source](#build-from-source).
+
+**2. Get ready.** In the folder of the project you want the Agent to work on:
+
+```text
+boi quickstart
+```
+
+It finds a model for you and checks what that model can do:
+
+- a model running on your computer (Ollama, LM Studio, llama.cpp) is detected
+  and offered by name; nothing to type, no API key
+- or choose a hosted provider (OpenAI, Anthropic, Cloudflare and others) and
+  enter its API key
+- the settings go into `.env` in the project, kept out of Git
+
+No model yet? The quickest free start is [Ollama](https://ollama.com): install
+it, run `ollama pull qwen2.5-coder:7b`, then `boi quickstart`.
+
+**3. Use it.**
+
+```text
+boi                                 chat and work on this project
+boi ask "what does main.go do?"     one read-only answer
+```
+
+Every edit and every command asks you first and shows what it will do.
+Something wrong? `boi doctor` checks the setup and `boi env` shows what the
+Agent can use right now. More in [GET_STARTED.md](GET_STARTED.md).
 
 ## Architecture
 
@@ -122,24 +168,24 @@ Observe → Decide → Authorize → Act → Verify → Recover
 6. Completed work lands in `agent-folder/output/<task-id>/` with a manifest.
    Failed or cancelled work stays in `agent-folder/bin/<task-id>/`.
 
-## Quick start (Linux)
+## Build from source
 
-Requires Go 1.24.2 or later and an API key for a supported Provider.
+Requires Go 1.24.2 or later.
 
 ```bash
 git clone https://github.com/wersoul-source/BOI-CLI.git
 cd BOI-CLI
-go build -trimpath -o boi ./cmd/boi
-sudo install boi /usr/local/bin/      # or keep ./boi
+go build -trimpath -o boi ./cmd/boi      # Windows: go build -o boi.exe ./cmd/boi
+sudo install boi /usr/local/bin/         # or keep ./boi
 ```
 
-In the project you want the Agent to work on:
+Then run `boi quickstart` in your project. The individual steps it performs,
+for when you want them one by one:
 
 ```bash
 boi init                        # create .boi state (non-destructive)
-boi registry init               # create the bounded Tool/Skill index
-boi setup                       # choose a Provider and enter the API key
-boi provider qualify <name>     # real behavioral test; uses API tokens
+boi setup                       # choose a Provider (wizard)
+boi provider qualify <name>     # real behavioral test; uses API tokens for hosted models
 boi doctor                      # health check
 boi                             # start the TUI
 ```
@@ -182,6 +228,7 @@ awaited. Exit codes: `0` completed, `1` internal, `2` invalid input,
 |---|---|
 | `boi` | Start the TUI |
 | `boi ask` | Run the Agent non-interactively |
+| `boi quickstart` | Find a model, save it, check it: the guided first run |
 | `boi init` / `boi setup` | Initialize the workspace / configure Providers |
 | `boi provider list\|switch\|qualify` | Manage and qualify Providers |
 | `boi registry init\|list\|add` | Manage the explicit Tool and Skill index |

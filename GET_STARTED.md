@@ -1,56 +1,63 @@
 # Get Started with BOI CLI
 
-Version 2.4. See the [README](README.md) for the full guide.
+The short version is in the [README](README.md#quick-start): install, run
+`boi quickstart` in your project, then run `boi`. This page adds what to do for a
+slow local model, what each step does, and what to check when something is off.
 
-You need three things: the `boi` binary, a Provider (a hosted API or a model on
-your own machine), and a short check that the Provider can drive the Agent.
+## The three steps
 
-## 1. Install
-
-From source (works on Linux, macOS and Windows; needs Go 1.24 or later):
+**1. Install** (Linux, or Windows in PowerShell) from the README, or build from
+source (Go 1.24 or later):
 
 ```powershell
 git clone https://github.com/wersoul-source/BOI-CLI.git
 cd BOI-CLI
-go build -o boi.exe ./cmd/boi        # Linux/macOS: go build -o boi ./cmd/boi
-.\boi.exe version
+go build -o boi.exe ./cmd/boi        # Linux: go build -o boi ./cmd/boi
 ```
 
-Release archives and the install scripts fetch the latest **release**, which can
-be older than the source. Check `boi version`.
-
-## 2. Connect a Provider
-
-### A hosted Provider
+**2. Get ready.** In the folder of your project:
 
 ```powershell
-.\boi.exe setup      # interactive wizard; writes .env in the project root
+boi quickstart
 ```
 
-### A model on your machine (Ollama, llama.cpp, LM Studio)
+It looks for a model server on this computer (Ollama, LM Studio, llama.cpp),
+lists the models it finds and lets you pick one with Enter. With none running,
+it offers a hosted provider with an API key, or a server at another address. It
+then saves the choice in `.env` (kept out of Git) and checks what the model can
+do. Run it again whenever you change the model.
 
-A server on `localhost` needs no API key. Use the Provider name `ollama` for any
-local OpenAI-compatible server and point `PSC_1_BASE_URL` at it. In PowerShell:
+**3. Use it.**
 
 ```powershell
-$env:PSC_1_NAME     = "ollama"
-$env:PSC_1_BASE_URL = "http://localhost:11434/v1"   # llama.cpp: http://localhost:8080/v1   LM Studio: http://localhost:1234/v1
-$env:PSC_1_MODEL    = "qwen2.5-coder:7b"            # the exact name your server lists
+boi                                      # chat and work on the project
+boi ask "what does calc.go do?"          # one question, read-only
 ```
 
-The same four `PSC_1_*` lines work in a `.env` file in the project folder.
-`.env` is never readable by the Agent.
+Every edit and every command asks you first and shows what it will do. If a task
+ends and the answer names a file but nothing was changed or run, BOI says so
+under the answer ("Nothing was changed or run in this task.").
+
+## No model yet?
+
+The quickest free start is [Ollama](https://ollama.com): install it, then
+
+```powershell
+ollama pull qwen2.5-coder:7b
+```
+
+and run `boi quickstart`. Use the model's exact name if you pull another one.
+
+## A slow local model (for example 7B on 6 GB of video memory)
 
 Give the model the context you want when you start the server, not in BOI:
 llama.cpp `-c 65536`; Ollama `OLLAMA_CONTEXT_LENGTH=65536` before `ollama serve`
 (or `PARAMETER num_ctx 65536` in a Modelfile); LM Studio, the context-length
-setting. A 7B model with a 64k context does not fit entirely in 6 GB of video
-memory, so expect part of it on the CPU and slow answers.
-
-### Slow models need longer limits
+setting. A 7B model with a 64k context does not fit entirely in 6 GB, so part of
+it runs on the CPU and answers are slow.
 
 The defaults suit a hosted API: 2 minutes per task and per request, 64,000 tokens
-per task. For a slow local model:
+per task. Raise them before you start `boi`:
 
 ```powershell
 $env:BOI_TASK_TIMEOUT    = "15m"       # a whole task (10s to 2h)
@@ -59,58 +66,52 @@ $env:BOI_MAX_TOKENS      = "200000"     # input plus output over the whole task
 # also: BOI_MAX_TOOL_CALLS (default 8), BOI_MAX_STEPS (default 12)
 ```
 
-A value that is not valid stops start-up and names the variable.
+A value that is not valid stops start-up and names the variable. The first check
+of a local model gets 3 minutes per step, because its first answer loads the
+model.
 
-## 3. Qualify the Provider
+## What the check means
 
-BOI turns on Tools and Skills only for what the model proved it can do:
-
-```powershell
-.\boi.exe provider qualify ollama      # the Provider name from PSC_1_NAME
-```
-
-Each probe gets 30 seconds, or 3 minutes for a local server (the first one loads
-the model). Read the list:
+`boi quickstart` (or `boi provider qualify <name>`) runs short probes and keeps
+only what the model proved:
 
 - `completion`, `reasoning`, `context` passed: it can chat.
-- `tool_calling`, `tool_observation`, `authority` passed: the Agent may use Tools.
-- `native_tool_schema` failed: fine. BOI falls back to text envelopes.
+- `tool_calling`, `tool_observation`, `authority` passed: the Agent may read, edit
+  and run commands (each with your approval).
+- `native_tool_schema` failed: normal. BOI then talks to the model in plain text.
 - `skill_calling` passed: Skills are offered.
 
-A capability that failed or was `inconclusive` stays off. Run `qualify` again
-after you change the model, the endpoint, or after 30 days.
+A capability that failed stays off, and the Agent then answers without touching
+files. Run the check again after you change the model or endpoint, or after 30
+days.
 
-## 4. Choose what the Agent can do
+## By hand (what quickstart does)
 
-```powershell
-.\boi.exe env use coding        # read, edit, write, run commands, all with approval
-.\boi.exe env                   # what is composed and what is actually active
-```
-
-`minimal` is read-only. `boi env` shows each Block as `active`, `loaded` or
-`declared`, with the reason when it is not active. `.boi/environment.json` is
-the file behind it; Skills and MCP servers are added there too (README).
-
-## 5. Use it
+Without the wizard, a local server needs no API key. In PowerShell:
 
 ```powershell
-.\boi.exe                       # the TUI: asks, edits and runs with your approval
-.\boi.exe ask "what does calc.go do?"   # one question, read-only, no changes
+$env:PSC_1_NAME     = "ollama"
+$env:PSC_1_BASE_URL = "http://localhost:11434/v1"   # llama.cpp: :8080/v1   LM Studio: :1234/v1
+$env:PSC_1_MODEL    = "qwen2.5-coder:7b"
+boi provider qualify ollama
 ```
 
-Every edit and every command asks you first and shows what it will do. If a task
-ends and the answer names a file but nothing was changed or run, BOI says so
-under the answer ("Nothing was changed or run in this task.").
+The same four `PSC_1_*` lines work in a `.env` file in the project folder, which
+the Agent can never read. `boi setup` is the full-screen wizard for hosted
+providers. `boi env` shows what the Agent can use; `boi env presets` lists
+read-only and coding setups.
 
 ## If something does not work
 
 | You see | Likely cause and fix |
 |---|---|
+| `boi: command not found` / not recognized | Open a new terminal after installing, or run `./boi` from the folder it was built in. |
+| `quickstart` finds no local model | The server is not running, or it is on another port: choose "A local server at another address". |
 | `no valid providers found` | `PSC_1_NAME` and `PSC_1_MODEL` are not set in this shell, or the endpoint is not `localhost` and has no `PSC_1_API_KEY` (any text works for your own server on the network). |
-| `Providers: none qualified` in `boi env` | Run `boi provider qualify <name>`. |
-| Tools stay off after qualifying | `tool_calling`, `tool_observation` or `authority` did not pass. Try another model or quantization. |
+| `Providers: none qualified` in `boi env` | Run `boi quickstart` again. |
+| The Agent only chats | The model did not pass `tool_calling`, `tool_observation` or `authority`. Try a larger or coder-tuned model. |
 | `timeout` or `budget_exhausted` | Raise `BOI_TASK_TIMEOUT`, `BOI_REQUEST_TIMEOUT` or `BOI_MAX_TOKENS`. |
-| The model says it edited a file but did not | See the notice under the answer; the host only counts changes it verified. |
+| The model says it edited a file but did not | Read the notice under the answer; BOI only counts changes it verified. |
 
 ## Measure a model
 
