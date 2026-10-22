@@ -41,17 +41,8 @@ func LoadProvidersFromEnv() ([]llm.Provider, error) {
 func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
 	var result []ConfiguredProvider
 	for i := 1; i <= maxProviders; i++ {
-		prefix := fmt.Sprintf("PSC_%d_", i)
-		cfg := ProviderConfig{
-			Name:    os.Getenv(prefix + "NAME"),
-			APIKey:  os.Getenv(prefix + "API_KEY"),
-			BaseURL: os.Getenv(prefix + "BASE_URL"),
-			Model:   os.Getenv(prefix + "MODEL"),
-		}
-		if cfg.Name == "" {
-			continue
-		}
-		if cfg.APIKey == "" || cfg.Model == "" {
+		cfg, ok := providerConfigFromEnv(i)
+		if !ok {
 			continue
 		}
 		p := createProvider(cfg)
@@ -63,6 +54,32 @@ func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
 		return nil, fmt.Errorf("no valid providers found in environment (PSC_1..PSC_%d)", maxProviders)
 	}
 	return result, nil
+}
+
+// ollamaBaseURL is where Ollama listens unless told otherwise.
+const ollamaBaseURL = "http://localhost:11434/v1"
+
+// providerConfigFromEnv reads PSC_<n>_*. A provider needs a name and a model,
+// and an API key unless it runs on this machine: a local server such as
+// Ollama, llama.cpp or LM Studio has no key to give.
+func providerConfigFromEnv(n int) (ProviderConfig, bool) {
+	prefix := fmt.Sprintf("PSC_%d_", n)
+	cfg := ProviderConfig{
+		Name:    os.Getenv(prefix + "NAME"),
+		APIKey:  os.Getenv(prefix + "API_KEY"),
+		BaseURL: os.Getenv(prefix + "BASE_URL"),
+		Model:   os.Getenv(prefix + "MODEL"),
+	}
+	if cfg.Name == "" || cfg.Model == "" {
+		return cfg, false
+	}
+	if cfg.Name == "ollama" && strings.TrimSpace(cfg.BaseURL) == "" {
+		cfg.BaseURL = ollamaBaseURL
+	}
+	if cfg.APIKey == "" && classifyEndpoint(cfg.Name, cfg.BaseURL) != "local" {
+		return cfg, false
+	}
+	return cfg, true
 }
 
 func classifyEndpoint(name, baseURL string) string {
@@ -83,13 +100,7 @@ func classifyEndpoint(name, baseURL string) string {
 func CountProvidersFromEnv() int {
 	count := 0
 	for i := 1; i <= maxProviders; i++ {
-		name := os.Getenv(fmt.Sprintf("PSC_%d_NAME", i))
-		if name == "" {
-			continue
-		}
-		key := os.Getenv(fmt.Sprintf("PSC_%d_API_KEY", i))
-		model := os.Getenv(fmt.Sprintf("PSC_%d_MODEL", i))
-		if key != "" && model != "" {
+		if _, ok := providerConfigFromEnv(i); ok {
 			count++
 		}
 	}

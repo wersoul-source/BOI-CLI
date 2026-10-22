@@ -70,6 +70,11 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 	}
 
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)
+	limits, err := LimitsFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	service.SetLimits(limits)
 	tools := composition.Tools
 	for _, tool := range tools {
 		if delegate, ok := tool.(interface{ Bind(subagent.Delegator) }); ok {

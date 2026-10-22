@@ -75,8 +75,13 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 		if err != nil {
 			return finishAsk(cmd, nil, unavailable("select capability registry; run 'boi registry init'", err))
 		}
-		limits := agent.DefaultEngineLimits()
-		limits.MaxSteps = agentSteps
+		limits, err := app.LimitsFromEnv()
+		if err != nil {
+			return finishAsk(cmd, nil, unavailable(err.Error(), err))
+		}
+		if cmd.Flags().Changed("steps") {
+			limits.MaxSteps = agentSteps
+		}
 		service.SetLimits(limits)
 
 		if agentVerbose {

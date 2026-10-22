@@ -131,8 +131,15 @@ type row struct {
 
 func main() {
 	runs := flag.Int("runs", 1, "runs per task")
-	timeout := flag.Duration("timeout", 3*time.Minute, "limit per task")
+	timeout := flag.Duration("timeout", 0, "limit per task (default: BOI_TASK_TIMEOUT or 2m, plus one minute)")
 	flag.Parse()
+	limits, err := app.LimitsFromEnv()
+	if err != nil {
+		fail(err.Error())
+	}
+	if *timeout <= 0 {
+		*timeout = limits.Timeout + time.Minute
+	}
 	if _, err := exec.LookPath("go"); err != nil {
 		fail("the tasks need the go toolchain on PATH")
 	}

@@ -130,7 +130,7 @@ func loadOrCreateConfig(path string) *config.Config {
 }
 
 func init() {
-	providerQualifyCmd.Flags().DurationVar(&providerProbeTimeout, "timeout", 30*time.Second, "Timeout for each capability probe")
+	providerQualifyCmd.Flags().DurationVar(&providerProbeTimeout, "timeout", 0, "Timeout for each capability probe (default 30s, 3m for a local server)")
 	providerCmd.AddCommand(providerListCmd)
 	providerCmd.AddCommand(providerSwitchCmd)
 	providerCmd.AddCommand(providerQualifyCmd)

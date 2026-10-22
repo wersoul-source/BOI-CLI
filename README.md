@@ -83,6 +83,16 @@ Tools it names. See [ADR-004](docs/architecture/ADR-004-skill-packs.md).
 {"id": "team-skills", "required": false, "skills": {"dir": "skills/team"}}
 ```
 
+### Slow or local models
+
+A server on `localhost` (Ollama, llama.cpp, LM Studio) needs no API key: set
+`PSC_1_NAME=ollama`, `PSC_1_BASE_URL` and `PSC_1_MODEL`. The task and request
+limits are made for hosted APIs (2 minutes, 64,000 tokens) and can be raised
+with `BOI_TASK_TIMEOUT`, `BOI_REQUEST_TIMEOUT`, `BOI_MAX_TOKENS`,
+`BOI_MAX_TOOL_CALLS` and `BOI_MAX_STEPS`; a local server gets 3 minutes per
+qualification probe because its first answer loads the model. See
+[GET_STARTED.md](GET_STARTED.md).
+
 ### Two ways to plug in
 
 | Path | When | How |
