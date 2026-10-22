@@ -10,11 +10,9 @@ import (
 	"github.com/boi-family/boi-cli/internal/equipment/skill"
 )
 
-const (
-	// maxSkillPackFiles and maxSkillFileBytes bound one Skill folder.
-	maxSkillPackFiles = 15
-	maxSkillFileBytes = 64 << 10
-)
+// maxSkillPackFiles bounds one Skill folder; each file is bounded by
+// skill.MaxFileBytes.
+const maxSkillPackFiles = 15
 
 // loadSkillFolder reads the *.skill.md files of one folder inside boiDir. It
 // returns the Skills, or the reason the folder cannot be used. The folder must
@@ -56,10 +54,10 @@ func loadSkillFolder(boiDir, dir string) ([]*skill.Skill, string) {
 		if err != nil || !info.Mode().IsRegular() {
 			return nil, fmt.Sprintf("%s is not a regular file", entry.Name())
 		}
-		if info.Size() > maxSkillFileBytes {
-			return nil, fmt.Sprintf("%s is larger than %d bytes", entry.Name(), maxSkillFileBytes)
+		if info.Size() > skill.MaxFileBytes {
+			return nil, fmt.Sprintf("%s is larger than %d bytes", entry.Name(), skill.MaxFileBytes)
 		}
-		loaded, err := skill.LoadFile(filepath.Join(folder, entry.Name()))
+		loaded, err := skill.LoadConfined(folder, entry.Name())
 		if err != nil {
 			return nil, fmt.Sprintf("%s: %v", entry.Name(), err)
 		}

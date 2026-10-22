@@ -12,6 +12,7 @@ type AgentState struct {
 	StartedAt   time.Time
 	MemoryUsed  int
 	Plan        *TaskPlan
+	ledger      *effectLedger
 }
 
 type AgentStep struct {
@@ -81,4 +82,7 @@ type AgentResult struct {
 	// Notice is a host statement the user must see next to the Response, for
 	// example that no Tool ran although the Agent could have acted.
 	Notice string
+	// Outcome and ChangedPaths are what the host recorded: see Outcome.
+	Outcome      Outcome
+	ChangedPaths []string
 }

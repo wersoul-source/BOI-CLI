@@ -321,7 +321,7 @@ func TestAnswerAboutAFileWithoutAnyToolIsChallengedAndFlagged(t *testing.T) {
 	if result.Usage.ProviderCalls != 2 || len(provider.requests) != 2 {
 		t.Fatalf("the model was not asked again: %d provider calls", result.Usage.ProviderCalls)
 	}
-	if !strings.Contains(allContent(provider.requests[1]), "you answered without using any Tool") {
+	if !strings.Contains(allContent(provider.requests[1]), "your reply came with no change") {
 		t.Fatal("the second request does not carry the host's challenge")
 	}
 	if result.StopReason != StopCompleted || result.Notice == "" || result.Response != "Yes, calc.go is fixed" {

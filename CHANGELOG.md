@@ -13,6 +13,12 @@ ADR-004. Skills and Tools are independent Blocks; until now only Tools could be 
 - `boi env` lists a skill pack's Skills: `active` when a qualified Provider allows Skills, `loaded` when it does not, `declared` when refused
 - No built-in skill pack and no preset Skill yet: one ships when a benchmark shows it helps
 
+Reliability and security (same release, ADR-005):
+- **Skill files can no longer be read from outside `.boi/skills`.** A registry entry (for example in a cloned workspace) could name a symlink to any file the user can read and the file's text reached the model. Skills now load through `skill.LoadConfined`: after symlinks are resolved the file must be a regular file inside its folder and at most 64 KB
+- The host records what a task really did: `Outcome` (`answered`, `no_effect`, `executed`, `changed`) and `ChangedPaths`, in the result and in `boi ask --json` (`outcome`, `changed_paths`). An effect is a verified Tool call that is not a read and not a delegation; SubAgent children count through the shared task ledger, so a delegation alone proves nothing
+- The v2.3 challenge now rests on that evidence instead of the Tool-call count: an answer about a workspace file with no effect is sent back once when the model made no Tool call, only delegated, had every change fail, or offered code in a fenced block as text. Reading and then answering in prose is left alone. The notice reads "Nothing was changed or run in this task."
+- `codingbench` prints `stop/outcome` per run and counts false completions (ended `completed`, host check failed)
+
 ## v2.3.0 — No silent "done" (unreleased)
 
 The coding benchmark showed llama-4-scout answering "fixed" in 10 of 12 runs without calling a single Tool; the run ended as `completed` and a user would have believed it.

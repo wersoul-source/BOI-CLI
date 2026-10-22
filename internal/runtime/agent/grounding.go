@@ -2,6 +2,10 @@ package agent
 
 import "strings"
 
+// hasCodeFence reports whether text offers code in a fenced block, the usual
+// shape of a fix that is shown instead of applied.
+func hasCodeFence(text string) bool { return strings.Contains(text, "```") }
+
 // maxProbedNames bounds how many names in one text are checked.
 const maxProbedNames = 20
 

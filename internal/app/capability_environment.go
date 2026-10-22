@@ -127,11 +127,7 @@ func selectCapabilities(boiDir, task string, environment coreblock.AgentEnvironm
 	installedSkills := map[string]bool{}
 	loadedByName := map[string]*skill.Skill{}
 	for _, entry := range skillIndex.Entries {
-		path, resolveErr := resolveIndexedSkill(skillDir, entry.Source)
-		if resolveErr != nil {
-			continue
-		}
-		loaded, loadErr := skill.LoadFile(path)
+		loaded, loadErr := skill.LoadConfined(skillDir, entry.Source)
 		if loadErr == nil && loaded.Name == entry.Name {
 			installedSkills[entry.Name], loadedByName[entry.Name] = true, loaded
 		}
@@ -163,22 +159,6 @@ func selectCapabilities(boiDir, task string, environment coreblock.AgentEnvironm
 	return &CapabilitySet{Tools: tools, Skills: skills, LoadedSkills: loaded}, nil
 }
 
-func resolveIndexedSkill(root, source string) (string, error) {
-	if filepath.IsAbs(source) {
-		return "", fmt.Errorf("Skill source must be relative")
-	}
-	clean := filepath.Clean(source)
-	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
-		return "", fmt.Errorf("Skill source escapes registry")
-	}
-	resolved := filepath.Join(root, clean)
-	rel, err := filepath.Rel(root, resolved)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("Skill source escapes registry")
-	}
-	return resolved, nil
-}
-
 func LoadRegisteredSkill(boiDir, name string) (*skill.Skill, error) {
 	index, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindSkill), capability.KindSkill)
 	if err != nil {
@@ -188,11 +168,7 @@ func LoadRegisteredSkill(boiDir, name string) (*skill.Skill, error) {
 		if entry.Name != name {
 			continue
 		}
-		path, err := resolveIndexedSkill(filepath.Join(boiDir, "skills"), entry.Source)
-		if err != nil {
-			return nil, err
-		}
-		loaded, err := skill.LoadFile(path)
+		loaded, err := skill.LoadConfined(filepath.Join(boiDir, "skills"), entry.Source)
 		if err != nil {
 			return nil, err
 		}

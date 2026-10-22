@@ -125,7 +125,7 @@ func digest(dir string, names []string) string {
 }
 
 type row struct {
-	task, result, stop, detail, trace               string
+	task, result, stop, outcome, detail, trace      string
 	providerCalls, toolCalls, approvals, tokens, ms int
 }
 
@@ -150,17 +150,21 @@ func main() {
 		for index := 0; index < *runs; index++ {
 			result := runTask(item, configured, *timeout)
 			rows = append(rows, result)
-			fmt.Printf("%s\t%s\tcalls=%d\ttools=%d\tapprovals=%d\ttokens=%d\t%dms\t%s\t%s\t%s\n", result.task, result.result, result.providerCalls, result.toolCalls, result.approvals, result.tokens, result.ms, result.stop, result.trace, result.detail)
+			fmt.Printf("%s\t%s\tcalls=%d\ttools=%d\tapprovals=%d\ttokens=%d\t%dms\t%s/%s\t%s\t%s\n", result.task, result.result, result.providerCalls, result.toolCalls, result.approvals, result.tokens, result.ms, result.stop, result.outcome, result.trace, result.detail)
 		}
 	}
-	passed, calls, tokens, ms := 0, 0, 0, 0
+	passed, falseDone, calls, toolCalls, tokens, ms := 0, 0, 0, 0, 0, 0
 	for _, item := range rows {
 		if item.result == "pass" {
 			passed++
+		} else if item.stop == "completed" {
+			// The run ended as completed but the host check failed: the Agent
+			// said it was done and was not.
+			falseDone++
 		}
-		calls, tokens, ms = calls+item.providerCalls, tokens+item.tokens, ms+item.ms
+		calls, toolCalls, tokens, ms = calls+item.providerCalls, toolCalls+item.toolCalls, tokens+item.tokens, ms+item.ms
 	}
-	fmt.Printf("\n== summary\nsuccess %d/%d, provider calls %d, tokens %d, time %.1fs\n", passed, len(rows), calls, tokens, float64(ms)/1000)
+	fmt.Printf("\n== summary\nsuccess %d/%d, false completions %d, provider calls %d, tool calls %d, tokens %d, time %.1fs\n", passed, len(rows), falseDone, calls, toolCalls, tokens, float64(ms)/1000)
 }
 
 // qualify runs the real probes once; profiles land in the per-user directory
@@ -261,7 +265,7 @@ func runTask(item task, configured []llmfactory.ConfiguredProvider, timeout time
 	}
 	out.ms = int(time.Since(started).Milliseconds())
 	if result != nil {
-		out.stop = string(result.StopReason)
+		out.stop, out.outcome = string(result.StopReason), string(result.Outcome)
 		out.providerCalls, out.toolCalls, out.tokens = result.Usage.ProviderCalls, result.Usage.ToolCalls, result.Usage.TotalTokens()
 	}
 	// The Agent could not run at all (no qualified Provider, provider error):

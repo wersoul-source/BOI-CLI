@@ -257,10 +257,10 @@ func TestEngineChallengesAnAnswerWithoutAnyToolOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decider.calls != 2 || decider.inputs[1].LastError != noToolReason {
+	if decider.calls != 2 || decider.inputs[1].LastError != unevidencedReason {
 		t.Fatalf("the model was not asked again: calls=%d inputs=%+v", decider.calls, decider.inputs)
 	}
-	if result.StopReason != StopCompleted || result.Response != "I fixed it" || result.Notice != noToolNotice {
+	if result.StopReason != StopCompleted || result.Response != "I fixed it" || result.Notice != unevidencedNotice {
 		t.Fatalf("a repeated answer must complete with the notice: %#v", result)
 	}
 }
@@ -308,5 +308,90 @@ func TestEngineDoesNotChallengeAnAnswerAfterATool(t *testing.T) {
 	result, err := engine.Run(context.Background(), "read then answer")
 	if err != nil || decider.calls != 2 || result.Notice != "" {
 		t.Fatalf("calls=%d result=%#v err=%v", decider.calls, result, err)
+	}
+}
+
+func writeCall(path string) *ToolCall {
+	return &ToolCall{
+		ID: "call_w", Tool: "workspace.write", Purpose: "apply the fix",
+		Arguments: map[string]any{"path": path, "content": "x"}, Target: path,
+		Risk: RiskChange, Approval: ApprovalConfirm, Timeout: time.Second,
+	}
+}
+
+func succeedingActor() actorFunc {
+	return func(_ context.Context, call ToolCall, _ Authorization) (ToolResult, error) {
+		result := successfulToolResult(call.ID)
+		if call.Risk != RiskRead {
+			result.ChangedPaths = []string{call.Target}
+		}
+		return result, nil
+	}
+}
+
+type grantAll struct{}
+
+func (grantAll) Authorize(_ context.Context, call ToolCall) (Authorization, error) {
+	return Authorization{Allowed: true, State: ApprovalApproved}, nil
+}
+
+func TestReadingThenOfferingCodeAsTextIsChallengedUntilItIsApplied(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionUseTool, ToolCall: readCall()},
+		{Kind: DecisionRespond, Response: "Here is the fix:\n```go\nreturn a + b\n```"},
+		{Kind: DecisionUseTool, ToolCall: writeCall("calc.go")},
+		{Kind: DecisionRespond, Response: "I applied it to calc.go"},
+	}}
+	engine := &Engine{Decider: decider, Authorizer: grantAll{}, Actor: succeedingActor(), Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(true)}
+	result, err := engine.Run(context.Background(), "fix calc.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decider.inputs[2].LastError != unevidencedReason {
+		t.Fatalf("code offered as text was not sent back: %+v", decider.inputs[2])
+	}
+	if result.StopReason != StopCompleted || result.Notice != "" || result.Outcome != OutcomeChanged || len(result.ChangedPaths) != 1 || result.ChangedPaths[0] != "calc.go" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestReadingThenAnsweringInProseIsNotChallenged(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionUseTool, ToolCall: readCall()},
+		{Kind: DecisionRespond, Response: "calc.go adds two numbers."},
+	}}
+	engine := &Engine{Decider: decider, Actor: succeedingActor(), Limits: DefaultEngineLimits(), Recoverer: BoundedRecoverer{}, Ungrounded: ungrounded(true)}
+	result, err := engine.Run(context.Background(), "what does calc.go do?")
+	if err != nil || decider.calls != 2 || result.Notice != "" || result.Outcome != OutcomeNoEffect || len(result.ChangedPaths) != 0 {
+		t.Fatalf("calls=%d result=%#v err=%v", decider.calls, result, err)
+	}
+}
+
+func TestOutcomeOfAnAnswerWithoutToolsIsAnswered(t *testing.T) {
+	engine := &Engine{Decider: &sequenceDecider{decisions: []Decision{{Kind: DecisionRespond, Response: "hello"}}}, Limits: DefaultEngineLimits()}
+	result, err := engine.Run(context.Background(), "hi")
+	if err != nil || result.Outcome != OutcomeAnswered {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
+func TestAFailedChangeIsNotAnEffect(t *testing.T) {
+	decider := &sequenceDecider{decisions: []Decision{
+		{Kind: DecisionUseTool, ToolCall: writeCall("calc.go")},
+		{Kind: DecisionRespond, Response: "done, calc.go is fixed"},
+		{Kind: DecisionRespond, Response: "done, calc.go is fixed"},
+	}}
+	failing := actorFunc(func(_ context.Context, call ToolCall, _ Authorization) (ToolResult, error) {
+		return ToolResult{CallID: call.ID}, errors.New("disk is read-only")
+	})
+	engine := &Engine{Decider: decider, Authorizer: grantAll{}, Actor: failing, Limits: DefaultEngineLimits(), Recoverer: recovererFunc(func(context.Context, Failure) Recovery {
+		return Recovery{Retry: true, Reason: "retry"}
+	}), Ungrounded: ungrounded(true)}
+	result, err := engine.Run(context.Background(), "fix calc.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome == OutcomeChanged || len(result.ChangedPaths) != 0 {
+		t.Fatalf("a change that failed was counted: %#v", result)
 	}
 }

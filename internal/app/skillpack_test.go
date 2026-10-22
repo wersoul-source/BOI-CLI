@@ -11,6 +11,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/block"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/equipment/capability"
+	"github.com/boi-family/boi-cli/internal/equipment/skill"
 )
 
 func writeSkill(t *testing.T, dir, file, name, body string) {
@@ -110,7 +111,7 @@ func TestSkillPackRefusals(t *testing.T) {
 			_ = os.Symlink(filepath.Join(outside, "secret.skill.md"), filepath.Join(b, "skills", "f", "x.skill.md"))
 		}, "skills/f", "not a regular file"},
 		"too large": {func(b string) {
-			writeSkill(t, filepath.Join(b, "skills", "big"), "big.skill.md", "big", strings.Repeat("x", maxSkillFileBytes))
+			writeSkill(t, filepath.Join(b, "skills", "big"), "big.skill.md", "big", strings.Repeat("x", skill.MaxFileBytes))
 		}, "skills/big", "larger than"},
 		"same name twice": {func(b string) {
 			writeSkill(t, filepath.Join(b, "skills", "d"), "a.skill.md", "same", "a")

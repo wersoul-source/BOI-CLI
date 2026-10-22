@@ -48,6 +48,21 @@ both, or neither. v2.2 already stopped a missing Tool from hiding a Skill.
 7. No built-in skill pack and no preset Skill ships in this version: a Skill
    is only worth shipping when a benchmark shows it helps.
 
+## Compatibility and states
+
+- A workspace without a Skill pack in `environment.json` composes exactly as
+  before: the registry is the only source of Skills, and the default
+  environment names no Skill pack. There is no second registry; pack Skills
+  are merged into the registry's selection at task time.
+- State names are the ones `boi env` already uses for every Block: `declared`
+  (listed, not loaded; the reason says why), `loaded` (read, but the Provider
+  cannot be offered Skills), `active` (offered to the model).
+- Skill files are read through `skill.LoadConfined`: after symlinks are
+  resolved the file must be a regular file inside its folder and at most
+  64 KB. This also closed a hole in the registry path: a registry entry in a
+  cloned workspace could point at a symlink to any file the user can read, and
+  its text went to the model.
+
 ## Consequences
 
 - A team can keep its Skills in one folder, reference it from

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
@@ -102,6 +103,9 @@ func TestReadOnlyDelegationRunsWithOnlyTheGrantedTools(t *testing.T) {
 	}
 	if result.Usage.ProviderCalls != 4 || result.Usage.ToolCalls != 2 {
 		t.Fatalf("the task must report parent and child use together: %+v", result.Usage)
+	}
+	if result.Outcome != agent.OutcomeNoEffect || len(result.ChangedPaths) != 0 {
+		t.Fatalf("a delegated read changed nothing: outcome=%s paths=%v", result.Outcome, result.ChangedPaths)
 	}
 	child := provider.requests[1]
 	if got := strings.Join(toolNames(child), ","); got != "context__expand,workspace__read" {
@@ -216,5 +220,65 @@ func TestGrantingContextExpandIsHarmless(t *testing.T) {
 	result, err := service.Run(context.Background(), "delegate")
 	if err != nil || result.Response != "parent done" || result.Usage.ToolCalls != 1 {
 		t.Fatalf("granting context.expand must not break delegation: err=%v result=%+v", err, result)
+	}
+}
+
+// startApproving runs an interactive task and approves every request.
+func startApproving(t *testing.T, service *agent.Service, query string) *agent.AgentResult {
+	t.Helper()
+	var result *agent.AgentResult
+	for event := range service.Start(context.Background(), query) {
+		if event.Approval != nil {
+			event.Approval.Decisions <- agent.ApprovalDecision{RequestID: event.Approval.Request.ID, State: agent.ApprovalApproved, DecidedAt: time.Now()}
+		}
+		if event.Err != nil {
+			t.Fatal(event.Err)
+		}
+		if event.Result != nil {
+			result = event.Result
+		}
+	}
+	if result == nil {
+		t.Fatal("no result")
+	}
+	return result
+}
+
+func TestDelegatedChangeCountsOnlyWhenTheChildReallyMadeIt(t *testing.T) {
+	provider := &script{responses: []llm.CompletionResponse{
+		call("agent__delegate", `{"task":"write b.txt","tools":["workspace.write"]}`),
+		call("workspace__write", `{"path":"b.txt","content":"beta"}`),
+		text("wrote b.txt"),
+		text("the helper wrote b.txt"),
+	}}
+	service, root := parentService(t, provider)
+	result := startApproving(t, service, "delegate a write")
+	if _, err := os.Stat(filepath.Join(root, "b.txt")); err != nil {
+		t.Fatalf("the child's approved write did not happen: %v", err)
+	}
+	if result.Outcome != agent.OutcomeChanged || len(result.ChangedPaths) != 1 || result.ChangedPaths[0] != "b.txt" || result.Notice != "" {
+		t.Fatalf("the child's real change must reach the parent's outcome: %+v", result)
+	}
+}
+
+func TestDelegationAloneProvesNothing(t *testing.T) {
+	// The child answers "done" without calling any Tool; the parent repeats
+	// the claim. The delegate call itself must not count as a change.
+	provider := &script{responses: []llm.CompletionResponse{
+		call("agent__delegate", `{"task":"write a.txt","tools":["workspace.write"]}`),
+		text("done, a.txt is rewritten"),
+		text("the helper rewrote a.txt"),
+		text("the helper rewrote a.txt"),
+	}}
+	service, root := parentService(t, provider)
+	result := startApproving(t, service, "ask the helper to rewrite a.txt")
+	if data, _ := os.ReadFile(filepath.Join(root, "a.txt")); string(data) != "alpha" {
+		t.Fatalf("nothing should have been written: %q", data)
+	}
+	if result.Outcome == agent.OutcomeChanged || len(result.ChangedPaths) != 0 {
+		t.Fatalf("a delegation without any change was counted as one: %+v", result)
+	}
+	if result.Notice == "" {
+		t.Fatalf("the user must be told that nothing was changed: %+v", result)
 	}
 }

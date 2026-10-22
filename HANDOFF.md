@@ -8,7 +8,7 @@ This is the entry point for Kampun or any Agent continuing BOI CLI.
 - Primary branch: `master`
 - Historical architecture baseline: `f5c0934`
 - Pre-W1.7 rollback baseline: `f3db72b`
-- Product version in source: `2.0.0` (BOI Agent Suite v2.0)
+- Product version in source: `2.4.0` (BOI Agent Suite v2.4; branch `agent-suite-v2.4` until merged)
 - Language: Go `1.24.2` or later compatible toolchain
 - Main interfaces: TUI (`boi`) and non-interactive CLI (`boi ask`)
 
@@ -69,3 +69,34 @@ Provider networking, and battery/thermal results as external evidence.
 Automation with side effects remains gated until non-interactive approval,
 stable machine-readable output, exit codes, and artifact manifests are defined
 and tested.
+
+## State at v2.4 (read this before the sections above)
+
+The sections above describe Work 1 (v1.x). The roadmap that followed is done
+through step 5 and recorded in `CHANGELOG.md` and `docs/architecture/ADR-001`
+to `ADR-005`:
+
+- **Composition.** `.boi/environment.json` chooses the Blocks of an Agent:
+  built-in Tool packs, MCP servers (run only after `boi env trust`), Skill
+  folders (`skills`, ADR-004) and the single SubAgent pack (ADR-003).
+  `boi env` reports each Block as `declared`, `loaded` or `active`;
+  `boi env presets|use|trust` manage presets and trust.
+- **Tools.** Native tool calling with text-envelope fallback; `workspace.edit`
+  changes exact text; a failure before any side effect (`port.NoEffect`) goes
+  back to the model instead of ending the task.
+- **Skills.** Registry Skills and Skill-pack Skills are offered with or
+  without the Tools they name; keyword overlap only orders them; files load
+  through `skill.LoadConfined` (symlink and path escape refused).
+- **Completion evidence (ADR-005).** The host records effects (a verified,
+  non-read, non-delegation Tool call, SubAgent children included) and exposes
+  `Outcome`/`ChangedPaths`; an answer about a workspace file with no effect is
+  challenged once and otherwise flagged with a `Notice`.
+- **Measurement.** `scripts/acceptance/benchmark.sh` (read-only tasks) and
+  `scripts/acceptance/codingbench.sh [MODEL...]` (four coding tasks; the host
+  runs the tests and checks protected files; reports false completions).
+
+Evidence still owed: codingbench on Qwen, Llama 3.3 and Llama 4 Scout with the
+v2.4 code (earlier numbers are in `CHANGELOG.md` and the PR descriptions), a
+local-model run on Windows PowerShell, and the second-Provider verification.
+Locked and not started: step 6 (Agent packs, organisations, factory) and the
+browser UI (`docs/planning/BOI_WEB_UI_PLAN.md`, proposal only).
