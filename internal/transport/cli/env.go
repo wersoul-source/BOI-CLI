@@ -20,7 +20,9 @@ var envCmd = &cobra.Command{
 Runtime actually holds. Each Block is:
 
   active    at least one of its Tools is offered to the model
+            (a Skill pack: the qualified Provider allows Skills)
   loaded    its Tools are registered, but none can be offered now
+            (a Skill pack: Skills are read, but no qualified Provider allows Skills)
   declared  listed in .boi/environment.json but not loaded (see reason)
 
 MCP servers are started once to list their tools.`,
@@ -70,6 +72,9 @@ func printReport(out io.Writer, report *app.AgentReport) {
 		}
 		for _, tool := range block.Tools {
 			fmt.Fprintf(out, "          %-30s %s\n", tool.Name, toolState(tool))
+		}
+		for _, name := range block.Skills {
+			fmt.Fprintf(out, "          %-30s Skill\n", name)
 		}
 	}
 	if len(report.RuntimeTools) > 0 {

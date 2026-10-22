@@ -69,13 +69,17 @@ func ErrorReported(err error) bool {
 }
 
 type AutomationResult struct {
-	SchemaVersion      int                       `json:"schema_version"`
-	Status             string                    `json:"status"`
-	TaskID             string                    `json:"task_id,omitempty"`
-	Response           string                    `json:"response,omitempty"`
-	StopReason         agent.StopReason          `json:"stop_reason,omitempty"`
-	Provider           string                    `json:"provider,omitempty"`
-	Model              string                    `json:"model,omitempty"`
+	SchemaVersion int              `json:"schema_version"`
+	Status        string           `json:"status"`
+	TaskID        string           `json:"task_id,omitempty"`
+	Response      string           `json:"response,omitempty"`
+	StopReason    agent.StopReason `json:"stop_reason,omitempty"`
+	Provider      string           `json:"provider,omitempty"`
+	Model         string           `json:"model,omitempty"`
+	// Outcome and ChangedPaths are recorded by the host, never taken from the
+	// model: answered, no_effect, executed or changed.
+	Outcome            agent.Outcome             `json:"outcome,omitempty"`
+	ChangedPaths       []string                  `json:"changed_paths,omitempty"`
 	Usage              AutomationUsage           `json:"usage"`
 	Manifest           string                    `json:"manifest,omitempty"`
 	Artifacts          []agent.ArtifactReference `json:"artifacts"`
@@ -120,6 +124,8 @@ func automationEnvelope(result *agent.AgentResult, runErr error) (AutomationResu
 		envelope.TaskID = result.TaskID
 		envelope.Response = result.Response
 		envelope.StopReason = result.StopReason
+		envelope.Outcome = result.Outcome
+		envelope.ChangedPaths = result.ChangedPaths
 		envelope.Provider = result.Provider
 		envelope.Model = result.Model
 		envelope.Manifest = result.Manifest

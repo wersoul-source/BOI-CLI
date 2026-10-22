@@ -319,3 +319,50 @@ func TestModelChosenCallIDsAreReplaced(t *testing.T) {
 		t.Fatal("each call must keep its own observation")
 	}
 }
+
+func approveAll(t *testing.T, service *Service, query string) *AgentResult {
+	t.Helper()
+	var result *AgentResult
+	for event := range service.Start(context.Background(), query) {
+		if event.Approval != nil {
+			event.Approval.Decisions <- ApprovalDecision{RequestID: event.Approval.Request.ID, State: ApprovalApproved, DecidedAt: time.Now()}
+		}
+		if event.Err != nil {
+			t.Fatal(event.Err)
+		}
+		if event.Result != nil {
+			result = event.Result
+		}
+	}
+	if result == nil {
+		t.Fatal("no result")
+	}
+	return result
+}
+
+func TestNativeToolCallingChallengesACodeFenceAnswerAndRecordsTheRealChange(t *testing.T) {
+	provider := &scriptedNativeProvider{responses: []llm.CompletionResponse{
+		{ToolCalls: []llm.ToolCallRequest{{ID: "c0", Name: "workspace__read", Arguments: `{"path":"calc.go"}`}}},
+		{Content: "Change it like this:\n```go\nreturn a + b\n```"},
+		{ToolCalls: []llm.ToolCallRequest{{ID: "c1", Name: "workspace__edit", Arguments: `{"path":"calc.go","old":"a - b","new":"a + b"}`}}},
+		{Content: "Applied the fix to calc.go."},
+	}}
+	service, root := nativeService(t, provider)
+	if err := os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n\nfunc Add(a, b int) int { return a - b }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result := approveAll(t, service, "fix the bug in calc.go")
+	if data, _ := os.ReadFile(filepath.Join(root, "calc.go")); !strings.Contains(string(data), "a + b") {
+		t.Fatalf("the fix was not applied: %q", data)
+	}
+	if result.Outcome != OutcomeChanged || len(result.ChangedPaths) != 1 || result.ChangedPaths[0] != "calc.go" || result.Notice != "" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(provider.requests) != 4 {
+		t.Fatalf("provider calls = %d, want 4 (read, fence challenged, edit, answer)", len(provider.requests))
+	}
+	last := provider.requests[2].Messages
+	if !strings.Contains(last[len(last)-1].Content, "your reply came with no change") {
+		t.Fatalf("the challenge did not reach the model in native mode: %q", last[len(last)-1].Content)
+	}
+}

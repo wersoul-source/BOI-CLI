@@ -8,6 +8,7 @@ import (
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/memory"
+	"github.com/boi-family/boi-cli/internal/equipment/skill"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
@@ -69,6 +70,11 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 	}
 
 	service := agent.NewService(persona.CorePersona(), router, memoryHook, r.Sandbox)
+	limits, err := LimitsFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	service.SetLimits(limits)
 	tools := composition.Tools
 	for _, tool := range tools {
 		if delegate, ok := tool.(interface{ Bind(subagent.Delegator) }); ok {
@@ -96,7 +102,11 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 
 // PrepareTask selects the bounded working set for one task and activates it.
 func (a *Agent) PrepareTask(task string) (*CapabilitySet, error) {
-	capabilities, err := SelectCapabilities(a.boiDir, task, a.Environment, a.Service.RegisteredTools())
+	var packSkills []*skill.Skill
+	if a.Composition != nil {
+		packSkills = a.Composition.Skills
+	}
+	capabilities, err := selectCapabilities(a.boiDir, task, a.Environment, a.Service.RegisteredTools(), packSkills)
 	if err != nil {
 		return nil, err
 	}

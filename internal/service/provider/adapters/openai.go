@@ -112,7 +112,9 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	if p.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {

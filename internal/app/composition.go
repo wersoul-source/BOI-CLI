@@ -14,6 +14,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/block"
 	"github.com/boi-family/boi-cli/internal/block/port"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
+	"github.com/boi-family/boi-cli/internal/equipment/skill"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/mcp"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/process"
@@ -110,6 +111,7 @@ func LoadEnvironment(boiDir string) (block.Environment, error) {
 		return block.Environment{}, fmt.Errorf("%s: %w", EnvironmentFile, err)
 	}
 	environment.Trusted = environmentTrusted(boiDir, data)
+	environment.Dir = boiDir
 	return environment, nil
 }
 
@@ -122,13 +124,15 @@ const (
 // CompositionEntry reports what happened to one pack named by the environment.
 type CompositionEntry struct {
 	ID string
-	// Kind is "tool-pack" for a compiled-in pack or "mcp" for an MCP server.
+	// Kind is "tool-pack" for a compiled-in pack, "mcp" for an MCP server or
+	// "skill-pack" for a folder of Skills.
 	Kind     string
 	Version  string
 	Required bool
 	Status   string
 	Reason   string
 	Tools    []string
+	Skills   []string
 }
 
 // Composition is the resolved set of Blocks for one Agent.
@@ -136,6 +140,9 @@ type Composition struct {
 	Environment string
 	Entries     []CompositionEntry
 	Tools       []port.Tool
+	// Skills come from Skill packs; they join the registry's Skills when a
+	// task selects its working set.
+	Skills []*skill.Skill
 }
 
 // ToolNames lists the Tools the composition registers.
@@ -163,11 +170,26 @@ func compose(environment block.Environment, packs map[string]Pack, sandbox *work
 	}
 	composition := &Composition{Environment: environment.Name}
 	owner := map[string]string{}
+	skillOwner := map[string]string{}
 	for _, item := range environment.Blocks {
 		entry := CompositionEntry{ID: item.ID, Required: item.Required, Kind: string(block.ToolPack)}
 		var tools []port.Tool
+		var skills []*skill.Skill
 		var reason string
-		if item.MCP != nil {
+		switch {
+		case item.Skills != nil:
+			entry.Kind = string(block.SkillPack)
+			if _, builtin := packs[item.ID]; builtin {
+				reason = "the id is already used by a built-in pack"
+				break
+			}
+			skills, reason = loadSkillFolder(environment.Dir, item.Skills.Dir)
+			for _, loaded := range skills {
+				if other, taken := skillOwner[loaded.Name]; taken && reason == "" {
+					reason = fmt.Sprintf("Skill %s is already provided by %s", loaded.Name, other)
+				}
+			}
+		case item.MCP != nil:
 			entry.Kind = mcpKind
 			if environment.Trusted {
 				tools, reason = resolveMCP(item, packs, runtimeVersion)
@@ -176,7 +198,7 @@ func compose(environment block.Environment, packs map[string]Pack, sandbox *work
 				// commands unasked would run untrusted code.
 				reason = "MCP servers in this environment.json are not trusted yet; review the file, then run 'boi env trust'"
 			}
-		} else {
+		default:
 			tools, reason = resolvePack(item.ID, packs, sandbox, runtimeVersion, capabilities, &entry)
 		}
 		for _, tool := range tools {
@@ -196,7 +218,12 @@ func compose(environment block.Environment, packs map[string]Pack, sandbox *work
 			owner[tool.Spec().Name] = item.ID
 			entry.Tools = append(entry.Tools, tool.Spec().Name)
 		}
+		for _, loaded := range skills {
+			skillOwner[loaded.Name] = item.ID
+		}
+		entry.Skills = skillNames(skills)
 		entry.Status = PackActive
+		composition.Skills = append(composition.Skills, skills...)
 		composition.Tools = append(composition.Tools, tools...)
 		composition.Entries = append(composition.Entries, entry)
 	}

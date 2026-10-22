@@ -220,6 +220,9 @@ func (m *WizardModel) selectProvider() (tea.Model, tea.Cmd) {
 
 	m.textInput.SetValue("")
 	m.textInput.Placeholder = "sk-..."
+	if isLocalEndpoint(m.curBaseURL) {
+		m.textInput.Placeholder = "(no key needed for a local server: press Enter)"
+	}
 	m.textInput.Focus()
 	m.step = stepAPIKey
 	return m, textinput.Blink
@@ -229,7 +232,7 @@ func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		key := strings.TrimSpace(m.textInput.Value())
-		if key == "" {
+		if key == "" && !isLocalEndpoint(m.curBaseURL) {
 			// Skip this provider
 			m.current++
 			m.errorMsg = ""

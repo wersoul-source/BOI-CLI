@@ -254,3 +254,9 @@ func TestProbeRetriesOnceBeforeFailing(t *testing.T) {
 		t.Fatal("two wrong replies must fail the capability")
 	}
 }
+
+func TestLocalServersGetALongerProbeTimeout(t *testing.T) {
+	if DefaultProbeTimeout("local") <= DefaultProbeTimeout("official") || DefaultProbeTimeout("custom") != DefaultProbeTimeout("official") {
+		t.Fatalf("local %v, official %v, custom %v", DefaultProbeTimeout("local"), DefaultProbeTimeout("official"), DefaultProbeTimeout("custom"))
+	}
+}

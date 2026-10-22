@@ -6,9 +6,15 @@
 #   bash scripts/acceptance/codingbench.sh @cf/qwen/qwen2.5-coder-32b-instruct
 #   RUNS=3 bash scripts/acceptance/codingbench.sh MODEL_A MODEL_B   # compare
 #
-# Another Provider: set PSC_1_NAME, PSC_1_API_KEY and PSC_1_MODEL (and
-# PSC_1_BASE_URL) and the script uses them. CF_ACCOUNT_ID skips the account
-# question. The token is read silently, kept in memory only, and never printed.
+# Another Provider: set PSC_1_NAME and PSC_1_MODEL (and PSC_1_BASE_URL, and
+# PSC_1_API_KEY unless the server is local) and the script uses them, for
+# example a local Ollama:
+#   PSC_1_NAME=ollama PSC_1_BASE_URL=http://localhost:11434/v1 bash scripts/acceptance/codingbench.sh qwen2.5-coder:7b
+# A slow local model needs longer limits: BOI_TASK_TIMEOUT=15m BOI_REQUEST_TIMEOUT=10m
+# (the benchmark's own per-task limit then follows BOI_TASK_TIMEOUT).
+#
+# CF_ACCOUNT_ID skips the account question. The token is read silently, kept in
+# memory only, and never printed.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -17,7 +23,7 @@ default_model="@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 models=("$@")
 [ ${#models[@]} -gt 0 ] || models=("${PSC_1_MODEL:-$default_model}")
 
-if [ -z "${PSC_1_API_KEY:-}" ]; then
+if [ -z "${PSC_1_API_KEY:-}" ] && [ -z "${PSC_1_NAME:-}" ]; then
 	account="${CF_ACCOUNT_ID:-}"
 	if [ -z "$account" ]; then
 		read -r -p "Cloudflare account ID: " account
@@ -31,7 +37,8 @@ if [ -z "${PSC_1_API_KEY:-}" ]; then
 	PSC_1_BASE_URL="https://api.cloudflare.com/client/v4/accounts/$account/ai/v1"
 fi
 [ -n "${PSC_1_NAME:-}" ] || { echo "FAIL: set PSC_1_NAME (or leave PSC_1_API_KEY unset to use Cloudflare)" >&2; exit 1; }
-export PSC_1_NAME PSC_1_API_KEY PSC_1_BASE_URL
+export PSC_1_NAME PSC_1_BASE_URL
+export PSC_1_API_KEY="${PSC_1_API_KEY:-}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

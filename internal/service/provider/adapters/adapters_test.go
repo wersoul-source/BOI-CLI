@@ -163,8 +163,39 @@ func TestCompleteContextCancel(t *testing.T) {
 }
 
 func TestClientHasTimeout(t *testing.T) {
-	if newHTTPClient().Timeout != requestTimeout || requestTimeout <= 0 {
+	t.Setenv(EnvRequestTimeout, "")
+	if newHTTPClient().Timeout != defaultRequestTimeout || defaultRequestTimeout <= 0 {
 		t.Fatal("http client must have a bounded timeout")
+	}
+}
+
+func TestRequestTimeoutCanBeRaisedForSlowLocalModels(t *testing.T) {
+	cases := map[string]time.Duration{
+		"10m": 10 * time.Minute, " 90s ": 90 * time.Second,
+		"": defaultRequestTimeout, "soon": defaultRequestTimeout, "1s": defaultRequestTimeout, "48h": defaultRequestTimeout, "-5m": defaultRequestTimeout,
+	}
+	for value, want := range cases {
+		t.Setenv(EnvRequestTimeout, value)
+		if got := newHTTPClient().Timeout; got != want {
+			t.Errorf("%s=%q: timeout %v, want %v", EnvRequestTimeout, value, got, want)
+		}
+	}
+}
+
+func TestAnEmptyAPIKeySendsNoAuthorizationHeader(t *testing.T) {
+	var header string
+	var seen bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header, seen = r.Header.Get("Authorization"), true
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`))
+	}))
+	defer server.Close()
+	provider := NewOpenAIProvider("ollama", "", server.URL, "m")
+	if _, err := provider.Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{{Role: "user", Content: "hi"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if !seen || header != "" {
+		t.Fatalf("a keyless local server must not receive an Authorization header: seen=%v header=%q", seen, header)
 	}
 }
 

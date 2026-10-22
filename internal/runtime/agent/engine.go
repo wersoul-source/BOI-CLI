@@ -215,8 +215,8 @@ type Engine struct {
 }
 
 const (
-	noToolReason = "you answered without using any Tool, so nothing was changed or run. If the task needs a file changed or a command run, call the Tool now. If it only needs an answer, say so and answer again."
-	noToolNotice = "No Tool ran in this task: no file was changed and no command was run."
+	unevidencedReason = "your reply came with no change: no file was changed and no command was run. If the task needs that, call the Tool now. If it only needs an answer, say so and answer again."
+	unevidencedNotice = "Nothing was changed or run in this task."
 )
 
 func (e *Engine) ungrounded(task, response string) bool {
@@ -233,6 +233,10 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	}
 	limits := normalizeEngineLimits(e.Limits)
 	budget := budgetFrom(ctx)
+	ledger := &effectLedger{}
+	if budget != nil {
+		ledger = &budget.effects
+	}
 	runCtx, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
 
@@ -256,6 +260,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 		Task:      task,
 		StartedAt: started,
 		Plan:      plan,
+		ledger:    ledger,
 	}
 	e.emit(EngineEvent{Kind: "task", Phase: PhaseObserve, Plan: plan})
 	if err := e.transition(state, PhaseDecide, 0); err != nil {
@@ -268,6 +273,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	var lastSkill *SkillObservation
 	lastError := ""
 	toolCalls := 0
+	// attempts counts calls that tried to change or run something, whether or
+	// not they worked; a delegation is one.
+	attempts := 0
 	skillCalls := 0
 	recoveries := 0
 	challenged := false
@@ -352,15 +360,21 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			if err := e.transition(state, PhaseVerify, step); err != nil {
 				return e.invalidStateResult(state, started, err), nil
 			}
-			// A model that could act, and answers about a workspace file with
-			// no Tool call, may be claiming work it never did. The host cannot
-			// read the claim in any language, so it asks once and the model
-			// decides.
-			if toolCalls == 0 && !challenged && e.ungrounded(task, decision.Response) {
+			// Evidence is what the host recorded, not what the model says: a
+			// Tool call that changed or ran something and passed verification.
+			// A model that could act, answers about a workspace file, and has
+			// no such effect either made no Tool call, only delegated or had
+			// every change fail, or is offering code as text instead of
+			// applying it. Reading and then answering in prose is a question
+			// answered, and is left alone. The host cannot read a claim in any
+			// language, so it asks once and the model decides.
+			effects, _ := ledger.snapshot()
+			unevidenced := effects == 0 && (toolCalls == 0 || attempts > 0 || hasCodeFence(decision.Response)) && e.ungrounded(task, decision.Response)
+			if unevidenced && !challenged {
 				challenged = true
-				e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &Verification{Passed: false, Reason: noToolReason}})
-				if e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: errors.New(noToolReason), Attempt: recoveries + 1}, &recoveries, limits, step) {
-					lastError = noToolReason
+				e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &Verification{Passed: false, Reason: unevidencedReason}})
+				if e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: errors.New(unevidencedReason), Attempt: recoveries + 1}, &recoveries, limits, step) {
+					lastError = unevidencedReason
 					continue
 				}
 			}
@@ -382,8 +396,8 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			setPlanPhase(plan, PhaseStopped, PlanCompleted)
 			result := e.stop(state, started, usage, provider, model, StopCompleted, "")
 			result.Response = decision.Response
-			if toolCalls == 0 && e.ungrounded(task, decision.Response) {
-				result.Notice = noToolNotice
+			if unevidenced {
+				result.Notice = unevidencedNotice
 			}
 			return result, nil
 		}
@@ -402,6 +416,9 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 				return e.stop(state, started, usage, provider, model, StopBudgetExhausted, "task tool-call budget exhausted"), nil
 			}
 			toolCalls++
+			if call.Risk != RiskRead {
+				attempts++
+			}
 			usage.ToolCalls = toolCalls
 			setPlanPhase(plan, PhaseAct, PlanRunning)
 			e.emit(EngineEvent{Kind: "tool", Phase: PhaseAuthorize, Step: step, ToolCall: call})
@@ -478,6 +495,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 				break
 			}
 			toolResult.Evidence = append(toolResult.Evidence, verification.Evidence...)
+			ledger.record(call, &toolResult)
 			state.Steps = append(state.Steps, AgentStep{Number: step, Phase: PhaseVerify, Action: call.Tool, Result: toolResult.Output, ToolCall: call, ToolResult: &toolResult, Success: true, Duration: time.Since(started)})
 			setPlanPhase(plan, PhaseAct, PlanCompleted)
 			setPlanPhase(plan, PhaseVerify, PlanCompleted)
@@ -636,7 +654,14 @@ func (e *Engine) stop(state *AgentState, started time.Time, usage Usage, provide
 		state.Plan.Status = PlanFailed
 	}
 	e.emit(EngineEvent{Kind: "stop", Phase: PhaseStopped, Step: len(state.Steps), StopReason: reason, Plan: state.Plan})
-	return &AgentResult{TaskID: state.ID, Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message, Plan: state.Plan, Trace: append([]AgentStep(nil), state.Steps...)}
+	outcome, changed := OutcomeAnswered, []string(nil)
+	if state.ledger != nil {
+		effectCalls, paths := state.ledger.snapshot()
+		outcome, changed = outcomeFor(usage.ToolCalls, effectCalls, len(paths)), paths
+	} else if usage.ToolCalls > 0 {
+		outcome = OutcomeNoEffect
+	}
+	return &AgentResult{Outcome: outcome, ChangedPaths: changed, TaskID: state.ID, Steps: len(state.Steps), Tokens: usage.TotalTokens(), Duration: usage.Elapsed, Provider: provider, Model: model, StopReason: reason, Usage: usage, Error: message, Plan: state.Plan, Trace: append([]AgentStep(nil), state.Steps...)}
 }
 
 func setPlanPhase(plan *TaskPlan, phase AgentPhase, status PlanStatus) {

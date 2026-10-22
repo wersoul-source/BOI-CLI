@@ -2,6 +2,31 @@
 
 All notable changes to BOI CLI.
 
+## v2.4.0 — Skill packs (unreleased)
+
+ADR-004. Skills and Tools are independent Blocks; until now only Tools could be chosen in `environment.json`.
+
+- An `environment.json` entry with `skills` plugs in a folder of `*.skill.md` files (relative to `.boi`): `{"id": "team-skills", "required": false, "skills": {"dir": "skills/team"}}`
+- The folder must stay inside `.boi` after symlinks are resolved; entries must be plain files of at most 64 KB, and at most 15 Skills. A missing or empty folder, a file that does not parse, or a Skill name already provided by another pack refuses the pack (required stops start-up, optional is skipped and reported)
+- Pack Skills join the registry's Skills when a task selects its working set. A Skill named in `.boi/registry/skills.json` wins over a pack Skill of the same name. A Skill is offered with or without the Tools it names; the model decides whether to load it
+- A Skill is untrusted text and adds no Tool or authority, so a Skill pack needs no `boi env trust`
+- `boi env` lists a skill pack's Skills: `active` when a qualified Provider allows Skills, `loaded` when it does not, `declared` when refused
+- No built-in skill pack and no preset Skill yet: one ships when a benchmark shows it helps
+
+Reliability and security (same release, ADR-005):
+- **Skill files can no longer be read from outside `.boi/skills`.** A registry entry (for example in a cloned workspace) could name a symlink to any file the user can read and the file's text reached the model. Skills now load through `skill.LoadConfined`: after symlinks are resolved the file must be a regular file inside its folder and at most 64 KB
+- The host records what a task really did: `Outcome` (`answered`, `no_effect`, `executed`, `changed`) and `ChangedPaths`, in the result and in `boi ask --json` (`outcome`, `changed_paths`). An effect is a verified Tool call that is not a read and not a delegation; SubAgent children count through the shared task ledger, so a delegation alone proves nothing
+- The v2.3 challenge now rests on that evidence instead of the Tool-call count: an answer about a workspace file with no effect is sent back once when the model made no Tool call, only delegated, had every change fail, or offered code in a fenced block as text. Reading and then answering in prose is left alone. The notice reads "Nothing was changed or run in this task."
+- `codingbench` prints `stop/outcome` per run and counts false completions
+
+Local models (same release):
+- A Provider on `localhost`, `127.0.0.1` or `[::1]` needs no API key, in the environment, in `.env` and in `boi setup` (an empty key used to skip the Provider). `PSC_1_NAME=ollama` without a base URL now means `http://localhost:11434/v1` instead of OpenAI's address, and no `Authorization` header is sent without a key
+- Task limits can be set with `BOI_TASK_TIMEOUT`, `BOI_MAX_TOKENS`, `BOI_MAX_TOOL_CALLS` and `BOI_MAX_STEPS`, and the per-request timeout with `BOI_REQUEST_TIMEOUT`. The defaults (2 minutes, 64,000 tokens) stay. An invalid task limit stops start-up and names the variable; an invalid request timeout is ignored
+- A local server gets 3 minutes per qualification probe instead of 30 seconds, because its first answer loads the model
+- `GET_STARTED.md` rewritten for v2.4: source install, Provider setup for hosted and local models in PowerShell, qualification, environments and troubleshooting
+- `codingbench.sh` runs against a local server too; its per-task limit follows `BOI_TASK_TIMEOUT`
+ (ended `completed`, host check failed)
+
 ## v2.3.0 — No silent "done" (unreleased)
 
 The coding benchmark showed llama-4-scout answering "fixed" in 10 of 12 runs without calling a single Tool; the run ended as `completed` and a user would have believed it.

@@ -21,6 +21,7 @@ type sharedBudget struct {
 	maxTokens    int
 	maxToolCalls int
 	used         Usage
+	effects      effectLedger
 }
 
 // charge records use and reports whether the budget still holds.

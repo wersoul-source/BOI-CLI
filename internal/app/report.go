@@ -3,6 +3,7 @@ package app
 import (
 	"sort"
 
+	"github.com/boi-family/boi-cli/internal/block"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
@@ -39,6 +40,8 @@ type BlockReport struct {
 	State    string       `json:"state"`
 	Reason   string       `json:"reason,omitempty"`
 	Tools    []ToolReport `json:"tools"`
+	// Skills lists the Skills of a skill-pack Block.
+	Skills []string `json:"skills,omitempty"`
 }
 
 type ToolReport struct {
@@ -110,6 +113,15 @@ func (r *Runtime) Report(configured []llmfactory.ConfiguredProvider) (*AgentRepo
 			spec := tool.Spec()
 			block.Tools = append(block.Tools, ToolReport{Name: name, Registered: registered[name], Offered: offered[name], Risk: string(spec.Risk), Approval: string(spec.Approval)})
 		}
+		if entry.Kind == skillPackKind {
+			block.Skills = entry.Skills
+			block.State = skillPackState(entry, environment.SkillCalling)
+			if block.State == StateLoaded && block.Reason == "" {
+				block.Reason = "no qualified Provider allows Skills"
+			}
+			report.Blocks = append(report.Blocks, block)
+			continue
+		}
 		block.State = blockState(entry, block.Tools, service != nil)
 		if block.State == StateLoaded && block.Reason == "" {
 			block.Reason = loadedReason(environment.ToolCalling)
@@ -124,6 +136,21 @@ func (r *Runtime) Report(configured []llmfactory.ConfiguredProvider) (*AgentRepo
 	sort.Slice(report.RuntimeTools, func(i, j int) bool { return report.RuntimeTools[i].Name < report.RuntimeTools[j].Name })
 	report.Ready = report.Problem == "" && service != nil
 	return report, nil
+}
+
+const skillPackKind = string(block.SkillPack)
+
+// skillPackState: a Skill pack is active when the qualified Provider allows
+// Skills, loaded when its Skills are read but cannot be offered, declared
+// when it was refused.
+func skillPackState(entry CompositionEntry, skillCalling bool) string {
+	if entry.Status != PackActive {
+		return StateDeclared
+	}
+	if skillCalling {
+		return StateActive
+	}
+	return StateLoaded
 }
 
 func blockState(entry CompositionEntry, tools []ToolReport, assembled bool) string {

@@ -95,6 +95,16 @@ func EnsureCapabilityIndexes(boiDir string) error {
 }
 
 func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment, registeredTools []string) (*CapabilitySet, error) {
+	return selectCapabilities(boiDir, task, environment, registeredTools, nil)
+}
+
+// packSkillPriority orders Skills from Skill packs among the registry's.
+const packSkillPriority = 50
+
+// selectCapabilities selects the task's Tools and Skills. packSkills come
+// from Skill packs of the environment; a Skill whose name the registry
+// already lists is ignored, because the registry is the user's explicit choice.
+func selectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment, registeredTools []string, packSkills []*skill.Skill) (*CapabilitySet, error) {
 	toolIndex, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindTool), capability.KindTool)
 	if err != nil {
 		return nil, err
@@ -117,16 +127,29 @@ func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironm
 	installedSkills := map[string]bool{}
 	loadedByName := map[string]*skill.Skill{}
 	for _, entry := range skillIndex.Entries {
-		path, resolveErr := resolveIndexedSkill(skillDir, entry.Source)
-		if resolveErr != nil {
-			continue
-		}
-		loaded, loadErr := skill.LoadFile(path)
+		loaded, loadErr := skill.LoadConfined(skillDir, entry.Source)
 		if loadErr == nil && loaded.Name == entry.Name {
 			installedSkills[entry.Name], loadedByName[entry.Name] = true, loaded
 		}
 	}
-	skills := capability.Select(*skillIndex, capability.SelectionInput{Task: task, Installed: installedSkills, AvailableRequirements: available, ProviderAllows: environment.SkillCalling, ContextBudget: environment.ContextBytes})
+	registryNames := map[string]bool{}
+	for _, entry := range skillIndex.Entries {
+		registryNames[entry.Name] = true
+	}
+	merged := *skillIndex
+	merged.Entries = append([]capability.Entry(nil), skillIndex.Entries...)
+	for _, item := range packSkills {
+		if registryNames[item.Name] {
+			continue
+		}
+		merged.Entries = append(merged.Entries, capability.Entry{
+			Name: item.Name, Source: "skill-pack", Summary: item.Description, Enabled: true, Priority: packSkillPriority,
+			Tags: strings.FieldsFunc(item.Name, func(r rune) bool { return r == '-' || r == '_' || r == '.' }), Requires: item.Requires,
+			ContextCost: len(item.Name) + len(item.Description) + 32,
+		})
+		installedSkills[item.Name], loadedByName[item.Name] = true, item
+	}
+	skills := capability.Select(merged, capability.SelectionInput{Task: task, Installed: installedSkills, AvailableRequirements: available, ProviderAllows: environment.SkillCalling, ContextBudget: environment.ContextBytes})
 	loaded := make([]*skill.Skill, 0, len(skills.Active))
 	for _, name := range skills.Active {
 		if item := loadedByName[name]; item != nil {
@@ -134,22 +157,6 @@ func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironm
 		}
 	}
 	return &CapabilitySet{Tools: tools, Skills: skills, LoadedSkills: loaded}, nil
-}
-
-func resolveIndexedSkill(root, source string) (string, error) {
-	if filepath.IsAbs(source) {
-		return "", fmt.Errorf("Skill source must be relative")
-	}
-	clean := filepath.Clean(source)
-	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
-		return "", fmt.Errorf("Skill source escapes registry")
-	}
-	resolved := filepath.Join(root, clean)
-	rel, err := filepath.Rel(root, resolved)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("Skill source escapes registry")
-	}
-	return resolved, nil
 }
 
 func LoadRegisteredSkill(boiDir, name string) (*skill.Skill, error) {
@@ -161,11 +168,7 @@ func LoadRegisteredSkill(boiDir, name string) (*skill.Skill, error) {
 		if entry.Name != name {
 			continue
 		}
-		path, err := resolveIndexedSkill(filepath.Join(boiDir, "skills"), entry.Source)
-		if err != nil {
-			return nil, err
-		}
-		loaded, err := skill.LoadFile(path)
+		loaded, err := skill.LoadConfined(filepath.Join(boiDir, "skills"), entry.Source)
 		if err != nil {
 			return nil, err
 		}

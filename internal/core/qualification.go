@@ -242,6 +242,16 @@ func defaultProbeCases() []probeCase {
 	}
 }
 
+// DefaultProbeTimeout is the time one probe gets. A local server may need to
+// load the model into memory on the first request, which takes longer than
+// any hosted Provider needs to answer.
+func DefaultProbeTimeout(endpointClass string) time.Duration {
+	if endpointClass == "local" {
+		return 3 * time.Minute
+	}
+	return 30 * time.Second
+}
+
 type Qualifier struct {
 	Timeout time.Duration
 	Now     func() time.Time
@@ -254,7 +264,7 @@ func (q Qualifier) Run(ctx context.Context, target ProviderTarget, provider llm.
 		return nil, fmt.Errorf("provider is required")
 	}
 	if q.Timeout <= 0 {
-		q.Timeout = 30 * time.Second
+		q.Timeout = DefaultProbeTimeout(target.EndpointClass)
 	}
 	if q.Now == nil {
 		q.Now = time.Now
