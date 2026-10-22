@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	registry "github.com/boi-family/boi-cli/internal/service/provider/catalog"
@@ -30,11 +31,12 @@ type WizardResult struct {
 type step int
 
 const (
-	stepCount  step = iota // ask how many providers
-	stepSelect             // select provider from list
-	stepAPIKey             // enter API key
-	stepModel              // select model
-	stepDone               // summary + test + save
+	stepCount    step = iota // ask how many providers
+	stepSelect               // select provider from list
+	stepEndpoint             // enter the address of a custom OpenAI-compatible endpoint
+	stepAPIKey               // enter API key
+	stepModel                // select model
+	stepDone                 // summary + test + save
 )
 
 type WizardModel struct {
@@ -57,7 +59,10 @@ type WizardModel struct {
 	curName       string
 	curLabel      string
 	curBaseURL    string
-	curCustomText bool // currently entering custom model name via text input
+	curCustomText bool   // currently entering custom model name via text input
+	curCustom     bool   // the provider is a custom OpenAI-compatible endpoint
+	single        bool   // one provider only: skip the "how many" question
+	curKey        string // the API key just entered; the text box is reused for the model name
 
 	done      bool
 	cancelled bool
@@ -125,6 +130,8 @@ func (m *WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateCount(msg)
 		case stepSelect:
 			return m.updateSelect(msg)
+		case stepEndpoint:
+			return m.updateEndpoint(msg)
 		case stepAPIKey:
 			return m.updateAPIKey(msg)
 		case stepModel:
@@ -132,7 +139,7 @@ func (m *WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.step == stepAPIKey || (m.step == stepModel && m.curCustomText) {
+	if m.step == stepEndpoint || m.step == stepAPIKey || (m.step == stepModel && m.curCustomText) {
 		var cmd tea.Cmd
 		m.textInput, cmd = m.textInput.Update(msg)
 		return m, cmd
@@ -202,10 +209,20 @@ func (m *WizardModel) updateSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *WizardModel) selectProvider() (tea.Model, tea.Cmd) {
 	if m.cursor == len(m.listItems)-1 {
-		// "Other" selected
-		m.curName = "other"
-		m.curLabel = "Custom"
+		// "Other": any OpenAI-compatible endpoint (Cloudflare Workers AI, a
+		// server on your network, a gateway). It is built as "openai" with
+		// the address the user gives.
+		m.curName = "openai"
+		m.curLabel = "Custom (OpenAI-compatible)"
 		m.curBaseURL = ""
+		m.curCustom = true
+		m.textInput.SetValue("")
+		m.textInput.Placeholder = "https://host/v1"
+		m.textInput.EchoMode = textinput.EchoNormal
+		m.textInput.Focus()
+		m.errorMsg, m.infoMsg = "", ""
+		m.step = stepEndpoint
+		return m, textinput.Blink
 	} else {
 		names := m.registry.Names()
 		if m.cursor < len(names) {
@@ -218,14 +235,48 @@ func (m *WizardModel) selectProvider() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	m.curCustom = false
 	m.textInput.SetValue("")
 	m.textInput.Placeholder = "sk-..."
+	m.textInput.EchoMode = textinput.EchoPassword
 	if isLocalEndpoint(m.curBaseURL) {
 		m.textInput.Placeholder = "(no key needed for a local server: press Enter)"
 	}
 	m.textInput.Focus()
 	m.step = stepAPIKey
 	return m, textinput.Blink
+}
+
+// updateEndpoint reads the address of a custom OpenAI-compatible endpoint.
+func (m *WizardModel) updateEndpoint(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "enter" {
+		address := strings.TrimSpace(m.textInput.Value())
+		parsed, err := url.Parse(address)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+			m.errorMsg = "Type an address such as https://api.example.com/v1"
+			return m, nil
+		}
+		m.curBaseURL = strings.TrimRight(address, "/")
+		m.errorMsg, m.infoMsg = "", ""
+		m.textInput.SetValue("")
+		m.textInput.Placeholder = "sk-..."
+		if isLocalEndpoint(m.curBaseURL) {
+			m.textInput.Placeholder = "(no key needed for a local server: press Enter)"
+		}
+		m.textInput.EchoMode = textinput.EchoPassword
+		m.textInput.Focus()
+		m.step = stepAPIKey
+		return m, textinput.Blink
+	}
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
+}
+
+func (m *WizardModel) viewEndpoint() string {
+	title := titleStyle.Render("⚡ Custom Endpoint") + infoMsgStyle.Render(fmt.Sprintf("  Provider %d of %d", m.current+1, m.totalCount))
+	help := infoMsgStyle.Render("  Any OpenAI-compatible server. Examples:\n  Cloudflare  https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1\n  Your own    http://192.168.1.20:8080/v1")
+	return title + "\n\n" + help + fmt.Sprintf("\n\n  Address:\n  %s", m.textInput.View())
 }
 
 func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -245,11 +296,13 @@ func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.step = stepSelect
 			return m, nil
 		}
-		// Store API key in textinput, proceed to model selection
+		// Keep the key apart: the text box is reused for a typed model name,
+		// and used to overwrite the key with it.
+		m.curKey = key
 		m.infoMsg = "API key set. Select model..."
 		m.errorMsg = ""
 		m.cursor = 0
-		if m.curName == "other" {
+		if m.curCustom {
 			// Custom provider: enter model name as text
 			m.curCustomText = true
 			m.textInput.SetValue("")
@@ -314,10 +367,9 @@ func (m *WizardModel) selectModel() (tea.Model, tea.Cmd) {
 
 // confirmProvider saves the provider with the given model and advances.
 func (m *WizardModel) confirmProvider(model string) (tea.Model, tea.Cmd) {
-	key := m.textInput.Value()
 	m.providers = append(m.providers, ConfiguredProvider{
 		Name:     m.curName,
-		APIKey:   key,
+		APIKey:   m.curKey,
 		Endpoint: m.curBaseURL,
 		Model:    model,
 	})
@@ -367,6 +419,8 @@ func (m *WizardModel) View() string {
 		body = m.viewCount()
 	case stepSelect:
 		body = m.viewSelect()
+	case stepEndpoint:
+		body = m.viewEndpoint()
 	case stepAPIKey:
 		body = m.viewAPIKey()
 	case stepModel:
@@ -468,7 +522,7 @@ func (m *WizardModel) viewHelp() string {
 		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Esc: cancel    Ctrl+C: quit")
 	case stepSelect, stepModel:
 		return "\n\n  " + infoMsgStyle.Render("↑↓: navigate    Enter: select    Esc: back    Ctrl+C: quit")
-	case stepAPIKey:
+	case stepEndpoint, stepAPIKey:
 		return "\n\n  " + infoMsgStyle.Render("Enter: confirm    Esc: back    Ctrl+C: quit")
 	case stepDone:
 		return "\n\n  " + infoMsgStyle.Render("Press any key to exit")
@@ -480,11 +534,35 @@ func (m *WizardModel) viewHelp() string {
 func (m *WizardModel) goBack() (tea.Model, tea.Cmd) {
 	switch m.step {
 	case stepSelect:
+		if m.single {
+			m.cancelled = true
+			m.done = true
+			return m, tea.Quit
+		}
 		// Back to count
 		m.step = stepCount
 		m.errorMsg = ""
 		m.infoMsg = ""
+	case stepEndpoint:
+		m.cursor = 0
+		m.buildProviderList()
+		m.listMode = "provider"
+		m.textInput.EchoMode = textinput.EchoPassword
+		m.textInput.Placeholder = "sk-..."
+		m.step = stepSelect
+		m.errorMsg = ""
+		m.infoMsg = ""
 	case stepAPIKey:
+		if m.curCustom {
+			m.textInput.SetValue(m.curBaseURL)
+			m.textInput.EchoMode = textinput.EchoNormal
+			m.textInput.Placeholder = "https://host/v1"
+			m.step = stepEndpoint
+			m.errorMsg = ""
+			m.infoMsg = ""
+			m.textInput.Focus()
+			return m, textinput.Blink
+		}
 		// Back to provider selection (keep provider name)
 		m.cursor = 0
 		m.buildProviderList()
@@ -497,7 +575,7 @@ func (m *WizardModel) goBack() (tea.Model, tea.Cmd) {
 		if m.curCustomText {
 			m.curCustomText = false
 		}
-		m.textInput.SetValue(m.textInput.Value()) // keep current value
+		m.textInput.SetValue(m.curKey) // the box may hold a typed model name
 		m.textInput.EchoMode = textinput.EchoPassword
 		m.textInput.Placeholder = "sk-..."
 		m.step = stepAPIKey
@@ -525,8 +603,20 @@ func (m *WizardModel) Result() *WizardResult {
 }
 
 // Run runs the setup wizard TUI and returns the result.
-func Run(r *registry.Registry) *WizardResult {
+func Run(r *registry.Registry) *WizardResult { return run(NewWizard(r)) }
+
+// RunOne configures exactly one provider: it skips the "how many providers"
+// question and starts at the provider list.
+func RunOne(r *registry.Registry) *WizardResult {
 	w := NewWizard(r)
+	w.single, w.totalCount = true, 1
+	w.buildProviderList()
+	w.listMode = "provider"
+	w.step = stepSelect
+	return run(w)
+}
+
+func run(w *WizardModel) *WizardResult {
 	// Note: WithoutAltScreen for better compatibility with PowerShell 7 / conpty
 	p := tea.NewProgram(w)
 	model, err := p.Run()

@@ -26,7 +26,12 @@ var setupCmd = &cobra.Command{
 }
 
 // RunSetupWizard launches the interactive provider setup TUI.
-func RunSetupWizard(refresh bool) error {
+func RunSetupWizard(refresh bool) error { return runWizard(refresh, false) }
+
+// runSetupWizard configures a single provider, without the "how many" question.
+func runSetupWizard(single bool) error { return runWizard(false, single) }
+
+func runWizard(refresh, single bool) error {
 	reg := registry.LoadEmbedded()
 
 	if refresh {
@@ -36,7 +41,11 @@ func RunSetupWizard(refresh bool) error {
 		fmt.Println("  Using embedded registry.")
 	}
 
-	result := setup.Run(reg)
+	run := setup.Run
+	if single {
+		run = setup.RunOne
+	}
+	result := run(reg)
 	if result.Err != nil {
 		return fmt.Errorf("save Provider configuration: %w", result.Err)
 	}

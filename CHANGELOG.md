@@ -2,6 +2,17 @@
 
 All notable changes to BOI CLI.
 
+## v2.5.1 — Setup wizard fixes (unreleased)
+
+Found when the first real hosted run failed every check with HTTP 401.
+
+- **The wizard saved the model name as the API key** whenever a model was typed instead of picked from the list. The text box was shared between the key and the model name. The key is now kept apart; going back to the key step shows the key again
+- **"Other (custom)" never worked.** It saved a provider named `other`, which the factory does not know, so it was silently dropped. It now asks for an OpenAI-compatible address (Cloudflare Workers AI, a server on your network, a gateway), then the key and the model, and saves an `openai` provider with that address. A key was always sent to the address in the catalog (OpenAI's), so a Cloudflare key failed with 401
+- `boi quickstart` uses a single-provider wizard: the "how many providers" question is gone from that path
+- The check prints the server it talked to (`Endpoint: api.openai.com`, host and port only) and, when every probe is rejected with 401, says that the server did not accept the key and what to check
+- The wizard tests drive the real key presses: custom endpoint, address validation, Esc at each step, a typed model name, a local endpoint without a key
+- `GET_STARTED.md` explains that a key only works on its own provider's server and how to give Cloudflare's address
+
 ## v2.5.0 — Easier first run (unreleased)
 
 Using BOI took a Go toolchain, six commands in the right order, and knowing the environment variables. v2.5 gives it one guided step and a real download.

@@ -27,6 +27,16 @@ it offers a hosted provider with an API key, or a server at another address. It
 then saves the choice in `.env` (kept out of Git) and checks what the model can
 do. Run it again whenever you change the model.
 
+For a hosted provider the wizard lists OpenAI, Anthropic, Google, Groq,
+OpenRouter and others: pick one with the arrows, paste the key (it is hidden),
+pick or type the model. **A key only works on its own provider's server.** For
+anything not in the list, choose **Other** at the bottom and give the address:
+
+| Provider | Address to give |
+|---|---|
+| Cloudflare Workers AI | `https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1`, with a model such as `@cf/qwen/qwen2.5-coder-32b-instruct` |
+| A server on your network | `http://192.168.1.20:8080/v1` |
+
 **3. Use it.**
 
 ```powershell
@@ -106,6 +116,7 @@ read-only and coding setups.
 | You see | Likely cause and fix |
 |---|---|
 | `boi: command not found` / not recognized | Open a new terminal after installing, or run `./boi` from the folder it was built in. |
+| Every check says `HTTP 401` | The server did not accept the key: the key belongs to another provider than the address shown on the `Endpoint:` line, or was copied incompletely. Run `boi quickstart` again, and for a provider that is not in the list choose **Other** and give its address. Create a new key if the old one may have been sent to the wrong server. |
 | `quickstart` finds no local model | The server is not running, or it is on another port: choose "A local server at another address". |
 | `no valid providers found` | `PSC_1_NAME` and `PSC_1_MODEL` are not set in this shell, or the endpoint is not `localhost` and has no `PSC_1_API_KEY` (any text works for your own server on the network). |
 | `Providers: none qualified` in `boi env` | Run `boi quickstart` again. |

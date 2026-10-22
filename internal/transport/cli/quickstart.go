@@ -22,7 +22,7 @@ import (
 // qualification and the .env writer.
 var (
 	quickstartCandidates = localCandidates
-	quickstartHosted     = func() error { return RunSetupWizard(false) }
+	quickstartHosted     = func() error { return runSetupWizard(true) }
 	quickstartQualify    = qualifyProvider
 	quickstartSave       = setup.SaveProviders
 )

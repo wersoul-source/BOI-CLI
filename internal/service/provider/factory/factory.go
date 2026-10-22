@@ -24,6 +24,9 @@ type ConfiguredProvider struct {
 	Name          string
 	Model         string
 	EndpointClass string
+	// Host is where requests go (host and port only), so a check can say which
+	// server rejected a key. It is empty when the Provider's own default is used.
+	Host string
 }
 
 func LoadProvidersFromEnv() ([]llm.Provider, error) {
@@ -47,7 +50,7 @@ func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
 		}
 		p := createProvider(cfg)
 		if p != nil {
-			result = append(result, ConfiguredProvider{Provider: p, Name: cfg.Name, Model: cfg.Model, EndpointClass: classifyEndpoint(cfg.Name, cfg.BaseURL)})
+			result = append(result, ConfiguredProvider{Provider: p, Name: cfg.Name, Model: cfg.Model, EndpointClass: classifyEndpoint(cfg.Name, cfg.BaseURL), Host: endpointHost(cfg.BaseURL)})
 		}
 	}
 	if len(result) == 0 {
@@ -80,6 +83,16 @@ func providerConfigFromEnv(n int) (ProviderConfig, bool) {
 		return cfg, false
 	}
 	return cfg, true
+}
+
+// endpointHost returns the host (and port) of a base URL, or "" when there is
+// none. It never includes a path, a user name or a query.
+func endpointHost(baseURL string) string {
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return ""
+	}
+	return u.Host
 }
 
 func classifyEndpoint(name, baseURL string) string {
