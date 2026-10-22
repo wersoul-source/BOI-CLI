@@ -74,6 +74,15 @@ servers start only after you review `environment.json` and run
 `boi env trust`. Editing the file withdraws the trust. See
 [ADR-002](docs/architecture/ADR-002-block-packs.md).
 
+An entry with `skills` plugs in a folder of Skill files (`*.skill.md`,
+relative to `.boi`). Skills are text: they add no Tool and need no trust, and
+the model decides whether to load one. A Skill works with or without the
+Tools it names. See [ADR-004](docs/architecture/ADR-004-skill-packs.md).
+
+```json
+{"id": "team-skills", "required": false, "skills": {"dir": "skills/team"}}
+```
+
 ### Two ways to plug in
 
 | Path | When | How |

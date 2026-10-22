@@ -2,6 +2,17 @@
 
 All notable changes to BOI CLI.
 
+## v2.4.0 — Skill packs (unreleased)
+
+ADR-004. Skills and Tools are independent Blocks; until now only Tools could be chosen in `environment.json`.
+
+- An `environment.json` entry with `skills` plugs in a folder of `*.skill.md` files (relative to `.boi`): `{"id": "team-skills", "required": false, "skills": {"dir": "skills/team"}}`
+- The folder must stay inside `.boi` after symlinks are resolved; entries must be plain files of at most 64 KB, and at most 15 Skills. A missing or empty folder, a file that does not parse, or a Skill name already provided by another pack refuses the pack (required stops start-up, optional is skipped and reported)
+- Pack Skills join the registry's Skills when a task selects its working set. A Skill named in `.boi/registry/skills.json` wins over a pack Skill of the same name. A Skill is offered with or without the Tools it names; the model decides whether to load it
+- A Skill is untrusted text and adds no Tool or authority, so a Skill pack needs no `boi env trust`
+- `boi env` lists a skill pack's Skills: `active` when a qualified Provider allows Skills, `loaded` when it does not, `declared` when refused
+- No built-in skill pack and no preset Skill yet: one ships when a benchmark shows it helps
+
 ## v2.3.0 — No silent "done" (unreleased)
 
 The coding benchmark showed llama-4-scout answering "fixed" in 10 of 12 runs without calling a single Tool; the run ended as `completed` and a user would have believed it.

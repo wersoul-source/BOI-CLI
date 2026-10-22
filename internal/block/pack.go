@@ -13,6 +13,8 @@ type PackKind string
 
 const (
 	ToolPack PackKind = "tool-pack"
+	// SkillPack is a folder of Skill files named by an environment entry.
+	SkillPack PackKind = "skill-pack"
 )
 
 // PackManifest declares one pluggable Block pack: what it provides and what it
@@ -81,6 +83,9 @@ type Environment struct {
 	// Trusted is set by the host, never read from the file: only a trusted
 	// environment may start MCP server processes.
 	Trusted bool `json:"-"`
+	// Dir is the .boi directory the file was read from, set by the host. A
+	// Skill folder is resolved inside it.
+	Dir string `json:"-"`
 }
 
 // EnvironmentBlock selects one pack. A missing required pack stops start-up;
@@ -89,6 +94,14 @@ type EnvironmentBlock struct {
 	ID       string     `json:"id"`
 	Required bool       `json:"required"`
 	MCP      *MCPServer `json:"mcp,omitempty"`
+	// Skills makes the entry a Skill pack: a folder of Skill files.
+	Skills *SkillFolder `json:"skills,omitempty"`
+}
+
+// SkillFolder is a folder of *.skill.md files, relative to the workspace's
+// .boi directory. A Skill is untrusted text; it adds no Tool and no authority.
+type SkillFolder struct {
+	Dir string `json:"dir"`
 }
 
 // MCPServer makes an environment entry an MCP Block: a local server process
@@ -115,6 +128,12 @@ func (e Environment) Validate() error {
 		}
 		if item.MCP != nil && strings.TrimSpace(item.MCP.Command) == "" {
 			return fmt.Errorf("environment %q: MCP Block %q has no command", e.Name, item.ID)
+		}
+		if item.Skills != nil && item.MCP != nil {
+			return fmt.Errorf("environment %q: Block %q cannot be both an MCP server and a Skill folder", e.Name, item.ID)
+		}
+		if item.Skills != nil && strings.TrimSpace(item.Skills.Dir) == "" {
+			return fmt.Errorf("environment %q: Skill pack %q has no dir", e.Name, item.ID)
 		}
 		if strings.ContainsAny(item.ID, ". /\\") {
 			return fmt.Errorf("environment %q: Block id %q may not contain dots, spaces or slashes", e.Name, item.ID)

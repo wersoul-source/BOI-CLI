@@ -45,6 +45,7 @@ Linux คือแพลตฟอร์มแรกที่รองรับ �
 ชุดสำเร็จรูป: ดูด้วย `boi env presets` แล้วเลือก `boi env use minimal` (อ่านอย่างเดียว) หรือ `boi env use coding` (อ่าน เขียน รันคำสั่ง โดยต้องขออนุญาต) แล้วดูผลด้วย `boi env`
 
 pack ในตัว: `workspace-tools` (list, read, search, write), `workspace-read` (list, read, search), `process-tools` (`process.run`) และ `subagent` (`agent.delegate`: ส่งงานย่อยให้ผู้ช่วยที่ใช้ได้เฉพาะ Tool ที่อนุญาต ดู [ADR-003](docs/architecture/ADR-003-subagent.md))
+รายการที่มี `skills` จะเสียบโฟลเดอร์ Skill (ไฟล์ `*.skill.md` อยู่ใต้ `.boi`) เช่น `{"id": "team-skills", "required": false, "skills": {"dir": "skills/team"}}` Skill เป็นแค่ข้อความ ไม่เพิ่ม Tool และไม่ต้อง trust โมเดลเป็นคนตัดสินว่าจะโหลดหรือไม่ และ Skill ทำงานได้ทั้งมีและไม่มี Tool ที่มันอ้างถึง ดู [ADR-004](docs/architecture/ADR-004-skill-packs.md)
 รายการที่มี `mcp` จะเสียบ tool ของ MCP server ในเครื่องเข้ามา ทุกตัวต้องขออนุญาตก่อนใช้ และไม่ต้อง build BOI ใหม่
 แต่ MCP คือคำสั่งที่รันบนเครื่องคุณ จึงเริ่มทำงานก็ต่อเมื่อคุณตรวจไฟล์แล้วสั่ง `boi env trust` ถ้าไฟล์ถูกแก้ภายหลัง trust จะถูกถอนอัตโนมัติ
 

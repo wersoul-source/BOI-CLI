@@ -95,6 +95,16 @@ func EnsureCapabilityIndexes(boiDir string) error {
 }
 
 func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment, registeredTools []string) (*CapabilitySet, error) {
+	return selectCapabilities(boiDir, task, environment, registeredTools, nil)
+}
+
+// packSkillPriority orders Skills from Skill packs among the registry's.
+const packSkillPriority = 50
+
+// selectCapabilities selects the task's Tools and Skills. packSkills come
+// from Skill packs of the environment; a Skill whose name the registry
+// already lists is ignored, because the registry is the user's explicit choice.
+func selectCapabilities(boiDir, task string, environment coreblock.AgentEnvironment, registeredTools []string, packSkills []*skill.Skill) (*CapabilitySet, error) {
 	toolIndex, err := capability.LoadIndex(capability.IndexPath(boiDir, capability.KindTool), capability.KindTool)
 	if err != nil {
 		return nil, err
@@ -126,7 +136,24 @@ func SelectCapabilities(boiDir, task string, environment coreblock.AgentEnvironm
 			installedSkills[entry.Name], loadedByName[entry.Name] = true, loaded
 		}
 	}
-	skills := capability.Select(*skillIndex, capability.SelectionInput{Task: task, Installed: installedSkills, AvailableRequirements: available, ProviderAllows: environment.SkillCalling, ContextBudget: environment.ContextBytes})
+	registryNames := map[string]bool{}
+	for _, entry := range skillIndex.Entries {
+		registryNames[entry.Name] = true
+	}
+	merged := *skillIndex
+	merged.Entries = append([]capability.Entry(nil), skillIndex.Entries...)
+	for _, item := range packSkills {
+		if registryNames[item.Name] {
+			continue
+		}
+		merged.Entries = append(merged.Entries, capability.Entry{
+			Name: item.Name, Source: "skill-pack", Summary: item.Description, Enabled: true, Priority: packSkillPriority,
+			Tags: strings.FieldsFunc(item.Name, func(r rune) bool { return r == '-' || r == '_' || r == '.' }), Requires: item.Requires,
+			ContextCost: len(item.Name) + len(item.Description) + 32,
+		})
+		installedSkills[item.Name], loadedByName[item.Name] = true, item
+	}
+	skills := capability.Select(merged, capability.SelectionInput{Task: task, Installed: installedSkills, AvailableRequirements: available, ProviderAllows: environment.SkillCalling, ContextBudget: environment.ContextBytes})
 	loaded := make([]*skill.Skill, 0, len(skills.Active))
 	for _, name := range skills.Active {
 		if item := loadedByName[name]; item != nil {
