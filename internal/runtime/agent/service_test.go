@@ -296,3 +296,53 @@ func TestClipMiddleKeepsTailAndValidUTF8(t *testing.T) {
 		t.Fatalf("bad clip: len=%d valid=%v", len(clipped), utf8.ValidString(clipped))
 	}
 }
+
+func startResult(t *testing.T, service *Service, query string) *AgentResult {
+	t.Helper()
+	var result *AgentResult
+	for event := range service.Start(context.Background(), query) {
+		if event.Err != nil {
+			t.Fatal(event.Err)
+		}
+		if event.Result != nil {
+			result = event.Result
+		}
+	}
+	if result == nil {
+		t.Fatal("no result")
+	}
+	return result
+}
+
+func TestAnswerAboutAFileWithoutAnyToolIsChallengedAndFlagged(t *testing.T) {
+	service, provider, root := newSequenceService(t, "I fixed calc.go", "Yes, calc.go is fixed")
+	_ = os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n"), 0o600)
+	result := startResult(t, service, "fix the bug in calc.go")
+	if result.Usage.ProviderCalls != 2 || len(provider.requests) != 2 {
+		t.Fatalf("the model was not asked again: %d provider calls", result.Usage.ProviderCalls)
+	}
+	if !strings.Contains(allContent(provider.requests[1]), "you answered without using any Tool") {
+		t.Fatal("the second request does not carry the host's challenge")
+	}
+	if result.StopReason != StopCompleted || result.Notice == "" || result.Response != "Yes, calc.go is fixed" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestPlainConversationIsNotChallenged(t *testing.T) {
+	service, provider, root := newSequenceService(t, "my name is Kite")
+	_ = os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n"), 0o600)
+	result := startResult(t, service, "what is your name?")
+	if result.Usage.ProviderCalls != 1 || len(provider.requests) != 1 || result.Notice != "" {
+		t.Fatalf("a chat turn was challenged: calls=%d notice=%q", result.Usage.ProviderCalls, result.Notice)
+	}
+}
+
+func TestNonInteractiveRunsAreNotChallenged(t *testing.T) {
+	service, _, root := newSequenceService(t, "I fixed calc.go")
+	_ = os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n"), 0o600)
+	result, err := service.Run(context.Background(), "fix the bug in calc.go")
+	if err != nil || result.Usage.ProviderCalls != 1 || result.Notice != "" {
+		t.Fatalf("a non-interactive run was challenged: %#v %v", result, err)
+	}
+}

@@ -78,4 +78,7 @@ type AgentResult struct {
 	Artifacts          []ArtifactReference
 	ProviderProfileRef string
 	IdempotencyKeyHash string
+	// Notice is a host statement the user must see next to the Response, for
+	// example that no Tool ran although the Agent could have acted.
+	Notice string
 }

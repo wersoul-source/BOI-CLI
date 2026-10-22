@@ -2,6 +2,15 @@
 
 All notable changes to BOI CLI.
 
+## v2.3.0 — No silent "done" (unreleased)
+
+The coding benchmark showed llama-4-scout answering "fixed" in 10 of 12 runs without calling a single Tool; the run ended as `completed` and a user would have believed it.
+
+- In an interactive run where the model can change files or run commands, an answer that names an existing workspace file (in the task or in the answer, any language) but follows no Tool call is sent back once: "you answered without using any Tool, so nothing was changed or run..." The model then acts or answers again
+- If it answers again without a Tool, the run still completes, with `Notice`: "No Tool ran in this task: no file was changed and no command was run.", shown under the answer in the TUI
+- Plain conversation (no workspace file named), non-interactive runs (`boi ask`, `--json`) and read-only environments are never challenged, so they cost no extra provider call
+- `codingbench` marks a challenged answer as `answer?` in the Tool trace
+
 ## v2.2.0 — Edit in place, Skills always offered (unreleased)
 
 Driven by the first coding benchmark on Cloudflare Workers AI (llama-3.3-70b, 5/12): every failed `implement` and `edit_config` run rewrote a whole file to change one line and lost or invented the lines around it (a changed `package` name, config keys dropped or made up).

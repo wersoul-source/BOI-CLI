@@ -468,7 +468,11 @@ func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 		if event.Result == nil {
 			return agentResponseMsg{err: fmt.Errorf("agent event is empty")}
 		}
-		return agentResponseMsg{content: event.Result.Response, model: event.Result.Model, provider: event.Result.Provider, tokens: event.Result.Tokens, taskID: event.Result.TaskID, manifest: event.Result.Manifest}
+		content := event.Result.Response
+		if event.Result.Notice != "" {
+			content += "\n\n" + event.Result.Notice
+		}
+		return agentResponseMsg{content: content, model: event.Result.Model, provider: event.Result.Provider, tokens: event.Result.Tokens, taskID: event.Result.TaskID, manifest: event.Result.Manifest}
 	}
 }
 
