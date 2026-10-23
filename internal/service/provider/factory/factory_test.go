@@ -1,6 +1,10 @@
 package factory
 
-import "testing"
+import (
+	"testing"
+
+	registry "github.com/boi-family/boi-cli/internal/service/provider/catalog"
+)
 
 func setProvider(t *testing.T, name, key, baseURL, model string) {
 	t.Helper()
@@ -78,5 +82,13 @@ func TestBaseURLIsShownWithoutCredentialsOrQuery(t *testing.T) {
 	setProvider(t, "openai", "k", "", "m")
 	if configured, _ := LoadConfiguredProvidersFromEnv(); len(configured) != 1 || configured[0].BaseURL != "" {
 		t.Fatalf("no address, nothing to show: %+v", configured)
+	}
+}
+
+func TestEveryCatalogProviderCanBeBuilt(t *testing.T) {
+	for _, name := range registry.LoadEmbedded().Names() {
+		if createProvider(ProviderConfig{Name: name, APIKey: "k", Model: "m"}) == nil {
+			t.Errorf("provider %q is in the catalog but the factory cannot build it", name)
+		}
 	}
 }

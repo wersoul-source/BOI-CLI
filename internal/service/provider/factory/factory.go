@@ -139,7 +139,7 @@ func createProvider(cfg ProviderConfig) llm.Provider {
 		"ollama", "openrouter", "together",
 		"cerebras", "fireworks", "hyperbolic", "cohere",
 		"perplexity", "replicate", "nvidia", "deepinfra",
-		"novita", "runpod":
+		"novita", "runpod", "opencode":
 		return providers.NewOpenAIProvider(cfg.Name, cfg.APIKey, cfg.BaseURL, cfg.Model)
 	case "anthropic":
 		return providers.NewAnthropicProvider(cfg.Name, cfg.APIKey, cfg.BaseURL, cfg.Model)
