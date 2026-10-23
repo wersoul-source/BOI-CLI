@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -69,7 +70,18 @@ type Model struct {
 	boiDir          string
 	environment     coreblock.AgentEnvironment
 	agent           *app.Agent
+	configured      []llmfactory.ConfiguredProvider
 }
+
+// cliName is the command the user typed to start this program, so hints name
+// a command that exists on their machine (boi-agent, boi, boi-agent.exe).
+var cliName = func() string {
+	name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+	if name == "" || name == "." || strings.HasSuffix(name, ".test") {
+		return "boi-agent"
+	}
+	return name
+}()
 
 func NewApp(runtime *app.Runtime) *Model {
 	agentName := coreblock.DefaultAgentName
@@ -132,6 +144,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		boiDir:          runtime.BoiDir,
 		environment:     environment,
 		composeErr:      composeErr,
+		configured:      configuredProviders,
 	}
 
 	return m
@@ -371,24 +384,68 @@ func (m *Model) handleSlashCommand(input string) (string, bool) {
 	case strings.HasPrefix(lower, "/provider "):
 		name := strings.TrimSpace(input[len("/provider "):])
 		return m.switchProviderMsg(name), false
-	case strings.HasPrefix(lower, "/model "):
-		name := strings.TrimSpace(input[len("/model "):])
-		return fmt.Sprintf("Model set to: %s", name), false
+	case lower == "/model", strings.HasPrefix(lower, "/model "):
+		return m.modelMsg(), false
+	case lower == "/config", lower == "/setup", lower == "/quickstart":
+		return m.configMsg(), false
 	case lower == "/clear":
 		if m.agentService != nil {
 			m.agentService.ResetConversation()
 		}
 		return "Chat and conversation memory cleared", true
-	case lower == "/quit":
+	case lower == "/quit", lower == "/exit":
 		return "Use Ctrl+Q or Esc to quit", false
 	default:
 		return fmt.Sprintf("Command not recognized: %s\nType /help for available commands.", input), false
 	}
 }
 
+// noProviderMsg explains why the Agent cannot answer and the one step that
+// fixes it. A configured but unqualified provider is a different problem from
+// no provider at all.
+func (m *Model) noProviderMsg() string {
+	if len(m.configured) > 0 {
+		names := make([]string, 0, len(m.configured))
+		for _, p := range m.configured {
+			names = append(names, p.Name+"/"+p.Model)
+		}
+		return fmt.Sprintf("A model is configured (%s) but has not been checked in this folder.\nRun '%s quickstart' in a terminal, in the folder you work in.", strings.Join(names, ", "), cliName)
+	}
+	return fmt.Sprintf("No model is configured for %s.\nRun '%s quickstart' in a terminal, in the folder you work in; it saves the choice in .env here.", m.root, cliName)
+}
+
+func (m *Model) modelMsg() string {
+	if m.agent == nil || len(m.agent.Qualified) == 0 {
+		return m.noProviderMsg()
+	}
+	active := m.agent.Qualified[0]
+	if m.router != nil {
+		for _, q := range m.agent.Qualified {
+			if q.Name == m.router.ActiveProvider() {
+				active = q
+			}
+		}
+	}
+	return fmt.Sprintf("Model: %s\nProvider: %s\nAddress: %s\nThe model is chosen in '%s quickstart --change'; it cannot be switched from inside the chat.", active.Model, active.Name, active.BaseURL, cliName)
+}
+
+func (m *Model) configMsg() string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Folder: %s\n", m.root)
+	if m.agent == nil || len(m.agent.Qualified) == 0 {
+		sb.WriteString(m.noProviderMsg())
+		return sb.String()
+	}
+	for _, q := range m.agent.Qualified {
+		fmt.Fprintf(&sb, "Model: %s/%s at %s\n", q.Name, q.Model, q.BaseURL)
+	}
+	fmt.Fprintf(&sb, "To change the model or the key: '%s quickstart --change' in a terminal.", cliName)
+	return sb.String()
+}
+
 func (m *Model) providerListMsg() string {
-	if m.router == nil {
-		return "No providers configured. Run 'boi quickstart'."
+	if m.router == nil || len(m.router.Stats()) == 0 {
+		return m.noProviderMsg()
 	}
 	stats := m.router.Stats()
 	var sb strings.Builder
@@ -406,7 +463,7 @@ func (m *Model) providerListMsg() string {
 
 func (m *Model) switchProviderMsg(name string) string {
 	if m.router == nil {
-		return "No providers configured."
+		return m.noProviderMsg()
 	}
 	if m.router.SetActiveProvider(name) {
 		// Update status bar
@@ -489,7 +546,7 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 	}
 	if msg.err != nil {
 		if errors.Is(msg.err, agent.ErrNoProvider) {
-			m.chat.AddMessage("error", "No AI providers configured. Run 'boi quickstart' in a terminal to set one up.")
+			m.chat.AddMessage("error", m.noProviderMsg())
 		} else {
 			m.chat.AddMessage("error", fmt.Sprintf("Agent error: %v", msg.err))
 		}
@@ -583,8 +640,9 @@ var helpText = `Available commands:
   /persona   Show the fixed Core Persona and Agent name
   /clear     Clear chat history
   /quit      Exit BOI CLI
-  /provider  Switch LLM provider
-  /model     Switch model
+  /provider  List providers, or /provider NAME to switch
+  /model     Show the model in use
+  /config    Show the folder, model and how to change it
   /workspace Show the active sandbox root
   /ls [path] List a directory inside the workspace
   /read PATH Read a text file inside the workspace
