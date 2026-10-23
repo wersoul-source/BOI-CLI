@@ -302,18 +302,23 @@ func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.infoMsg = "API key set. Select model..."
 		m.errorMsg = ""
 		m.cursor = 0
-		if m.curCustom {
-			// Custom provider: enter model name as text
+		live := liveModels(m.curName, m.curBaseURL, key)
+		if m.curCustom && len(live) == 0 {
+			// Custom provider whose list could not be read: type the name.
 			m.curCustomText = true
 			m.textInput.SetValue("")
 			m.textInput.Placeholder = "e.g. gpt-4o"
 			m.textInput.EchoMode = textinput.EchoNormal
 			m.textInput.Focus()
-			m.step = stepModel
 		} else {
 			m.buildModelList(m.curName)
-			m.step = stepModel
+			if len(live) > 0 {
+				// The provider's own list is current; the catalog is a fallback.
+				m.listItems = append(append([]string{}, live...), "[Type custom model...]")
+				m.infoMsg = fmt.Sprintf("%d models from the provider. Select model...", len(live))
+			}
 		}
+		m.step = stepModel
 		return m, nil
 	}
 	// Forward all other keys to textinput (let user type the API key)

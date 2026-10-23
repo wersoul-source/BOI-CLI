@@ -271,5 +271,11 @@
       "deepseek-r1",
       "qwen3-72b-instruct"
     ]
+  },
+  {
+    "name": "opencode",
+    "label": "OpenCode Zen",
+    "base_url": "https://opencode.ai/zen/v1",
+    "models": []
   }
 ]

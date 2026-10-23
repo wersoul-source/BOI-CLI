@@ -2,6 +2,12 @@
 
 All notable changes to BOI CLI.
 
+## v2.6.0 — Providers that stay current (unreleased)
+
+- **The wizard asks the provider for its models.** After the key is entered, the wizard reads `GET <address>/models` and offers that list, so it is never older than the provider; the built-in list is the fallback when the server cannot be asked (Anthropic and Google use other protocols and keep the built-in list). Custom endpoints get the list too, with "Type custom model" still available
+- **OpenCode Zen** (`opencode`, `https://opencode.ai/zen/v1`) is in the provider list. Its models come from the live list. Models Zen serves through other routes than chat completions (some Qwen and Gemini models) are not covered
+- A test requires every provider in the catalog to be buildable by the factory
+
 ## v2.5.2 — Wizard: typed model names, working TUI commands (unreleased)
 
 The second real hosted run saved the model `custom` and an address cut short, and every check failed with 404 and then 400.
