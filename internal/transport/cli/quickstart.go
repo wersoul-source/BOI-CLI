@@ -37,22 +37,38 @@ var quickstartCmd = &cobra.Command{
   2. saves the settings in this project's .env (kept out of Git)
   3. checks what the model can do, so the Agent only uses what it proved
 
-Run it again any time to change the model or repeat the check.`,
+Run it again any time to repeat the check. To pick another model or enter the
+address and key again, run 'boi quickstart --change'.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		runtime, ok := app.RuntimeFromContext(cmd.Context())
 		if !ok || runtime == nil {
 			return fmt.Errorf("application runtime is not configured")
 		}
-		return RunQuickstart(cmd.Context(), runtime, bufio.NewReader(cmd.InOrStdin()), cmd.OutOrStdout())
+		change, _ := cmd.Flags().GetBool("change")
+		return RunQuickstart(cmd.Context(), runtime, bufio.NewReader(cmd.InOrStdin()), cmd.OutOrStdout(), change)
 	},
 }
 
-func init() { rootCmd.AddCommand(quickstartCmd) }
+func init() {
+	quickstartCmd.Flags().Bool("change", false, "choose the model again instead of keeping the saved one")
+	rootCmd.AddCommand(quickstartCmd)
+}
+
+// clearProviderEnv forgets every PSC_* value held by this process. The saved
+// .env is read into the environment at start, and a value already set is never
+// replaced by a later read, so a changed choice would otherwise be ignored.
+func clearProviderEnv() {
+	for i := 1; i <= 20; i++ {
+		for _, name := range []string{"NAME", "API_KEY", "BASE_URL", "MODEL"} {
+			os.Unsetenv(fmt.Sprintf("PSC_%d_%s", i, name))
+		}
+	}
+}
 
 // RunQuickstart takes a project from nothing to an Agent whose Provider has
 // been checked, asking only what it cannot find out itself.
-func RunQuickstart(ctx context.Context, runtime *app.Runtime, in *bufio.Reader, out io.Writer) error {
+func RunQuickstart(ctx context.Context, runtime *app.Runtime, in *bufio.Reader, out io.Writer, change bool) error {
 	fmt.Fprintln(out, "BOI quick start")
 	fmt.Fprintln(out)
 	if _, err := os.Stat(filepath.Join(runtime.BoiDir, "config.yaml")); os.IsNotExist(err) {
@@ -64,6 +80,9 @@ func RunQuickstart(ctx context.Context, runtime *app.Runtime, in *bufio.Reader, 
 		return fmt.Errorf("prepare the project: %w", err)
 	}
 	loadEnvFiles(runtime.EnvPath)
+	if change {
+		clearProviderEnv()
+	}
 
 	if llmfactory.CountProvidersFromEnv() == 0 {
 		fmt.Fprintln(out, "Step 1 of 2: find a model")
@@ -78,7 +97,11 @@ func RunQuickstart(ctx context.Context, runtime *app.Runtime, in *bufio.Reader, 
 		return nil
 	}
 	item := configured[0]
-	fmt.Fprintf(out, "Model: %s (%s)\n\n", item.Model, item.Name)
+	fmt.Fprintf(out, "Model: %s (%s)\n", item.Model, item.Name)
+	if item.BaseURL != "" {
+		fmt.Fprintf(out, "Address: %s\n", item.BaseURL)
+	}
+	fmt.Fprintln(out)
 
 	fmt.Fprintln(out, "Step 2 of 2: check what the model can do")
 	if len(app.QualifiedProviders(runtime.BoiDir, configured)) == 0 {
@@ -94,6 +117,7 @@ func RunQuickstart(ctx context.Context, runtime *app.Runtime, in *bufio.Reader, 
 	}
 	fmt.Fprintln(out)
 	printVerdict(runtime, configured, out)
+	fmt.Fprintln(out, "To pick another model or enter the address and key again: boi quickstart --change")
 	return nil
 }
 

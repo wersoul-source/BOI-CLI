@@ -164,6 +164,9 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 	if hint := authFailureHint(profile.Results, item.Host); hint != "" {
 		fmt.Fprintln(out, hint)
 	}
+	if hint := notFoundHint(profile.Results, item.BaseURL, item.Model); hint != "" {
+		fmt.Fprintln(out, hint)
+	}
 	fmt.Fprintf(out, "Profile: %s\n", path)
 	return nil
 }
@@ -186,5 +189,36 @@ func authFailureHint(results []coreblock.CapabilityResult, host string) string {
 	}
 	return "\nEvery check was rejected as unauthorized (401): " + where + " did not accept the API key.\n" +
 		"Check that the key belongs to that server and was copied whole. For another provider's key, use the matching endpoint\n" +
-		"(run 'boi quickstart' and choose the custom endpoint). The key was sent to " + where + " only."
+		"(run 'boi quickstart --change' and choose the custom endpoint). The key was sent to " + where + " only."
+}
+
+// notFoundHint covers the other common first-run mistake: every check got
+// HTTP 404, so the server answered but does not know the address or the model.
+// It prints both so a typo can be seen.
+func notFoundHint(results []coreblock.CapabilityResult, baseURL, model string) string {
+	if len(results) == 0 {
+		return ""
+	}
+	failed := 0
+	for _, result := range results {
+		switch {
+		case result.Status == coreblock.CapabilityUnsupported:
+			continue
+		case result.Status == coreblock.CapabilityFailed && strings.Contains(result.Detail, "HTTP 404"):
+			failed++
+		default:
+			return ""
+		}
+	}
+	if failed == 0 {
+		return ""
+	}
+	if baseURL == "" {
+		baseURL = "(the provider's own address)"
+	}
+	return "\nEvery check got 404 (not found): the server answered, but it does not know this address or this model.\n" +
+		"  Address: " + baseURL + "\n" +
+		"  Model:   " + model + "\n" +
+		"Look for a missing or extra character (the address must end like .../ai/v1 and requests go to .../chat/completions),\n" +
+		"and use the model name exactly as the provider lists it. Run 'boi quickstart --change' to enter them again."
 }

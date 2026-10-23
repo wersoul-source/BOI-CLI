@@ -25,7 +25,8 @@ It looks for a model server on this computer (Ollama, LM Studio, llama.cpp),
 lists the models it finds and lets you pick one with Enter. With none running,
 it offers a hosted provider with an API key, or a server at another address. It
 then saves the choice in `.env` (kept out of Git) and checks what the model can
-do. Run it again whenever you change the model.
+do. Run it again to repeat the check; run `boi quickstart --change` to pick another
+model or enter the address and key again.
 
 For a hosted provider the wizard lists OpenAI, Anthropic, Google, Groq,
 OpenRouter and others: pick one with the arrows, paste the key (it is hidden),
@@ -116,7 +117,7 @@ read-only and coding setups.
 | You see | Likely cause and fix |
 |---|---|
 | `boi: command not found` / not recognized | Open a new terminal after installing, or run `./boi` from the folder it was built in. |
-| Every check says `HTTP 401` | The server did not accept the key: the key belongs to another provider than the address shown on the `Endpoint:` line, or was copied incompletely. Run `boi quickstart` again, and for a provider that is not in the list choose **Other** and give its address. Create a new key if the old one may have been sent to the wrong server. |
+| Every check says `HTTP 401` | The server did not accept the key: the key belongs to another provider than the address shown on the `Endpoint:` line, or was copied incompletely. Run `boi quickstart --change`, and for a provider that is not in the list choose **Other** and give its address. Create a new key if the old one may have been sent to the wrong server. |
 | `quickstart` finds no local model | The server is not running, or it is on another port: choose "A local server at another address". |
 | `no valid providers found` | `PSC_1_NAME` and `PSC_1_MODEL` are not set in this shell, or the endpoint is not `localhost` and has no `PSC_1_API_KEY` (any text works for your own server on the network). |
 | `Providers: none qualified` in `boi env` | Run `boi quickstart` again. |

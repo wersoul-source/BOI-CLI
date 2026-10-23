@@ -27,6 +27,9 @@ type ConfiguredProvider struct {
 	// Host is where requests go (host and port only), so a check can say which
 	// server rejected a key. It is empty when the Provider's own default is used.
 	Host string
+	// BaseURL is the address requests are built on, without any user name,
+	// query or fragment, so it can be shown to the user to check.
+	BaseURL string
 }
 
 func LoadProvidersFromEnv() ([]llm.Provider, error) {
@@ -50,7 +53,7 @@ func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
 		}
 		p := createProvider(cfg)
 		if p != nil {
-			result = append(result, ConfiguredProvider{Provider: p, Name: cfg.Name, Model: cfg.Model, EndpointClass: classifyEndpoint(cfg.Name, cfg.BaseURL), Host: endpointHost(cfg.BaseURL)})
+			result = append(result, ConfiguredProvider{Provider: p, Name: cfg.Name, Model: cfg.Model, EndpointClass: classifyEndpoint(cfg.Name, cfg.BaseURL), Host: endpointHost(cfg.BaseURL), BaseURL: displayURL(cfg.BaseURL)})
 		}
 	}
 	if len(result) == 0 {
@@ -93,6 +96,16 @@ func endpointHost(baseURL string) string {
 		return ""
 	}
 	return u.Host
+}
+
+// displayURL returns scheme, host and path of a base URL: nothing a user
+// would not want to read back, and no credentials.
+func displayURL(baseURL string) string {
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return strings.TrimRight(u.Scheme+"://"+u.Host+u.EscapedPath(), "/")
 }
 
 func classifyEndpoint(name, baseURL string) string {
