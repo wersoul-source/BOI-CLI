@@ -202,3 +202,24 @@ func TestQuickstartSkipsTheChoiceWhenAModelIsAlreadyConfigured(t *testing.T) {
 		t.Fatalf("a second run must not repeat the check: err=%v qualified=%v\n%s", err, fixture.qualified, output)
 	}
 }
+
+func TestAuthFailureHintNamesTheServerOnlyWhenEveryCheckWasUnauthorized(t *testing.T) {
+	unauthorized := func(name string) coreblock.CapabilityResult {
+		return coreblock.CapabilityResult{Capability: name, Status: coreblock.CapabilityFailed, Detail: "provider request failed: auth, HTTP 401 (check the API key)"}
+	}
+	all := []coreblock.CapabilityResult{unauthorized("completion"), unauthorized("reasoning")}
+	hint := authFailureHint(all, "api.openai.com")
+	if !strings.Contains(hint, "api.openai.com") || !strings.Contains(hint, "401") || !strings.Contains(hint, "only") {
+		t.Fatalf("hint = %q", hint)
+	}
+	if !strings.Contains(authFailureHint(all, ""), "the provider") {
+		t.Fatal("without a host the hint must still read well")
+	}
+	mixed := append([]coreblock.CapabilityResult{{Capability: "context", Status: coreblock.CapabilityPassed}}, all...)
+	other := []coreblock.CapabilityResult{unauthorized("completion"), {Capability: "reasoning", Status: coreblock.CapabilityFailed, Detail: "timeout"}}
+	for name, results := range map[string][]coreblock.CapabilityResult{"one passed": mixed, "another cause": other, "none": nil} {
+		if hint := authFailureHint(results, "x"); hint != "" {
+			t.Errorf("%s: unexpected hint %q", name, hint)
+		}
+	}
+}

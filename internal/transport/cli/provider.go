@@ -151,6 +151,9 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 		return err
 	}
 	fmt.Fprintf(out, "Provider: %s\nModel: %s\nEndpoint class: %s\n", target.Provider, target.Model, target.EndpointClass)
+	if item.Host != "" {
+		fmt.Fprintf(out, "Endpoint: %s\n", item.Host)
+	}
 	for _, result := range profile.Results {
 		line := fmt.Sprintf("  %-20s %s", result.Capability, result.Status)
 		if result.Status == coreblock.CapabilityFailed && result.Detail != "" {
@@ -158,6 +161,30 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 		}
 		fmt.Fprintln(out, line)
 	}
+	if hint := authFailureHint(profile.Results, item.Host); hint != "" {
+		fmt.Fprintln(out, hint)
+	}
 	fmt.Fprintf(out, "Profile: %s\n", path)
 	return nil
+}
+
+// authFailureHint explains the most common first-run mistake: every check was
+// rejected as unauthorized, which means the key does not belong to the server
+// it was sent to (or was copied incompletely), not that the model is weak.
+func authFailureHint(results []coreblock.CapabilityResult, host string) string {
+	if len(results) == 0 {
+		return ""
+	}
+	for _, result := range results {
+		if result.Status != coreblock.CapabilityFailed || !strings.Contains(result.Detail, "HTTP 401") {
+			return ""
+		}
+	}
+	where := "the provider"
+	if host != "" {
+		where = host
+	}
+	return "\nEvery check was rejected as unauthorized (401): " + where + " did not accept the API key.\n" +
+		"Check that the key belongs to that server and was copied whole. For another provider's key, use the matching endpoint\n" +
+		"(run 'boi quickstart' and choose the custom endpoint). The key was sent to " + where + " only."
 }

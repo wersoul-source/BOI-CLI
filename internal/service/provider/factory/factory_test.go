@@ -52,3 +52,19 @@ func TestOllamaWithoutAnEndpointIsNotSentToOpenAI(t *testing.T) {
 		t.Fatalf("cfg = %+v ok=%v", cfg, ok)
 	}
 }
+
+func TestHostNamesTheServerWithoutThePathOrAccount(t *testing.T) {
+	setProvider(t, "openai", "k", "https://api.cloudflare.com/client/v4/accounts/3b6e5aaf73d88dd507c4f37a18ccc4cb/ai/v1", "m")
+	configured, err := LoadConfiguredProvidersFromEnv()
+	if err != nil || len(configured) != 1 || configured[0].Host != "api.cloudflare.com" {
+		t.Fatalf("configured = %+v, %v", configured, err)
+	}
+	setProvider(t, "openai", "k", "http://127.0.0.1:1234/v1", "m")
+	if configured, _ := LoadConfiguredProvidersFromEnv(); len(configured) != 1 || configured[0].Host != "127.0.0.1:1234" {
+		t.Fatalf("a local server's port belongs to its host: %+v", configured)
+	}
+	setProvider(t, "openai", "k", "", "m")
+	if configured, _ := LoadConfiguredProvidersFromEnv(); len(configured) != 1 || configured[0].Host != "" {
+		t.Fatalf("the Provider's own default has no host to name: %+v", configured)
+	}
+}
