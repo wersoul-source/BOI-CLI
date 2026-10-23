@@ -108,7 +108,7 @@ func newQuickstartFixture(t *testing.T, candidates []localCandidate) *quickstart
 func runQuickstart(t *testing.T, fixture *quickstartFixture, input string) (string, error) {
 	t.Helper()
 	var out strings.Builder
-	err := RunQuickstart(context.Background(), fixture.runtime, bufio.NewReader(strings.NewReader(input)), &out)
+	err := RunQuickstart(context.Background(), fixture.runtime, bufio.NewReader(strings.NewReader(input)), &out, false)
 	return out.String(), err
 }
 
@@ -220,6 +220,72 @@ func TestAuthFailureHintNamesTheServerOnlyWhenEveryCheckWasUnauthorized(t *testi
 	for name, results := range map[string][]coreblock.CapabilityResult{"one passed": mixed, "another cause": other, "none": nil} {
 		if hint := authFailureHint(results, "x"); hint != "" {
 			t.Errorf("%s: unexpected hint %q", name, hint)
+		}
+	}
+}
+
+func TestNotFoundHintShowsTheAddressAndModelToCheck(t *testing.T) {
+	missing := func(name string) coreblock.CapabilityResult {
+		return coreblock.CapabilityResult{Capability: name, Status: coreblock.CapabilityFailed, Detail: "provider request failed: not_found, HTTP 404 (check the model name and base URL)"}
+	}
+	all := []coreblock.CapabilityResult{missing("completion"), {Capability: "native_tool_schema", Status: coreblock.CapabilityUnsupported}, missing("reasoning")}
+	hint := notFoundHint(all, "https://api.cloudflare.com/client/v4/accounts/abc/ai/v", "custom")
+	for _, want := range []string{"404", "Address: https://api.cloudflare.com/client/v4/accounts/abc/ai/v\n", "Model:   custom", "chat/completions"} {
+		if !strings.Contains(hint, want) {
+			t.Errorf("hint lacks %q:\n%s", want, hint)
+		}
+	}
+	other := []coreblock.CapabilityResult{missing("completion"), {Capability: "reasoning", Status: coreblock.CapabilityPassed}}
+	if notFoundHint(other, "x", "m") != "" || notFoundHint(nil, "x", "m") != "" {
+		t.Fatal("the hint must appear only when every check got 404")
+	}
+	if !strings.Contains(notFoundHint(all, "", "m"), "provider's own address") {
+		t.Fatal("without an address the hint must say so")
+	}
+}
+
+func TestQuickstartChangeChoosesAgainAndChecksTheNewModel(t *testing.T) {
+	server := modelServer(t, "new-model:7b")
+	fixture := newQuickstartFixture(t, []localCandidate{{"Ollama", server.URL + "/v1"}})
+	t.Setenv("PSC_1_NAME", "openai")
+	t.Setenv("PSC_1_BASE_URL", "https://api.cloudflare.com/client/v4/accounts/abc/ai/v")
+	t.Setenv("PSC_1_MODEL", "custom")
+	t.Setenv("PSC_1_API_KEY", "old-key")
+	var out strings.Builder
+	if err := RunQuickstart(context.Background(), fixture.runtime, bufio.NewReader(strings.NewReader("\n")), &out, true); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if len(fixture.saved) != 1 || fixture.saved[0].Model != "new-model:7b" {
+		t.Fatalf("the new choice was not saved: %+v\n%s", fixture.saved, out.String())
+	}
+	if !strings.Contains(out.String(), "Model: new-model:7b") || strings.Contains(out.String(), "custom") || strings.Contains(out.String(), "old-key") {
+		t.Fatalf("the old settings must not be checked or shown:\n%s", out.String())
+	}
+	if len(fixture.qualified) != 1 {
+		t.Fatalf("qualified = %v", fixture.qualified)
+	}
+}
+
+func TestQuickstartWithoutChangeKeepsTheSavedModel(t *testing.T) {
+	server := modelServer(t, "other:7b")
+	fixture := newQuickstartFixture(t, []localCandidate{{"Ollama", server.URL + "/v1"}})
+	t.Setenv("PSC_1_NAME", "ollama")
+	t.Setenv("PSC_1_BASE_URL", "http://localhost:11434/v1")
+	t.Setenv("PSC_1_MODEL", "saved:7b")
+	output, err := runQuickstart(t, fixture, "")
+	if err != nil || len(fixture.saved) != 0 || !strings.Contains(output, "Model: saved:7b") || !strings.Contains(output, "quickstart --change") {
+		t.Fatalf("err=%v saved=%v\n%s", err, fixture.saved, output)
+	}
+}
+
+func TestClearProviderEnvForgetsEverySlot(t *testing.T) {
+	for _, name := range []string{"PSC_1_NAME", "PSC_2_MODEL", "PSC_20_API_KEY", "PSC_3_BASE_URL"} {
+		t.Setenv(name, "x")
+	}
+	clearProviderEnv()
+	for _, name := range []string{"PSC_1_NAME", "PSC_2_MODEL", "PSC_20_API_KEY", "PSC_3_BASE_URL"} {
+		if os.Getenv(name) != "" {
+			t.Errorf("%s survived", name)
 		}
 	}
 }

@@ -324,16 +324,21 @@ func (m *WizardModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *WizardModel) updateModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.curCustomText {
-		// Custom model text input mode
-		switch msg.String() {
-		case "enter":
+		// Custom model text input mode. Every other key goes to the text box:
+		// they were dropped here, so a typed model name never arrived and the
+		// provider was saved with the model "custom".
+		if msg.String() == "enter" {
 			customModel := strings.TrimSpace(m.textInput.Value())
 			if customModel == "" {
-				customModel = "custom"
+				m.errorMsg = "Type the model name, exactly as the provider lists it"
+				return m, nil
 			}
+			m.errorMsg = ""
 			return m.confirmProvider(customModel)
 		}
-		return m, nil
+		var cmd tea.Cmd
+		m.textInput, cmd = m.textInput.Update(msg)
+		return m, cmd
 	}
 
 	switch msg.String() {

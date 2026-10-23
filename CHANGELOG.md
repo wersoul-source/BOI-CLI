@@ -2,6 +2,15 @@
 
 All notable changes to BOI CLI.
 
+## v2.5.2 — Wizard: typed model names (unreleased)
+
+The second real hosted run saved the model `custom` and an address cut short, and every check failed with 404 and then 400.
+
+- **A model name typed in the wizard never arrived.** The model step threw away every key press, and an empty name was quietly replaced by the word `custom`, so a provider with a typed model (every custom model, and the "Custom model" item of every provider) was saved with the model `custom`. Typed keys now reach the text box, and an empty model name is refused with a message instead of replaced. This bug is older than v2.5; the v2.5.1 tests set the text box directly and missed it, so the wizard tests now type key by key and a typed and a pasted 84-character address are checked to arrive whole
+- `boi quickstart` shows the address it saved next to the model (`Address: https://…/ai/v1`, without any user name or query), so a missing character can be seen before the check
+- `boi quickstart --change` chooses again: a saved model was kept and re-checked every time, so a wrong address or model could not be corrected without editing `.env`. The saved values are forgotten first, because a value already read from `.env` is never replaced by a later read
+- When every check gets 404 the check prints the address and the model it used and what to look for; when every check gets 401 it still names the server
+
 ## v2.5.1 — Setup wizard fixes (unreleased)
 
 Found when the first real hosted run failed every check with HTTP 401.

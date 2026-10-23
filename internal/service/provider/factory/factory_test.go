@@ -68,3 +68,15 @@ func TestHostNamesTheServerWithoutThePathOrAccount(t *testing.T) {
 		t.Fatalf("the Provider's own default has no host to name: %+v", configured)
 	}
 }
+
+func TestBaseURLIsShownWithoutCredentialsOrQuery(t *testing.T) {
+	setProvider(t, "openai", "k", "https://user:pass@api.example.com/v1/?token=abc#frag", "m")
+	configured, err := LoadConfiguredProvidersFromEnv()
+	if err != nil || len(configured) != 1 || configured[0].BaseURL != "https://api.example.com/v1" {
+		t.Fatalf("configured = %+v, %v", configured, err)
+	}
+	setProvider(t, "openai", "k", "", "m")
+	if configured, _ := LoadConfiguredProvidersFromEnv(); len(configured) != 1 || configured[0].BaseURL != "" {
+		t.Fatalf("no address, nothing to show: %+v", configured)
+	}
+}
