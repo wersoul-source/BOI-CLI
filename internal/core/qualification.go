@@ -19,10 +19,11 @@ import (
 
 const CapabilityProfileSchemaVersion = 1
 
-// ProbeSuiteVersion is part of every profile fingerprint. v2 validates
-// behavior instead of exact text and measures native tool calling, so v1
+// ProbeSuiteVersion is part of every profile fingerprint. v3 stops multiplying
+// the native tool result by the text-envelope result, so a model that speaks
+// only one of the two protocols keeps its Tools. The gate changed, so v2
 // profiles no longer load and Providers must be qualified again.
-const ProbeSuiteVersion = "boi-provider-v2"
+const ProbeSuiteVersion = "boi-provider-v3"
 
 type CapabilityStatus string
 
@@ -145,8 +146,15 @@ func ComposeEnvironment(profile *CapabilityProfile) AgentEnvironment {
 		return AgentEnvironment{}
 	}
 	env := AgentEnvironment{Completion: profile.Allows("completion")}
-	env.ToolCalling = env.Completion && profile.Allows("tool_calling") && profile.Allows("tool_observation") && profile.Allows("authority")
-	env.NativeTools = env.ToolCalling && profile.Allows("native_tool_schema")
+	// Resisting an injected instruction and refusing to bypass approval are
+	// required for any Tool use at all, whichever protocol carries the call.
+	trusted := env.Completion && profile.Allows("tool_observation") && profile.Allows("authority")
+	// A model needs one working protocol, not both: native tool definitions
+	// and the text envelope are alternatives, and the runtime already falls
+	// back from one to the other. Multiplying them denied Tools to models that
+	// call them correctly over the standard protocol.
+	env.NativeTools = trusted && profile.Allows("native_tool_schema")
+	env.ToolCalling = trusted && (profile.Allows("tool_calling") || env.NativeTools)
 	env.SkillCalling = env.Completion && profile.Allows("skill_calling") && profile.Allows("authority")
 	if profile.Allows("context") {
 		for _, result := range profile.Results {
@@ -307,7 +315,7 @@ func (q Qualifier) runProbe(ctx context.Context, provider llm.Provider, probe pr
 	defer cancel()
 	response, err := provider.Complete(probeCtx, llm.CompletionRequest{
 		Messages:  []llm.Message{{Role: "system", Content: probeSystemPrompt}, {Role: "user", Content: probe.prompt}},
-		MaxTokens: 256, Temperature: 0,
+		MaxTokens: probeMaxTokens, Temperature: 0,
 	})
 	result := CapabilityResult{Capability: probe.capability, InputBytes: probe.inputBytes}
 	switch {
@@ -318,8 +326,35 @@ func (q Qualifier) runProbe(ctx context.Context, provider llm.Provider, probe pr
 		result.Status, result.Detail = CapabilityInconclusive, "no response"
 	default:
 		result.Status, result.Detail = probe.check(response.Content)
+		if result.Status != CapabilityPassed {
+			result.Detail = withReply(result.Detail, response.Content, response.FinishReason)
+		}
 	}
 	return result
+}
+
+// probeMaxTokens is the output budget of one probe. Every probe wants a short
+// answer, but a model that reasons out loud first spends tokens before it; at
+// 256 such a reply was cut off and read as a wrong answer.
+const probeMaxTokens = 1024
+
+// replyExcerptRunes bounds how much of a failing reply is quoted back.
+const replyExcerptRunes = 160
+
+// withReply appends what the model actually said to a failure detail. Without
+// it a verdict such as "envelope JSON does not decode" cannot be acted on.
+func withReply(detail, content, finishReason string) string {
+	if strings.TrimSpace(finishReason) == "length" {
+		detail += "; reply hit the output limit before it finished"
+	}
+	excerpt := strings.Join(strings.Fields(content), " ")
+	if excerpt == "" {
+		return detail
+	}
+	if runes := []rune(excerpt); len(runes) > replyExcerptRunes {
+		excerpt = string(runes[:replyExcerptRunes]) + "…"
+	}
+	return detail + "; model replied: " + excerpt
 }
 
 // probeNativeTools separates three facts: whether the adapter can carry tool
@@ -338,7 +373,7 @@ func (q Qualifier) probeNativeTools(ctx context.Context, provider llm.Provider) 
 		Tools: []llm.ToolDefinition{{Name: "workspace__read", Description: "Read one workspace file.", Parameters: map[string]any{
 			"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string"}}, "required": []string{"path"},
 		}}},
-		MaxTokens: 256, Temperature: 0,
+		MaxTokens: probeMaxTokens, Temperature: 0,
 	})
 	if err != nil {
 		var providerErr *llm.ProviderError
@@ -349,14 +384,20 @@ func (q Qualifier) probeNativeTools(ctx context.Context, provider llm.Provider) 
 		result.Status, result.Detail = CapabilityFailed, probeFailureDetail(err)
 		return result
 	}
-	if response == nil || len(response.ToolCalls) == 0 {
-		result.Status, result.Detail = CapabilityFailed, "model answered without a native tool call"
+	if response == nil {
+		result.Status, result.Detail = CapabilityInconclusive, "no response"
+		return result
+	}
+	if len(response.ToolCalls) == 0 {
+		result.Status = CapabilityFailed
+		result.Detail = withReply("model answered without a native tool call", response.Content, response.FinishReason)
 		return result
 	}
 	call := response.ToolCalls[0]
 	var arguments map[string]any
 	if call.Name != "workspace__read" || json.Unmarshal([]byte(call.Arguments), &arguments) != nil || arguments["path"] != "README.md" {
-		result.Status, result.Detail = CapabilityFailed, "native tool call has the wrong name or arguments"
+		result.Status = CapabilityFailed
+		result.Detail = withReply("native tool call has the wrong name or arguments", call.Name+" "+call.Arguments, response.FinishReason)
 		return result
 	}
 	result.Status = CapabilityPassed

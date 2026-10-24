@@ -84,6 +84,7 @@ type openAIResponse struct {
 			Content   string           `json:"content"`
 			ToolCalls []openAIToolCall `json:"tool_calls"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -150,6 +151,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	return &llm.CompletionResponse{
 		Content:            result.Choices[0].Message.Content,
 		ToolCalls:          calls,
+		FinishReason:       result.Choices[0].FinishReason,
 		InputTokens:        result.Usage.PromptTokens,
 		OutputTokens:       result.Usage.CompletionTokens,
 		Model:              result.Model,

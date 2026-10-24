@@ -281,7 +281,7 @@
   {
     "name": "maxplus",
     "label": "Maxplus AI",
-    "base_url": "https://api.maxplus-ai.cc",
+    "base_url": "https://api.maxplus-ai.cc/v1",
     "models": []
   }
 ]

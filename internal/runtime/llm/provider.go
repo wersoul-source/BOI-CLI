@@ -43,6 +43,11 @@ type CompletionResponse struct {
 	OutputTokens int
 	Model        string
 	Provider     string
+	// FinishReason is why the model stopped, in the Provider's own words
+	// ("stop", "length", "tool_calls", …). It is empty when the adapter or the
+	// endpoint does not report one. "length" tells a truncated reply apart
+	// from a wrong one.
+	FinishReason string
 	// Rate-limit info from API headers (0 if unknown)
 	RateLimitRemaining int
 	RateLimitTotal     int
