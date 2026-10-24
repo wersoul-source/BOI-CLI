@@ -277,5 +277,11 @@
     "label": "OpenCode Zen",
     "base_url": "https://opencode.ai/zen/v1",
     "models": []
+  },
+  {
+    "name": "maxplus",
+    "label": "Maxplus AI",
+    "base_url": "https://api.maxplus-ai.cc",
+    "models": []
   }
 ]
