@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	Version   = "2.6.0"
+	Version   = "2.6.1"
 	BuildGo   = runtime.Version()
 	BuildArch = "Chimera"
 )
