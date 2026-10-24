@@ -44,3 +44,6 @@ obj/
 !.env.example
 benchmark-results.tsv
 outputs/
+
+# ── Stray local build artifact ──
+/boi

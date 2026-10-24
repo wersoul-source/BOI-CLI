@@ -2,9 +2,14 @@
 
 All notable changes to BOI CLI.
 
-## v2.6.1 — Add Maxplus.ai (unreleased)
+## v2.6.1 — Add Maxplus.ai, runtime hardening (unreleased)
 
 - **Maxplus AI** (`maxplus`, `https://api.maxplus-ai.cc`) is in the provider list. Its models come from the live list, supporting both OpenAI-compatible and Anthropic-compatible endpoints
+
+Runtime hardening (ADR-005 scope):
+- **`boi ask` without `--json` now shows the evidence.** The reply alone used to hide the host's verdict: `Notice` ("Nothing was changed or run in this task.") prints under the answer and `Outcome` with `ChangedPaths` goes to stderr, same as the TUI and the automation envelope
+- **A task that asks for a file that does not exist yet is challenged too.** The unevidenced-answer check used to fire only when the task or the answer named an existing file, so "create report.md" answered in prose completed as `answered` with no challenge. The task text is now probed for path-like names that are not existing files (version numbers such as 1.2.3 are not file names); the answer alone still needs an existing file or a code fence
+- The TUI splash logo is redrawn as a clean five-line BOI wordmark (the old DOS-art logo was misaligned) and the unused 8x7 font file is removed
 
 ## v2.6.0 — Providers that stay current (unreleased)
 

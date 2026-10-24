@@ -415,7 +415,12 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		}
 	}
 	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Ungrounded: func(task, response string) bool {
-		return interactive && s.broker.CanChange() && namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists)
+		if !(interactive && s.broker.CanChange()) {
+			return false
+		}
+		// A task that names an existing file, or asks for one that does not
+		// exist yet, is file work: an answer with no effect is challenged.
+		return namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists) || namesNewWorkspaceFile(task, s.workspaceFileExists)
 	}}
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID
