@@ -100,3 +100,34 @@ v2.4 code (earlier numbers are in `CHANGELOG.md` and the PR descriptions), a
 local-model run on Windows PowerShell, and the second-Provider verification.
 Locked and not started: step 6 (Agent packs, organisations, factory) and the
 browser UI (`docs/planning/BOI_WEB_UI_PLAN.md`, proposal only).
+
+## State at v2.6.2 (latest)
+
+v2.5–v2.6 delivered the guided setup wizard (`boi quickstart`), live model
+lists, and new providers (OpenCode Zen, Maxplus.ai). v2.6.2 (tag `v2.6.2`,
+commits `e05d5c2` + `64191fb`) is runtime hardening on top of ADR-005:
+
+- **`boi ask` without `--json` prints the evidence**: `Notice` under the
+  answer, `Outcome` and `ChangedPaths` on stderr. A completed task with no
+  effect is now visible on every transport.
+- **The unevidenced-answer challenge also fires when the task asks for a
+  file that does not exist yet** (`namesNewWorkspaceFile` in
+  `internal/runtime/agent/grounding.go`; version-like tokens such as `1.2.3`
+  are excluded). Non-interactive runs stay unchallenged by design (ADR-005).
+- TUI splash logo redrawn; the unused 8x7 font was deleted.
+
+Known issues to carry forward:
+
+- `TestEditChangesOnlyTheMatchedText` (`internal/equipment/tools/filesystem`)
+  fails on Windows only: the test asserts a Unix file mode and the platform
+  reports 0666. Test-sensitivity fix, not a logic bug.
+- No `workspace.delete` Tool exists yet; see the roadmap.
+- The `llm.Provider.Stream` interface has no caller: streaming is not
+  implemented anywhere in the live paths.
+
+**Next work: read [`docs/planning/V2_6_PLUS_ROADMAP.md`](docs/planning/V2_6_PLUS_ROADMAP.md).**
+It maps the owner's eight capability asks to tiers and a concrete attack
+order, starting with `workspace.delete`, then the skill-authoring flow,
+`boi env add-mcp`, session persistence, and the Web UI ADR. Nothing there
+changes the Tool or automation contracts; every step needs its own tests
+and release.
