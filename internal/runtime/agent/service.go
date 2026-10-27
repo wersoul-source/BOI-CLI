@@ -444,7 +444,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		if !s.broker.HasChangeTools() {
 			return false
 		}
-		return namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists) || namesMissingTarget(task, s.workspaceFileExists)
+		return namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists) || namesNewWorkspaceFile(task, s.workspaceFileExists)
 	}}
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID

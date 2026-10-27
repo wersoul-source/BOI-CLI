@@ -10,7 +10,9 @@ func hasCodeFence(text string) bool { return strings.Contains(text, "```") }
 const maxProbedNames = 20
 
 // pathTokens splits text into the tokens that could name a file, in any human
-// language: anything a path is made of, cut at everything else.
+// language: anything a path is made of, cut at everything else. ':' is kept so
+// a web address arrives as one token and can be recognised and rejected,
+// rather than arriving as a bare "//example.com/docs" that reads like a path.
 func pathTokens(text string) []string {
 	return strings.FieldsFunc(text, func(r rune) bool {
 		return !(r == '.' || r == '_' || r == '-' || r == '/' || r == '\\' || r == ':' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r > 127)
@@ -40,12 +42,13 @@ func namesWorkspaceFile(text string, exists func(string) bool) bool {
 	return false
 }
 
-// namesMissingTarget reports whether text names a file or folder that does not
-// exist yet. That is what a task asking for something to be produced looks
-// like before the work is done, and namesWorkspaceFile cannot see it: that one
-// matches only files already on disk, so "write report.json" was never
-// challenged however little the model did.
-func namesMissingTarget(text string, exists func(string) bool) bool {
+// namesNewWorkspaceFile reports whether text names a file or folder that does
+// not exist yet: the shape of a task asking for something to be produced.
+// namesWorkspaceFile cannot see these, because it matches only files already
+// on disk, so "write report.json" was never challenged however little the
+// model did. Only the task text is checked, never the answer, so a model
+// mentioning a path in prose does not trigger a challenge by itself.
+func namesNewWorkspaceFile(text string, exists func(string) bool) bool {
 	if exists == nil {
 		return false
 	}
@@ -66,14 +69,15 @@ func namesMissingTarget(text string, exists func(string) bool) bool {
 
 // looksLikeFileTarget reports whether token has the shape of a path a task
 // asks for. A web address is not a target, and neither is a version such as
-// 2.6.1, so an extension must be short and alphabetic.
+// 2.6.1, so an extension must be short and alphabetic and the name must carry
+// a letter somewhere.
 func looksLikeFileTarget(token string) bool {
 	lower := strings.ToLower(token)
 	if strings.Contains(lower, "://") || strings.HasPrefix(lower, "http") || strings.Contains(token, ":") {
 		return false
 	}
 	token = strings.Trim(token, "./\\")
-	if len(token) < 3 {
+	if len(token) < 3 || !hasLetter(token) {
 		return false
 	}
 	if strings.ContainsAny(token, "/\\") {
@@ -93,4 +97,14 @@ func looksLikeFileTarget(token string) bool {
 		}
 	}
 	return true
+}
+
+// hasLetter keeps version numbers such as 1.2.3 from looking like file names.
+func hasLetter(token string) bool {
+	for _, r := range token {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r > 127 {
+			return true
+		}
+	}
+	return false
 }

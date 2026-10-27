@@ -112,6 +112,13 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), result.Response)
+		if result.Notice != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), result.Notice)
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Outcome: %s\n", result.Outcome)
+		if len(result.ChangedPaths) > 0 {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Changed: %s\n", strings.Join(result.ChangedPaths, ", "))
+		}
 
 		if agentVerbose {
 			fmt.Fprintln(cmd.ErrOrStderr(), "---")
