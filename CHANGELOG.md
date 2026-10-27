@@ -2,7 +2,7 @@
 
 All notable changes to BOI CLI.
 
-## v2.7.0 — Runtime hardening: tool calling, streaming, terminal, workspace policy (unreleased)
+## v2.7.0 — Runtime hardening: tool calling, streaming, terminal, workspace policy
 
 Found by running v2.6 against a real hosted provider. The root-cause analysis is in `docs/rca/v2.6.1-runtime-hardening.md`.
 
