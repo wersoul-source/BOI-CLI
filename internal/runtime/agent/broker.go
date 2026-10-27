@@ -329,6 +329,30 @@ func (b *Broker) CanChange() bool {
 	return false
 }
 
+// HasChangeTools reports whether the library holds a Tool that can change
+// files, run commands or reach outside, whether or not it is offered right
+// now. A task is judged against what the host could do for it, not against
+// what a Provider profile happened to allow: CanChange is false exactly when
+// Tool Calling is denied, which is the case an unevidenced answer matters most.
+func (b *Broker) HasChangeTools() bool {
+	b.registryMu.RLock()
+	defer b.registryMu.RUnlock()
+	for _, tool := range b.tools {
+		if tool.Spec().Risk != port.RiskRead {
+			return true
+		}
+	}
+	return false
+}
+
+// ToolsWithheld reports that Tools are registered but none is offered because
+// the Provider capability profile denied Tool Calling.
+func (b *Broker) ToolsWithheld() bool {
+	b.registryMu.RLock()
+	defer b.registryMu.RUnlock()
+	return !b.toolCallingAllowed && len(b.tools) > 0
+}
+
 // Tool returns a registered Tool by name.
 func (b *Broker) Tool(name string) (port.Tool, bool) {
 	b.registryMu.RLock()

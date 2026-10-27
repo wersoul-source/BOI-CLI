@@ -414,8 +414,16 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			onEngine(event)
 		}
 	}
-	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Ungrounded: func(task, response string) bool {
-		return interactive && s.broker.CanChange() && namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists)
+	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Withheld: s.broker.ToolsWithheld, NoChallenge: !interactive, Ungrounded: func(task, response string) bool {
+		// HasChangeTools, not CanChange: the question is whether the host could
+		// have done the work, and CanChange is false exactly when the Provider
+		// profile withheld every Tool, which is when an unevidenced answer
+		// matters most. A task naming a file that does not exist yet counts
+		// too: that is what "write report.json" looks like before the writing.
+		if !s.broker.HasChangeTools() {
+			return false
+		}
+		return namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists) || namesMissingTarget(task, s.workspaceFileExists)
 	}}
 	if taskSession != nil {
 		engine.TaskID = taskSession.ID

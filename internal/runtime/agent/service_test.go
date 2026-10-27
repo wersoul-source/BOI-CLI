@@ -338,11 +338,66 @@ func TestPlainConversationIsNotChallenged(t *testing.T) {
 	}
 }
 
-func TestNonInteractiveRunsAreNotChallenged(t *testing.T) {
+// A non-interactive run denies every mutation Tool, so asking the model again
+// cannot change anything and the challenge is skipped. The host still records
+// that nothing was changed or run, because an automation run that quietly
+// reports success it never earned is the worst place to stay silent.
+func TestNonInteractiveRunsAreNotChallengedButAreStillRecorded(t *testing.T) {
 	service, _, root := newSequenceService(t, "I fixed calc.go")
 	_ = os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n"), 0o600)
 	result, err := service.Run(context.Background(), "fix the bug in calc.go")
-	if err != nil || result.Usage.ProviderCalls != 1 || result.Notice != "" {
+	if err != nil || result.Usage.ProviderCalls != 1 {
 		t.Fatalf("a non-interactive run was challenged: %#v %v", result, err)
+	}
+	if result.Notice == "" || result.Outcome != OutcomeBlocked {
+		t.Fatalf("an unearned success was recorded as clean: outcome=%q notice=%q", result.Outcome, result.Notice)
+	}
+}
+
+// The reported failure: a Provider that is not qualified for Tool calling has
+// every Tool withheld, so CanChange was false and the grounding check switched
+// itself off in exactly the case it exists for. The run then finished as a
+// clean completion while nothing had been done.
+func TestWithheldToolsAreReportedBlockedNotCompleted(t *testing.T) {
+	service, provider, root := newSequenceService(t, "Done. I created report.json for you.")
+	_ = os.WriteFile(filepath.Join(root, "calc.go"), []byte("package bench\n"), 0o600)
+	service.SetToolCallingAllowed(false)
+	result := startResult(t, service, "write report.json describing calc.go")
+	if result.Outcome != OutcomeBlocked {
+		t.Fatalf("outcome = %q, want blocked", result.Outcome)
+	}
+	if !strings.Contains(result.Notice, "not qualified for Tool calling") {
+		t.Fatalf("notice should name the Provider as the cause, got %q", result.Notice)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("challenging a model that has no Tool is wasted: %d calls", len(provider.requests))
+	}
+}
+
+// A task that asks for a file to be produced names nothing that exists yet, so
+// the old check could never see it and "I created it" was never questioned.
+func TestATaskToProduceAFileIsChallenged(t *testing.T) {
+	service, provider, _ := newSequenceService(t, "I created report.json", "I could not create it")
+	result := startResult(t, service, "create report.json in the workspace")
+	if len(provider.requests) != 2 {
+		t.Fatalf("an unproduced file was not challenged: %d calls", len(provider.requests))
+	}
+	if result.Outcome != OutcomeBlocked || result.Notice == "" {
+		t.Fatalf("result = %q / %q", result.Outcome, result.Notice)
+	}
+}
+
+// The target shape must not fire on prose. A version and a web address are not
+// files a task asks for.
+func TestFileTargetShapeIgnoresVersionsAndURLs(t *testing.T) {
+	for _, token := range []string{"2.6.1", "v2.6.1", "https://example.com/docs/api", "http://a.b/c", "ok", "1.2"} {
+		if looksLikeFileTarget(token) {
+			t.Errorf("%q should not read as a file target", token)
+		}
+	}
+	for _, token := range []string{"report.json", "OK.docx", "system_probe.py", "agent-trial-001/probe.py", "docs/guide.md"} {
+		if !looksLikeFileTarget(token) {
+			t.Errorf("%q should read as a file target", token)
+		}
 	}
 }

@@ -212,11 +212,21 @@ type Engine struct {
 	// suspect: the model could act and the task or the answer names a
 	// workspace file it never touched. Such an answer is challenged once.
 	Ungrounded func(task, response string) bool
+	// Withheld reports that Tools exist but none is offered, because the
+	// Provider capability profile denied Tool Calling. Challenging the model
+	// then asks for something it cannot do, so the host says so instead.
+	Withheld func() bool
+	// NoChallenge suppresses the second provider call an unevidenced answer
+	// would otherwise cost. A non-interactive run denies every mutation Tool,
+	// so asking the model to call one cannot change the outcome. The outcome
+	// is still recorded as blocked.
+	NoChallenge bool
 }
 
 const (
 	unevidencedReason = "your reply came with no change: no file was changed and no command was run. If the task needs that, call the Tool now. If it only needs an answer, say so and answer again."
 	unevidencedNotice = "Nothing was changed or run in this task."
+	withheldNotice    = "Nothing was changed or run: this Provider is not qualified for Tool calling, so no Tool was offered. Run 'boi provider qualify' to see which capability failed."
 )
 
 func (e *Engine) ungrounded(task, response string) bool {
@@ -370,7 +380,8 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			// language, so it asks once and the model decides.
 			effects, _ := ledger.snapshot()
 			unevidenced := effects == 0 && (toolCalls == 0 || attempts > 0 || hasCodeFence(decision.Response)) && e.ungrounded(task, decision.Response)
-			if unevidenced && !challenged {
+			withheld := e.Withheld != nil && e.Withheld()
+			if unevidenced && !challenged && !withheld && !e.NoChallenge {
 				challenged = true
 				e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &Verification{Passed: false, Reason: unevidencedReason}})
 				if e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: errors.New(unevidencedReason), Attempt: recoveries + 1}, &recoveries, limits, step) {
@@ -397,7 +408,13 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 			result := e.stop(state, started, usage, provider, model, StopCompleted, "")
 			result.Response = decision.Response
 			if unevidenced {
+				// What the host recorded, not what the model said: the task
+				// named work on a file and nothing was changed or run.
+				result.Outcome = OutcomeBlocked
 				result.Notice = unevidencedNotice
+				if withheld {
+					result.Notice = withheldNotice
+				}
 			}
 			return result, nil
 		}
