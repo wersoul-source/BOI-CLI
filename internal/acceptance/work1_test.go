@@ -46,10 +46,6 @@ func (p *scriptedProvider) Complete(_ context.Context, request llm.CompletionReq
 	}
 	return &llm.CompletionResponse{Content: p.responses[index], Provider: p.Name(), Model: "fixture-model"}, nil
 }
-func (p *scriptedProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, nil
-}
-
 type blockingProvider struct{ started chan struct{} }
 
 func (p *blockingProvider) Name() string { return "blocking" }
@@ -62,10 +58,6 @@ func (p *blockingProvider) Complete(ctx context.Context, _ llm.CompletionRequest
 	<-ctx.Done()
 	return nil, ctx.Err()
 }
-func (p *blockingProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, nil
-}
-
 func newService(t *testing.T, provider llm.Provider) (*agent.Service, string) {
 	t.Helper()
 	root := t.TempDir()

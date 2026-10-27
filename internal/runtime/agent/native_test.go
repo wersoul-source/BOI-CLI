@@ -25,9 +25,6 @@ type scriptedNativeProvider struct {
 
 func (p *scriptedNativeProvider) Name() string              { return "native" }
 func (p *scriptedNativeProvider) SupportsNativeTools() bool { return true }
-func (p *scriptedNativeProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, nil
-}
 func (p *scriptedNativeProvider) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

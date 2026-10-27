@@ -199,19 +199,141 @@ func TestAnEmptyAPIKeySendsNoAuthorizationHeader(t *testing.T) {
 	}
 }
 
-func TestStreamEmitsContentThenDone(t *testing.T) {
-	for _, c := range cases() {
-		t.Run(c.name, func(t *testing.T) {
-			srv := serve(t, 200, c.okBody, nil)
-			ch, err := c.build(srv.URL).Stream(context.Background(), req)
-			if err != nil {
-				t.Fatal(err)
+// sseServer replies with a server-sent event stream built from the given
+// lines, the way a Chat Completions endpoint does.
+func sseServer(t *testing.T, events []string, inspect func(*http.Request)) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if inspect != nil {
+			inspect(r)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		for _, event := range events {
+			_, _ = w.Write([]byte("data: " + event + "\n\n"))
+			if flusher != nil {
+				flusher.Flush()
 			}
-			first, second := <-ch, <-ch
-			if first.Text != "hi" || !second.Done {
-				t.Fatalf("got %+v %+v", first, second)
-			}
-		})
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// A streamed reply must reach the caller while it is being produced, and the
+// whole text must still come back in the response. OnText is cumulative, so a
+// restarted reply replaces what was shown instead of doubling it.
+func TestStreamReportsTextAsItArrives(t *testing.T) {
+	var sent map[string]any
+	server := sseServer(t, []string{
+		`{"model":"m","choices":[{"delta":{"content":"สวัส"}}]}`,
+		`{"choices":[{"delta":{"content":"ดี"}}]}`,
+		`{"choices":[{"delta":{"content":" ok"},"finish_reason":"stop"}]}`,
+		`{"usage":{"prompt_tokens":7,"completion_tokens":3}}`,
+		"[DONE]",
+	}, func(r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+			t.Error(err)
+		}
+	})
+	var seen []string
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(text string) { seen = append(seen, text) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent["stream"] != true {
+		t.Fatalf("a streaming request must ask the endpoint to stream: %v", sent["stream"])
+	}
+	want := []string{"สวัส", "สวัสดี", "สวัสดี ok"}
+	if len(seen) != len(want) {
+		t.Fatalf("got %d updates, want %d: %q", len(seen), len(want), seen)
+	}
+	for i := range want {
+		if seen[i] != want[i] {
+			t.Fatalf("update %d = %q, want %q", i, seen[i], want[i])
+		}
+	}
+	if resp.Content != "สวัสดี ok" || resp.FinishReason != "stop" {
+		t.Fatalf("response = %q / %q", resp.Content, resp.FinishReason)
+	}
+	if resp.InputTokens != 7 || resp.OutputTokens != 3 {
+		t.Fatalf("usage = %d/%d", resp.InputTokens, resp.OutputTokens)
+	}
+}
+
+// A tool call arrives in pieces that share an index, with its arguments split
+// across chunks. It must be reassembled into the same call a non-streamed
+// reply returns.
+func TestStreamReassemblesASplitToolCall(t *testing.T) {
+	server := sseServer(t, []string{
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"workspace__read","arguments":"{\"pa"}}]}}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\":\"a.txt\"}"}}]}}]}`,
+		`{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}`,
+		"[DONE]",
+	}, nil)
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(string) {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.ToolCalls) != 1 {
+		t.Fatalf("want one tool call, got %d", len(resp.ToolCalls))
+	}
+	call := resp.ToolCalls[0]
+	if call.ID != "c1" || call.Name != "workspace__read" || call.Arguments != `{"path":"a.txt"}` {
+		t.Fatalf("call = %+v", call)
+	}
+}
+
+// Keep-alives, comments and events this adapter does not model must not end
+// the stream.
+func TestStreamIgnoresUnknownEvents(t *testing.T) {
+	server := sseServer(t, []string{
+		": keep-alive",
+		`{"choices":[{"delta":{"role":"assistant"}}]}`,
+		`{"choices":[{"delta":{"content":"hi"}}]}`,
+		"[DONE]",
+	}, nil)
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(string) {},
+	})
+	if err != nil || resp.Content != "hi" {
+		t.Fatalf("resp = %#v err = %v", resp, err)
+	}
+}
+
+// A rejected streaming request must classify like any other provider error,
+// so the Router can fail over or retry.
+func TestStreamSurfacesAnHTTPError(t *testing.T) {
+	server := serve(t, 401, `{"error":"bad key"}`, nil)
+	_, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(string) {},
+	})
+	if llm.ClassifyError(err) != llm.ErrorAuth {
+		t.Fatalf("want an auth error, got %v", err)
+	}
+}
+
+// Without OnText nothing changes: the request does not ask to stream.
+func TestCompleteDoesNotStreamWithoutASink(t *testing.T) {
+	var sent map[string]any
+	server := serve(t, 200, `{"choices":[{"message":{"content":"hi"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`, func(r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&sent); err != nil {
+			t.Error(err)
+		}
+	})
+	if _, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if sent["stream"] != false {
+		t.Fatalf("stream = %v, want false", sent["stream"])
 	}
 }
 

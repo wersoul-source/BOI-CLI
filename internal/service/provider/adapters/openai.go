@@ -1,10 +1,13 @@
 package adapters
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -74,8 +77,38 @@ type openAIRequest struct {
 	MaxTokens int             `json:"max_tokens,omitempty"`
 	// Temperature is a pointer so 0 (deterministic probes) is sent, not
 	// dropped in favor of the provider's default.
-	Temperature *float64 `json:"temperature,omitempty"`
-	Stream      bool     `json:"stream"`
+	Temperature   *float64             `json:"temperature,omitempty"`
+	Stream        bool                 `json:"stream"`
+	StreamOptions *openAIStreamOptions `json:"stream_options,omitempty"`
+}
+
+type openAIStreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
+}
+
+// openAIStreamChunk is one server-sent event of a streamed completion. Text
+// arrives in delta.content; a tool call arrives in pieces that share an index,
+// with its arguments split across any number of chunks.
+type openAIStreamChunk struct {
+	Choices []struct {
+		Delta struct {
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage *struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+	} `json:"usage"`
+	Model string `json:"model"`
 }
 
 type openAIResponse struct {
@@ -102,24 +135,13 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		Temperature: &req.Temperature,
 		Stream:      false,
 	}
-
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("provider %s: %w", p.name, err)
+	if req.OnText != nil {
+		return p.stream(ctx, req, body)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
+	resp, err := p.send(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("provider %s: %w", p.name, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if p.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
-	}
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("provider %s: %w", p.name, err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -209,17 +231,139 @@ func parseRateLimitHeaders(h http.Header) (remaining, total int) {
 	return
 }
 
-func (p *OpenAIProvider) Stream(ctx context.Context, req llm.CompletionRequest) (<-chan llm.Token, error) {
-	resp, err := p.Complete(ctx, req)
+// send posts one request and returns the open response. The caller closes the
+// body.
+func (p *OpenAIProvider) send(ctx context.Context, body openAIRequest) (*http.Response, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("provider %s: %w", p.name, err)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("provider %s: %w", p.name, err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if body.Stream {
+		httpReq.Header.Set("Accept", "text/event-stream")
+	}
+	if p.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
+	resp, err := p.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("provider %s: %w", p.name, err)
+	}
+	return resp, nil
+}
+
+// stream reads a server-sent event stream and reports the text as it arrives.
+// It returns the same response a non-streamed call would, so nothing above it
+// has to know which path ran.
+func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, body openAIRequest) (*llm.CompletionResponse, error) {
+	body.Stream = true
+	body.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
+	resp, err := p.send(ctx, body)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := readBody(resp.Body)
+		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
+	}
 
-	ch := make(chan llm.Token, 1)
-	go func() {
-		defer close(ch)
-		ch <- llm.Token{Text: resp.Content}
-		ch <- llm.Token{Done: true}
-	}()
-	return ch, nil
+	result := &llm.CompletionResponse{Provider: p.name, Model: p.model}
+	var content strings.Builder
+	calls := newToolCallAccumulator()
+	reader := bufio.NewReaderSize(resp.Body, 64<<10)
+	read := 0
+	for {
+		line, readErr := reader.ReadString('\n')
+		if read += len(line); read > maxResponseBytes {
+			return nil, fmt.Errorf("provider %s: stream exceeds %d bytes", p.name, maxResponseBytes)
+		}
+		payload, isData := strings.CutPrefix(strings.TrimRight(line, "\r\n"), "data:")
+		if isData {
+			payload = strings.TrimSpace(payload)
+			if payload == "[DONE]" {
+				break
+			}
+			var chunk openAIStreamChunk
+			// A comment, a keep-alive or an event this adapter does not model
+			// is not an error: the stream carries on.
+			if json.Unmarshal([]byte(payload), &chunk) == nil {
+				if chunk.Model != "" {
+					result.Model = chunk.Model
+				}
+				if chunk.Usage != nil {
+					result.InputTokens, result.OutputTokens = chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens
+				}
+				for _, choice := range chunk.Choices {
+					if choice.FinishReason != "" {
+						result.FinishReason = choice.FinishReason
+					}
+					for _, call := range choice.Delta.ToolCalls {
+						calls.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
+					}
+					if choice.Delta.Content != "" {
+						content.WriteString(choice.Delta.Content)
+						req.OnText(content.String())
+					}
+				}
+			}
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			return nil, fmt.Errorf("provider %s: read stream: %w", p.name, readErr)
+		}
+	}
+
+	result.Content = content.String()
+	result.ToolCalls = calls.requests()
+	result.RateLimitRemaining, result.RateLimitTotal = parseRateLimitHeaders(resp.Header)
+	return result, nil
+}
+
+// toolCallAccumulator rebuilds streamed tool calls. Each call keeps the index
+// it was announced with, and its arguments are appended in arrival order.
+type toolCallAccumulator struct {
+	order     []int
+	byIndex   map[int]*llm.ToolCallRequest
+	arguments map[int]*strings.Builder
+}
+
+func newToolCallAccumulator() *toolCallAccumulator {
+	return &toolCallAccumulator{byIndex: map[int]*llm.ToolCallRequest{}, arguments: map[int]*strings.Builder{}}
+}
+
+func (a *toolCallAccumulator) add(index int, id, name, arguments string) {
+	call, seen := a.byIndex[index]
+	if !seen {
+		call = &llm.ToolCallRequest{}
+		a.byIndex[index] = call
+		a.arguments[index] = &strings.Builder{}
+		a.order = append(a.order, index)
+	}
+	if id != "" {
+		call.ID = id
+	}
+	if name != "" {
+		call.Name = name
+	}
+	a.arguments[index].WriteString(arguments)
+}
+
+func (a *toolCallAccumulator) requests() []llm.ToolCallRequest {
+	var out []llm.ToolCallRequest
+	for _, index := range a.order {
+		call := *a.byIndex[index]
+		call.Arguments = a.arguments[index].String()
+		out = append(out, call)
+	}
+	return out
 }

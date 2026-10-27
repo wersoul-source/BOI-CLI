@@ -22,8 +22,12 @@ type Message struct {
 type ChatModel struct {
 	viewport viewport.Model
 	messages []Message
-	width    int
-	height   int
+	// partial is the reply being written right now. It is drawn as a bubble
+	// after the finished messages and replaced by the real message when the
+	// turn ends, so the user reads the answer as it arrives instead of after.
+	partial string
+	width   int
+	height  int
 }
 
 func NewChat() ChatModel {
@@ -38,6 +42,21 @@ func (c *ChatModel) AddMessage(role, content string) {
 	c.viewport.GotoBottom()
 }
 
+// SetPartial shows the reply being written. The text is cumulative, so each
+// update replaces the last.
+func (c *ChatModel) SetPartial(text string) {
+	if c.partial == text {
+		return
+	}
+	c.partial = text
+	c.renderMessages()
+	c.viewport.GotoBottom()
+}
+
+// ClearPartial drops the live reply without adding a message, for a turn that
+// ended in an error or was cancelled.
+func (c *ChatModel) ClearPartial() { c.SetPartial("") }
+
 func (c *ChatModel) AddAgentMessage(content, provider, model string, tokens int) {
 	msg := Message{
 		Role:     "agent",
@@ -47,6 +66,7 @@ func (c *ChatModel) AddAgentMessage(content, provider, model string, tokens int)
 		Tokens:   tokens,
 		Time:     time.Now(),
 	}
+	c.partial = ""
 	c.messages = append(c.messages, msg)
 	c.renderMessages()
 	c.viewport.GotoBottom()
@@ -54,6 +74,7 @@ func (c *ChatModel) AddAgentMessage(content, provider, model string, tokens int)
 
 func (c *ChatModel) Clear() {
 	c.messages = nil
+	c.partial = ""
 	c.viewport.SetContent("")
 }
 
@@ -73,6 +94,10 @@ func (c *ChatModel) renderMessages() {
 		case "error":
 			sb.WriteString(fmt.Sprintf("\n%s %s\n", ErrorStyle.Render("✗"), ErrorStyle.Render(msg.Content)))
 		}
+	}
+
+	if c.partial != "" {
+		c.renderBubble(&sb, Message{Role: "agent", Content: c.partial, Time: time.Now()}, AgentBubbleStyle, "◆ BOI", "writing…")
 	}
 
 	c.viewport.SetContent(sb.String())

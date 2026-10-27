@@ -85,3 +85,38 @@ func TestChatReflowsOnResize(t *testing.T) {
 		t.Fatalf("after widening the box is %d columns", got)
 	}
 }
+
+// A reply being written is shown as it arrives and is replaced by the real
+// message when the turn ends.
+func TestChatShowsAndThenReplacesTheLiveReply(t *testing.T) {
+	chat := NewChat()
+	chat.SetSize(60, 20)
+	chat.AddMessage("user", "สวัสดี")
+	chat.SetPartial("กำลัง")
+	chat.SetPartial("กำลังคิดอยู่ครับ")
+	view := chat.viewport.View()
+	if !strings.Contains(view, "กำลังคิดอยู่ครับ") {
+		t.Fatal("the live reply is not shown")
+	}
+	if strings.Contains(view, "กำลัง\n") && strings.Count(view, "writing") != 1 {
+		t.Fatal("cumulative updates must replace, not stack")
+	}
+	chat.AddAgentMessage("เสร็จแล้วครับ", "maxplus", "m", 10)
+	view = chat.viewport.View()
+	if strings.Contains(view, "writing") {
+		t.Fatal("the live bubble outlived the turn")
+	}
+	if !strings.Contains(view, "เสร็จแล้วครับ") {
+		t.Fatal("the final message is missing")
+	}
+}
+
+// A live reply must obey the same width rules as a finished one.
+func TestChatLiveReplyStaysInsideTheTerminal(t *testing.T) {
+	chat := NewChat()
+	chat.SetSize(51, 20)
+	chat.SetPartial(strings.Repeat("สวัสดีครับ 🙏 ", 30))
+	if got, line := widestLine(chat.viewport.View()); got > 51 {
+		t.Fatalf("live reply is %d columns: %q", got, line)
+	}
+}

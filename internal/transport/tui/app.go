@@ -46,6 +46,10 @@ type approvalDecisionSentMsg struct {
 
 type runtimeProgressMsg struct{ event agent.EngineEvent }
 
+// streamTextMsg carries the reply produced so far. The text is cumulative, so
+// the newest message is the whole answer and earlier ones can be ignored.
+type streamTextMsg struct{ text string }
+
 type Model struct {
 	// composeErr explains why no Agent could be composed, e.g. a missing
 	// required Block; it is shown when the chat opens.
@@ -258,6 +262,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.chat.AddMessage("system", approvalDecisionSummary(msg.decision))
 		m.status.SetStatus("thinking")
+		return m, waitAgentEventCmd(m.runtimeEvents)
+
+	case streamTextMsg:
+		m.chat.SetPartial(msg.text)
+		m.status.SetStatus("writing")
 		return m, waitAgentEventCmd(m.runtimeEvents)
 
 	case runtimeProgressMsg:
@@ -516,6 +525,9 @@ func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 		if event.Approval != nil {
 			return approvalRequestedMsg{request: event.Approval.Request, decisions: event.Approval.Decisions}
 		}
+		if event.Partial != "" {
+			return streamTextMsg{text: event.Partial}
+		}
 		if event.Engine != nil {
 			return runtimeProgressMsg{event: *event.Engine}
 		}
@@ -539,6 +551,9 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 		m.cancelActive = nil
 	}
 	m.runtimeEvents = nil
+	// The turn is over, so the live reply is replaced by the real message
+	// below, or dropped when the turn failed.
+	m.chat.ClearPartial()
 	if errors.Is(msg.err, context.Canceled) {
 		m.chat.AddMessage("system", "Agent task cancelled.")
 		m.status.SetStatus("idle")

@@ -53,10 +53,6 @@ func (p *captureProvider) Complete(_ context.Context, req llm.CompletionRequest)
 	}, nil
 }
 
-func (p *captureProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, nil
-}
-
 func TestServiceRunsInsideWorkspaceContext(t *testing.T) {
 	t.Parallel()
 
@@ -399,5 +395,72 @@ func TestFileTargetShapeIgnoresVersionsAndURLs(t *testing.T) {
 		if !looksLikeFileTarget(token) {
 			t.Errorf("%q should read as a file target", token)
 		}
+	}
+}
+
+// streamingProvider reports its reply in pieces, as a streaming endpoint does.
+type streamingProvider struct{ reply string }
+
+func (streamingProvider) Name() string { return "streaming" }
+func (p streamingProvider) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	if req.OnText != nil {
+		for _, size := range []int{3, 7, len([]rune(p.reply))} {
+			runes := []rune(p.reply)
+			if size > len(runes) {
+				size = len(runes)
+			}
+			req.OnText(string(runes[:size]))
+		}
+	}
+	return &llm.CompletionResponse{Content: p.reply, Provider: "streaming", Model: "m"}, nil
+}
+
+// The reply must reach the transport while it is being written, not only when
+// the turn ends.
+func TestInteractiveRunsStreamTheReply(t *testing.T) {
+	sandbox, err := workspace.NewSandbox(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply := "สวัสดีครับ ผมชื่อด่าง"
+	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{streamingProvider{reply: reply}}), nil, sandbox)
+	var partials []string
+	var result *AgentResult
+	for event := range service.Start(context.Background(), "ทักทายหน่อย") {
+		if event.Err != nil {
+			t.Fatal(event.Err)
+		}
+		if event.Partial != "" {
+			partials = append(partials, event.Partial)
+		}
+		if event.Result != nil {
+			result = event.Result
+		}
+	}
+	if len(partials) < 2 {
+		t.Fatalf("want several updates while the reply is written, got %q", partials)
+	}
+	if partials[len(partials)-1] != reply {
+		t.Fatalf("the last update is not the whole reply: %q", partials[len(partials)-1])
+	}
+	if result == nil || result.Response != reply {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+// An automation run has no transport to show text to, so it must not ask the
+// Provider to stream.
+func TestAutomationRunsDoNotStream(t *testing.T) {
+	sandbox, err := workspace.NewSandbox(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &captureProvider{}
+	service := NewService(persona.DefaultPersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	if _, err := service.Run(context.Background(), "say done"); err != nil {
+		t.Fatal(err)
+	}
+	if provider.request.OnText != nil {
+		t.Fatal("a non-interactive run asked the Provider to stream")
 	}
 }

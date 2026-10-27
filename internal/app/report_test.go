@@ -22,10 +22,6 @@ func (idleProvider) Name() string { return "fake" }
 func (idleProvider) Complete(context.Context, llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	return nil, errors.New("unused")
 }
-func (idleProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, errors.New("unused")
-}
-
 // qualifiedFake writes a passing profile so the fake Provider allows Tool calling.
 func qualifiedFake(t *testing.T, boiDir string) []llmfactory.ConfiguredProvider {
 	t.Helper()

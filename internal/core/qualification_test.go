@@ -45,10 +45,6 @@ func (p probeProvider) Complete(_ context.Context, req llm.CompletionRequest) (*
 	}
 	return &llm.CompletionResponse{Content: "unexpected"}, nil
 }
-func (p probeProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, errors.New("unused")
-}
-
 func TestQualifierProducesDeterministicFailClosedProfile(t *testing.T) {
 	now := time.Date(2026, 9, 2, 15, 0, 0, 0, time.UTC)
 	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
