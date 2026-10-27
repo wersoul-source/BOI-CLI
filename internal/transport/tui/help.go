@@ -15,6 +15,7 @@ var availableCommands = []string{
 	"/workspace",
 	"/ls",
 	"/read",
+	"/allow",
 }
 
 type HelpModel struct {

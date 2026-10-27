@@ -40,6 +40,13 @@ func NewRuntime(version string) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create workspace sandbox: %w", err)
 	}
+	policy, err := workspace.LoadAccessPolicy(workspace.AccessPolicyPath(boiDir))
+	if err != nil {
+		return nil, err
+	}
+	if err := policy.Apply(sandbox, root); err != nil {
+		return nil, err
+	}
 	agentFolderRoot := filepath.Join(root, "agent-folder")
 	agentFolder, err := agentfolder.OpenStore(agentFolderRoot)
 	if err != nil {

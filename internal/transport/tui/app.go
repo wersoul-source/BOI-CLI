@@ -16,6 +16,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	"github.com/boi-family/boi-cli/internal/service/config"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	tea "github.com/charmbracelet/bubbletea"
@@ -66,6 +67,7 @@ type Model struct {
 	router          *llm.Router
 	activeP         *persona.Persona
 	root            string
+	sandbox         *workspace.Sandbox
 	workspaceReader *filesystem.Reader
 	agentService    *agent.Service
 	cancelActive    context.CancelFunc
@@ -142,6 +144,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		router:          router,
 		activeP:         activeP,
 		root:            root,
+		sandbox:         runtime.Sandbox,
 		workspaceReader: filesystem.NewReader(runtime.Sandbox),
 		agentService:    agentService,
 		agent:           composed,
@@ -658,7 +661,8 @@ var helpText = `Available commands:
   /provider  List providers, or /provider NAME to switch
   /model     Show the model in use
   /config    Show the folder, model and how to change it
-  /workspace Show the active sandbox root
+  /workspace Show the folders the Agent may use
+  /allow PATH Allow a folder for the next task only
   /ls [path] List a directory inside the workspace
   /read PATH Read a text file inside the workspace
 

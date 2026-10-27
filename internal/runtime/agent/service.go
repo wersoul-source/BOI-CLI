@@ -257,6 +257,12 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
 	}
+	if depth == 0 && s.sandbox != nil {
+		// A folder granted for this task is withdrawn when it ends. Only the
+		// top-level run releases: a delegated child shares the parent's grants
+		// and must not take them away from it.
+		defer s.sandbox.ReleaseTaskGrants()
+	}
 	if s.router == nil || s.router.ProviderCount() == 0 {
 		return nil, ErrNoProvider
 	}

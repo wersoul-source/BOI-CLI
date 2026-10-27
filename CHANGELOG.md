@@ -2,9 +2,17 @@
 
 All notable changes to BOI CLI.
 
-## v2.6.1 — Add Maxplus.ai (unreleased)
+## v2.7.0 — Runtime hardening (unreleased)
 
-- **Maxplus AI** (`maxplus`, `https://api.maxplus-ai.cc`) is in the provider list. Its models come from the live list, supporting both OpenAI-compatible and Anthropic-compatible endpoints
+Found by running v2.6 against a real hosted provider. The root-cause analysis is in `docs/rca/v2.6.1-runtime-hardening.md`.
+
+- **A model that calls tools correctly kept being denied them.** The capability profile multiplied the native tool-calling result by the text-envelope result, so a Provider that passed `native_tool_schema` but would not emit BOI's `<boi-action>` envelope had every Tool withheld (`boi env` showed them all as "registered, not offered"). The two are alternative protocols and the runtime already falls back between them; each is now measured on its own and either one enables Tool Calling. The safety probes (`tool_observation`, `authority`) still gate both. Profiles are re-earned: the probe suite is now `boi-provider-v3`
+- **A failing probe says what the model actually replied**, and names a reply cut off by the output limit instead of calling it wrong. The per-probe output budget is 1024 tokens, up from 256, which a model that reasons before answering was spending before reaching its answer
+- **A task that needed a Tool and got none is recorded as `blocked`**, not as a clean completion. The grounding check asked whether a Tool was *offered*, which is false exactly when the Provider withheld them — so it switched itself off in the case it exists for. It now asks whether the host has such a Tool at all, and a task naming a file that does not exist yet ("write report.json") counts as work to be done, which the old check could never see. When the Provider is the reason, the notice says so and points at `boi provider qualify`
+- **Replies stream.** `Provider.Stream` was a stub on all three adapters — it waited for the whole body and pushed it as one token — and nothing in the runtime called it. Streaming is now part of the request (`OnText`), the OpenAI adapter reads a real server-sent event stream, and the TUI draws the reply as it arrives
+- **Message boxes no longer break.** Content lines were never wrapped, so a long Thai line was written at full length and the terminal wrapped it with the border mid-row; width was counted per rune, so every emoji shifted the border one column; a resize never redrew; and a message arriving before the first window size panicked. Width and wrapping now work on grapheme clusters, the unit a terminal draws
+- **Workspace access policy**: `.boi/workspace-policy.json` names folders outside the project root the Agent may use (at most 8, never the whole filesystem), and `/allow PATH` grants one for a single task, withdrawn when that task ends. Everything else is still refused, and a symlink inside an allowed folder cannot lead out of it
+- **Maxplus AI** (`maxplus`, `https://api.maxplus-ai.cc/v1`) is in the provider list, with models from the live list
 
 ## v2.6.0 — Providers that stay current (unreleased)
 
