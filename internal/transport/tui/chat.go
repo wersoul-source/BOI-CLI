@@ -78,63 +78,89 @@ func (c *ChatModel) renderMessages() {
 	c.viewport.SetContent(sb.String())
 }
 
+// minBubbleWidth keeps a box readable on a narrow terminal.
+const minBubbleWidth = 20
+
+// assumedTermWidth is used until the first WindowSizeMsg arrives. Without it
+// c.width is 0, the box width goes negative and rendering panics.
+const assumedTermWidth = 80
+
+// bubbleWidth returns the inner width of a box holding content of the given
+// display width, never wider than the terminal and never negative.
+func (c *ChatModel) bubbleWidth(contentWidth int) int {
+	terminalWidth := c.width
+	if terminalWidth <= 0 {
+		terminalWidth = assumedTermWidth
+	}
+	limit := terminalWidth - 6
+	if limit < minBubbleWidth {
+		limit = minBubbleWidth
+	}
+	boxW := contentWidth + 4
+	if boxW < minBubbleWidth {
+		boxW = minBubbleWidth
+	}
+	if boxW > limit {
+		boxW = limit
+	}
+	return boxW
+}
+
 func (c *ChatModel) renderBubble(sb *strings.Builder, msg Message, style bubbleStyle, header, meta string) {
 	content := strings.TrimSpace(msg.Content)
 	if content == "" {
 		return
 	}
 
-	// Calculate max line width from content (display width, not byte length —
-	// len() would count UTF-8 bytes and break the box shape for Thai text).
-	lines := strings.Split(content, "\n")
-	maxLine := 0
-	for _, l := range lines {
-		w := term.ThaiStringWidth(l)
-		if w > maxLine {
-			maxLine = w
+	// Size the box to the content, measured in display columns: len() counts
+	// UTF-8 bytes and would make the box several times too wide for Thai.
+	widest := term.StringWidth(header)
+	for _, line := range strings.Split(content, "\n") {
+		if w := term.StringWidth(line); w > widest {
+			widest = w
 		}
 	}
-	headerLen := term.ThaiStringWidth(header)
 	if meta != "" {
-		headerLen += term.ThaiStringWidth(" · ") + term.ThaiStringWidth(meta)
+		if headerWidth := term.StringWidth(header + " · " + meta); headerWidth > widest {
+			widest = headerWidth
+		}
 	}
-	if headerLen > maxLine {
-		maxLine = headerLen
-	}
-	boxW := maxLine + 4 // padding
-	if boxW < 20 {
-		boxW = 20
-	}
-	if boxW > c.width-6 {
-		boxW = c.width - 6
+	boxW := c.bubbleWidth(widest)
+	// One column for the space after the left border, one so the text never
+	// touches the right border. Without this the line was written at full
+	// length, the terminal wrapped it, and the border landed mid-row.
+	inner := boxW - 2
+	if inner < 1 {
+		inner = 1
 	}
 
-	// Header line
+	// Header: the name always fits, the model and the clock only when there is
+	// room for them.
 	headerLine := style.header.Render(header)
-	if meta != "" {
+	used := term.StringWidth(header)
+	if meta != "" && used+3+term.StringWidth(meta) <= inner {
 		headerLine += DimStyle.Render(" · ") + style.meta.Render(meta)
+		used += 3 + term.StringWidth(meta)
 	}
-	timeStr := msg.Time.Format("15:04")
-	headerLine += "  " + timeStampStyle.Render(timeStr)
+	if timeStr := msg.Time.Format("15:04"); used+2+len(timeStr) <= inner {
+		headerLine += "  " + timeStampStyle.Render(timeStr)
+		used += 2 + len(timeStr)
+	}
 
 	sb.WriteString("\n")
 	sb.WriteString(style.topLeft)
 	sb.WriteString(headerLine)
-	sb.WriteString(strings.Repeat(style.horiz, max(1, boxW-term.ThaiStringWidth(headerLine)-2)))
+	sb.WriteString(strings.Repeat(style.horiz, max(1, boxW-used-2)))
 	sb.WriteString(style.topRight)
 	sb.WriteString("\n")
 
 	// Empty line after header
 	sb.WriteString(style.vert + strings.Repeat(" ", boxW) + style.vert + "\n")
 
-	// Content lines
-	for _, line := range lines {
+	// Content lines, wrapped so every row is exactly as wide as the box.
+	for _, line := range term.Wrap(content, inner) {
 		sb.WriteString(style.vert + " " + line)
-		pad := boxW - term.ThaiStringWidth(line) - 1
-		if pad < 0 {
-			pad = 0
-		}
-		sb.WriteString(strings.Repeat(" ", pad) + style.vert + "\n")
+		sb.WriteString(strings.Repeat(" ", max(0, boxW-term.StringWidth(line)-1)) + style.vert + "\n")
 	}
 
 	// Empty line before bottom
@@ -169,10 +195,21 @@ func formatMetadata(provider, model string, tokens int) string {
 }
 
 func (c *ChatModel) SetSize(w, h int) {
+	changed := c.width != w
 	c.width = w
 	c.height = h
 	c.viewport.Width = w - 4
 	c.viewport.Height = max(h, 1)
+	if changed {
+		// Boxes are drawn to a fixed width, so a resize has to redraw them.
+		// Without this they kept the width they were built at and the viewport
+		// cut their right border away.
+		atBottom := c.viewport.AtBottom()
+		c.renderMessages()
+		if atBottom {
+			c.viewport.GotoBottom()
+		}
+	}
 }
 
 func (c *ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {

@@ -95,7 +95,7 @@ func (i *InputModel) refreshHeight() {
 	lines := 0
 	if val != "" {
 		for _, l := range strings.Split(val, "\n") {
-			w := term.ThaiStringWidth(l)
+			w := term.StringWidth(l)
 			if w == 0 {
 				lines++
 			} else {

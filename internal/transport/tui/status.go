@@ -95,7 +95,7 @@ func (s *StatusModel) View() string {
 	}
 	right := fmt.Sprintf(" %s: %s  %s ", provStr, s.status, statusIcon)
 
-	available := s.width - term.ThaiStringWidth(left) - term.ThaiStringWidth(mid) - term.ThaiStringWidth(right)
+	available := s.width - term.StringWidth(left) - term.StringWidth(mid) - term.StringWidth(right)
 	if available < 0 {
 		available = 0
 	}
