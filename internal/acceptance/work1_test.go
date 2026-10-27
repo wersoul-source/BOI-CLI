@@ -46,6 +46,7 @@ func (p *scriptedProvider) Complete(_ context.Context, request llm.CompletionReq
 	}
 	return &llm.CompletionResponse{Content: p.responses[index], Provider: p.Name(), Model: "fixture-model"}, nil
 }
+
 type blockingProvider struct{ started chan struct{} }
 
 func (p *blockingProvider) Name() string { return "blocking" }
