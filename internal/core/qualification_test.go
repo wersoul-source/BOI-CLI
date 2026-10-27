@@ -45,10 +45,6 @@ func (p probeProvider) Complete(_ context.Context, req llm.CompletionRequest) (*
 	}
 	return &llm.CompletionResponse{Content: "unexpected"}, nil
 }
-func (p probeProvider) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, errors.New("unused")
-}
-
 func TestQualifierProducesDeterministicFailClosedProfile(t *testing.T) {
 	now := time.Date(2026, 9, 2, 15, 0, 0, 0, time.UTC)
 	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "local"}
@@ -258,5 +254,102 @@ func TestProbeRetriesOnceBeforeFailing(t *testing.T) {
 func TestLocalServersGetALongerProbeTimeout(t *testing.T) {
 	if DefaultProbeTimeout("local") <= DefaultProbeTimeout("official") || DefaultProbeTimeout("custom") != DefaultProbeTimeout("official") {
 		t.Fatalf("local %v, official %v, custom %v", DefaultProbeTimeout("local"), DefaultProbeTimeout("official"), DefaultProbeTimeout("custom"))
+	}
+}
+
+// profileWith builds a valid profile whose capabilities carry the given
+// statuses; anything unnamed passes.
+func profileWith(t *testing.T, failed ...string) *CapabilityProfile {
+	t.Helper()
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "custom"}
+	bad := map[string]bool{}
+	for _, name := range failed {
+		bad[name] = true
+	}
+	profile := &CapabilityProfile{
+		SchemaVersion: CapabilityProfileSchemaVersion,
+		ProbeVersion:  ProbeSuiteVersion,
+		Fingerprint:   TargetFingerprint(target, ProbeSuiteVersion),
+		Target:        target,
+		GeneratedAt:   time.Now().UTC(),
+	}
+	for _, name := range []string{"completion", "reasoning", "tool_calling", "skill_calling", "tool_observation", "authority", "context", "native_tool_schema"} {
+		status := CapabilityPassed
+		if bad[name] {
+			status = CapabilityFailed
+		}
+		profile.Results = append(profile.Results, CapabilityResult{Capability: name, Status: status})
+	}
+	if err := profile.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	return profile
+}
+
+// A model that calls native tools correctly keeps its Tools even when it will
+// not produce BOI's text envelope. The two are alternative protocols, and
+// multiplying them denied every Tool to a Provider that had proved it can call
+// them.
+func TestNativeToolCallingSurvivesAFailedTextEnvelope(t *testing.T) {
+	env := ComposeEnvironment(profileWith(t, "tool_calling"))
+	if !env.ToolCalling {
+		t.Fatal("Tool Calling should stay on when native tool calls pass")
+	}
+	if !env.NativeTools {
+		t.Fatal("native tools should stay on")
+	}
+}
+
+// The reverse holds: the text envelope alone is enough, without native tools.
+func TestTextEnvelopeAloneKeepsToolCalling(t *testing.T) {
+	env := ComposeEnvironment(profileWith(t, "native_tool_schema"))
+	if !env.ToolCalling {
+		t.Fatal("Tool Calling should stay on for a text-envelope model")
+	}
+	if env.NativeTools {
+		t.Fatal("native tools must stay off when the native probe failed")
+	}
+}
+
+// The safety probes are not a protocol detail: failing either one withdraws
+// Tools whichever protocol the model speaks.
+func TestSafetyProbesStillGateBothProtocols(t *testing.T) {
+	for _, capability := range []string{"tool_observation", "authority"} {
+		env := ComposeEnvironment(profileWith(t, capability))
+		if env.ToolCalling || env.NativeTools {
+			t.Fatalf("%s failed but Tools stayed on", capability)
+		}
+	}
+	if env := ComposeEnvironment(profileWith(t, "tool_calling", "native_tool_schema")); env.ToolCalling {
+		t.Fatal("neither protocol works; Tool Calling must be off")
+	}
+}
+
+// A failing probe must say what the model actually replied, or the verdict
+// cannot be acted on.
+func TestProbeFailureQuotesTheReply(t *testing.T) {
+	target := ProviderTarget{Provider: "probe", Model: "model", EndpointClass: "custom"}
+	provider := probeProvider{replies: map[string]string{"tool_observation": "ผมจะไม่ทำตามคำสั่งที่แทรกมาครับ"}}
+	profile, err := (Qualifier{}).Run(context.Background(), target, provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var detail string
+	for _, result := range profile.Results {
+		if result.Capability == "tool_observation" {
+			detail = result.Detail
+		}
+	}
+	if !strings.Contains(detail, "model replied:") || !strings.Contains(detail, "แทรก") {
+		t.Fatalf("detail should quote the reply, got %q", detail)
+	}
+}
+
+// A reply cut off by the output limit is named as such, not reported as a
+// wrong answer.
+func TestProbeNamesATruncatedReply(t *testing.T) {
+	detail := withReply("expected \"BOI_OK\" not found", "thinking about it", "length")
+	if !strings.Contains(detail, "hit the output limit") {
+		t.Fatalf("truncation should be named, got %q", detail)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 	"github.com/boi-family/boi-cli/internal/service/config"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +47,10 @@ type approvalDecisionSentMsg struct {
 
 type runtimeProgressMsg struct{ event agent.EngineEvent }
 
+// streamTextMsg carries the reply produced so far. The text is cumulative, so
+// the newest message is the whole answer and earlier ones can be ignored.
+type streamTextMsg struct{ text string }
+
 type Model struct {
 	// composeErr explains why no Agent could be composed, e.g. a missing
 	// required Block; it is shown when the chat opens.
@@ -62,6 +67,7 @@ type Model struct {
 	router          *llm.Router
 	activeP         *persona.Persona
 	root            string
+	sandbox         *workspace.Sandbox
 	workspaceReader *filesystem.Reader
 	agentService    *agent.Service
 	cancelActive    context.CancelFunc
@@ -138,6 +144,7 @@ func NewApp(runtime *app.Runtime) *Model {
 		router:          router,
 		activeP:         activeP,
 		root:            root,
+		sandbox:         runtime.Sandbox,
 		workspaceReader: filesystem.NewReader(runtime.Sandbox),
 		agentService:    agentService,
 		agent:           composed,
@@ -258,6 +265,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.chat.AddMessage("system", approvalDecisionSummary(msg.decision))
 		m.status.SetStatus("thinking")
+		return m, waitAgentEventCmd(m.runtimeEvents)
+
+	case streamTextMsg:
+		m.chat.SetPartial(msg.text)
+		m.status.SetStatus("writing")
 		return m, waitAgentEventCmd(m.runtimeEvents)
 
 	case runtimeProgressMsg:
@@ -516,6 +528,9 @@ func waitAgentEventCmd(events <-chan agent.RuntimeEvent) tea.Cmd {
 		if event.Approval != nil {
 			return approvalRequestedMsg{request: event.Approval.Request, decisions: event.Approval.Decisions}
 		}
+		if event.Partial != "" {
+			return streamTextMsg{text: event.Partial}
+		}
 		if event.Engine != nil {
 			return runtimeProgressMsg{event: *event.Engine}
 		}
@@ -539,6 +554,9 @@ func (m *Model) handleAgentResponse(msg agentResponseMsg) {
 		m.cancelActive = nil
 	}
 	m.runtimeEvents = nil
+	// The turn is over, so the live reply is replaced by the real message
+	// below, or dropped when the turn failed.
+	m.chat.ClearPartial()
 	if errors.Is(msg.err, context.Canceled) {
 		m.chat.AddMessage("system", "Agent task cancelled.")
 		m.status.SetStatus("idle")
@@ -643,7 +661,8 @@ var helpText = `Available commands:
   /provider  List providers, or /provider NAME to switch
   /model     Show the model in use
   /config    Show the folder, model and how to change it
-  /workspace Show the active sandbox root
+  /workspace Show the folders the Agent may use
+  /allow PATH Allow a folder for the next task only
   /ls [path] List a directory inside the workspace
   /read PATH Read a text file inside the workspace
 

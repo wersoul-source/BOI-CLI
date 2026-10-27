@@ -27,9 +27,6 @@ type script struct {
 
 func (s *script) Name() string              { return "script" }
 func (s *script) SupportsNativeTools() bool { return true }
-func (s *script) Stream(context.Context, llm.CompletionRequest) (<-chan llm.Token, error) {
-	return nil, nil
-}
 func (s *script) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

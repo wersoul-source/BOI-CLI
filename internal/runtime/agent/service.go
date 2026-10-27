@@ -176,7 +176,12 @@ type RuntimeEvent struct {
 	Approval *ApprovalEvent
 	Engine   *EngineEvent
 	Result   *AgentResult
-	Err      error
+	// Partial is the assistant text produced so far in the current provider
+	// call, for a transport that shows a reply as it is written. It is
+	// cumulative, so a transport renders the latest value and ignores the
+	// rest; an update dropped under load costs nothing.
+	Partial string
+	Err     error
 }
 
 // Start runs the synchronous kernel in a worker goroutine and exposes bounded
@@ -193,12 +198,21 @@ func (s *Service) Start(ctx context.Context, query string) <-chan RuntimeEvent {
 				return ctx.Err()
 			}
 		}}
+		// Streamed text is cumulative, so a full channel may drop an update
+		// without losing anything: the next one carries the whole reply. A
+		// blocking send here would stall the provider read instead.
+		onText := func(text string) {
+			select {
+			case events <- RuntimeEvent{Partial: text}:
+			default:
+			}
+		}
 		result, err := s.run(ctx, query, authorizer, func(event EngineEvent) {
 			select {
 			case events <- RuntimeEvent{Engine: &event}:
 			case <-ctx.Done():
 			}
-		}, "", true)
+		}, onText, "", true)
 		final := RuntimeEvent{Result: result, Err: err}
 		select {
 		case events <- final:
@@ -213,13 +227,13 @@ func (s *Service) Start(ctx context.Context, query string) <-chan RuntimeEvent {
 }
 
 func (s *Service) Run(ctx context.Context, query string) (*AgentResult, error) {
-	return s.run(ctx, query, RejectingAuthorizer{}, nil, "", false)
+	return s.run(ctx, query, RejectingAuthorizer{}, nil, nil, "", false)
 }
 
 // RunAutomation executes the non-interactive contract. Mutation Tools remain
 // subject to RejectingAuthorizer and therefore cannot wait for or infer consent.
 func (s *Service) RunAutomation(ctx context.Context, query, idempotencyKey string) (*AgentResult, error) {
-	return s.run(ctx, query, RejectingAuthorizer{}, nil, strings.TrimSpace(idempotencyKey), false)
+	return s.run(ctx, query, RejectingAuthorizer{}, nil, nil, strings.TrimSpace(idempotencyKey), false)
 }
 
 // ResetConversation forgets prior interactive turns, e.g. on /clear.
@@ -229,19 +243,25 @@ func (s *Service) ResetConversation() {
 	s.mu.Unlock()
 }
 
-func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool) (*AgentResult, error) {
-	return s.runWith(ctx, query, authorizer, onEngine, idempotencyKey, remember, 0)
+func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), onText func(string), idempotencyKey string, remember bool) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, onEngine, onText, idempotencyKey, remember, 0)
 }
 
 // runScoped runs a delegated child task at the given depth.
 func (s *Service) runScoped(ctx context.Context, query string, authorizer Authorizer, depth int) (*AgentResult, error) {
-	return s.runWith(ctx, query, authorizer, nil, "", false, depth)
+	return s.runWith(ctx, query, authorizer, nil, nil, "", false, depth)
 }
 
-func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), idempotencyKey string, remember bool, depth int) (*AgentResult, error) {
+func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), onText func(string), idempotencyKey string, remember bool, depth int) (*AgentResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
+	}
+	if depth == 0 && s.sandbox != nil {
+		// A folder granted for this task is withdrawn when it ends. Only the
+		// top-level run releases: a delegated child shares the parent's grants
+		// and must not take them away from it.
+		defer s.sandbox.ReleaseTaskGrants()
 	}
 	if s.router == nil || s.router.ProviderCount() == 0 {
 		return nil, ErrNoProvider
@@ -346,6 +366,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 				MaxTokens:   maxTokens,
 				Temperature: activePersona.Temperature,
 				Tools:       definitions,
+				OnText:      onText,
 			})
 		}
 		response, err := request()
@@ -414,12 +435,15 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			onEngine(event)
 		}
 	}
-	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Ungrounded: func(task, response string) bool {
-		if !(interactive && s.broker.CanChange()) {
+	engine := &Engine{Decider: decider, Authorizer: authorizer, Actor: s.broker, Verifier: RuntimeVerifier{Tools: s.broker}, Recoverer: BoundedRecoverer{}, Limits: limits, Plan: plan, OnEvent: emit, SkillLoader: loader, Withheld: s.broker.ToolsWithheld, NoChallenge: !interactive, Ungrounded: func(task, response string) bool {
+		// HasChangeTools, not CanChange: the question is whether the host could
+		// have done the work, and CanChange is false exactly when the Provider
+		// profile withheld every Tool, which is when an unevidenced answer
+		// matters most. A task naming a file that does not exist yet counts
+		// too: that is what "write report.json" looks like before the writing.
+		if !s.broker.HasChangeTools() {
 			return false
 		}
-		// A task that names an existing file, or asks for one that does not
-		// exist yet, is file work: an answer with no effect is challenged.
 		return namesWorkspaceFile(task+"\n"+response, s.workspaceFileExists) || namesNewWorkspaceFile(task, s.workspaceFileExists)
 	}}
 	if taskSession != nil {

@@ -20,6 +20,10 @@ const (
 	OutcomeExecuted Outcome = "executed"
 	// OutcomeChanged: at least one file was changed and verified.
 	OutcomeChanged Outcome = "changed"
+	// OutcomeBlocked: the task named work on a file and nothing was changed or
+	// run. The host records that rather than a clean answer, whether the Tool
+	// was missing, withheld by the Provider profile, or simply never called.
+	OutcomeBlocked Outcome = "blocked"
 )
 
 // effectLedger records the Tool calls of a whole task, SubAgent children

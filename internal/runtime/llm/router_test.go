@@ -26,10 +26,6 @@ func (p *scriptedProvider) Complete(ctx context.Context, req CompletionRequest) 
 	}
 	return &CompletionResponse{Content: p.name, Provider: p.name}, nil
 }
-func (p *scriptedProvider) Stream(context.Context, CompletionRequest) (<-chan Token, error) {
-	return nil, errors.New("unused")
-}
-
 func TestRouterRetriesTransientProvider(t *testing.T) {
 	p := &scriptedProvider{name: "one", errors: []error{&ProviderError{Provider: "one", Class: ErrorTransient}}}
 	r := NewRouterWithOptions([]Provider{p}, RouterOptions{MaxRetries: 1})

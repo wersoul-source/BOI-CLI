@@ -145,18 +145,3 @@ func (p *AnthropicProvider) Complete(ctx context.Context, req llm.CompletionRequ
 		Provider:     p.name,
 	}, nil
 }
-
-func (p *AnthropicProvider) Stream(ctx context.Context, req llm.CompletionRequest) (<-chan llm.Token, error) {
-	resp, err := p.Complete(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	ch := make(chan llm.Token, 1)
-	go func() {
-		defer close(ch)
-		ch <- llm.Token{Text: resp.Content}
-		ch <- llm.Token{Done: true}
-	}()
-	return ch, nil
-}

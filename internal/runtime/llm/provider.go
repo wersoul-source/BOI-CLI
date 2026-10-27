@@ -10,6 +10,13 @@ type CompletionRequest struct {
 	// ToolCaller ignore them, so callers send Tools only when every candidate
 	// Provider supports them.
 	Tools []ToolDefinition
+	// OnText, when set, asks the Provider to stream and receives the assistant
+	// text produced so far, not the latest piece. Cumulative text is safe to
+	// show as is after a Router retry restarts a reply, which a delta would
+	// duplicate. The whole text is still returned in the response, so a caller
+	// that leaves this nil is unaffected, and a Provider that cannot stream
+	// simply never calls it.
+	OnText func(text string)
 }
 
 type Message struct {
@@ -43,21 +50,19 @@ type CompletionResponse struct {
 	OutputTokens int
 	Model        string
 	Provider     string
+	// FinishReason is why the model stopped, in the Provider's own words
+	// ("stop", "length", "tool_calls", …). It is empty when the adapter or the
+	// endpoint does not report one. "length" tells a truncated reply apart
+	// from a wrong one.
+	FinishReason string
 	// Rate-limit info from API headers (0 if unknown)
 	RateLimitRemaining int
 	RateLimitTotal     int
 }
 
-type Token struct {
-	Text  string
-	Error error
-	Done  bool
-}
-
 type Provider interface {
 	Name() string
 	Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error)
-	Stream(ctx context.Context, req CompletionRequest) (<-chan Token, error)
 }
 
 // ToolCaller is implemented by a Provider whose adapter sends

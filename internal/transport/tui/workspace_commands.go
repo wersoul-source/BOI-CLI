@@ -17,7 +17,8 @@ func isWorkspaceCommand(input string) bool {
 	lower := strings.ToLower(strings.TrimSpace(input))
 	return lower == "/workspace" || lower == "/ls" ||
 		strings.HasPrefix(lower, "/ls ") || lower == "/read" ||
-		strings.HasPrefix(lower, "/read ")
+		strings.HasPrefix(lower, "/read ") || lower == "/allow" ||
+		strings.HasPrefix(lower, "/allow ")
 }
 
 func (m *Model) callWorkspaceCmd(input string) tea.Cmd {
@@ -30,10 +31,27 @@ func (m *Model) callWorkspaceCmd(input string) tea.Cmd {
 		lower := strings.ToLower(trimmed)
 		switch {
 		case lower == "/workspace":
-			return workspaceResponseMsg{content: fmt.Sprintf(
-				"Workspace sandbox\nRoot: %s\nAccess: read-only",
-				m.root,
-			)}
+			folders := []string{m.root}
+			if m.sandbox != nil {
+				folders = m.sandbox.Roots()
+			}
+			return workspaceResponseMsg{content: "Workspace sandbox\nRoot: " + folders[0] +
+				"\nAlso allowed: " + describeExtraRoots(folders[1:]) +
+				"\nAnything else is refused. Add a folder for one task with /allow PATH, or for every session in .boi/workspace-policy.json."}
+
+		case lower == "/allow" || strings.HasPrefix(lower, "/allow "):
+			path := strings.TrimSpace(trimmed[len("/allow"):])
+			if path == "" {
+				return workspaceResponseMsg{err: fmt.Errorf("usage: /allow PATH — allows a folder for the next task only")}
+			}
+			if m.sandbox == nil {
+				return workspaceResponseMsg{err: fmt.Errorf("workspace sandbox is not configured")}
+			}
+			if err := m.sandbox.GrantForTask(path); err != nil {
+				return workspaceResponseMsg{err: err}
+			}
+			return workspaceResponseMsg{content: "Allowed for the next task only: " + path +
+				"\nThe grant is withdrawn when that task ends."}
 
 		case lower == "/ls" || strings.HasPrefix(lower, "/ls "):
 			path := strings.TrimSpace(trimmed[len("/ls"):])
@@ -100,4 +118,12 @@ func formatWorkspaceRead(result *filesystem.ReadResult) string {
 		header += " [truncated]"
 	}
 	return header + "\n\n" + result.Content
+}
+
+// describeExtraRoots lists the folders allowed besides the primary root.
+func describeExtraRoots(folders []string) string {
+	if len(folders) == 0 {
+		return "(none)"
+	}
+	return strings.Join(folders, ", ")
 }
