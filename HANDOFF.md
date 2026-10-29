@@ -22,6 +22,7 @@ Always inspect the live commit and working tree; this file records a handoff bas
 4. [`remaining-plan.md`](skills/boi-project-handoff/references/remaining-plan.md)
 5. [`s25-plus.md`](skills/boi-project-handoff/references/s25-plus.md)
 6. [`WORK_1_PLAN.md`](docs/planning/WORK_1_PLAN.md)
+7. [`RENOVATION_PLAN.md`](docs/planning/RENOVATION_PLAN.md) — **draft, awaiting owner approval**; the foundation track (calibrate the environment to the model). Read it before starting any Provider, qualification or runtime work.
 
 ## Owner-approved direction
 
@@ -101,7 +102,31 @@ local-model run on Windows PowerShell, and the second-Provider verification.
 Locked and not started: step 6 (Agent packs, organisations, factory) and the
 browser UI (`docs/planning/BOI_WEB_UI_PLAN.md`, proposal only).
 
-## State at v2.6.2 (latest)
+## State at v2.7.0 (latest)
+
+v2.7.0 (tag `v2.7.0`, `master` `301bfc1`) is runtime hardening found by running
+v2.6 against a real hosted provider. Root-cause analysis:
+[`docs/rca/v2.6.1-runtime-hardening.md`](docs/rca/v2.6.1-runtime-hardening.md).
+
+- Native tool calling and the text envelope are qualified independently; either
+  enables Tool Calling. Probe suite is `boi-provider-v3`, so every Provider must
+  be re-qualified with `boi provider qualify <name>`.
+- A task that needed a Tool and got none is recorded as outcome `blocked`.
+- Replies stream for real (`CompletionRequest.OnText`; `Provider.Stream` was
+  removed). The v2.6.2 known issue below about streaming is obsolete.
+- TUI width and wrapping work on grapheme clusters; resize redraws.
+- Workspace access policy: `.boi/workspace-policy.json` and `/allow PATH`.
+
+Open: a real `maxplus` run still fails the `tool_observation` probe, which
+withholds every Tool (Appendix A of the renovation plan). The owner's direction
+is that qualification should **calibrate the environment to the model, not
+exclude it**; the plan turns that into tasks.
+
+**Next work: [`docs/planning/RENOVATION_PLAN.md`](docs/planning/RENOVATION_PLAN.md).**
+The roadmap below stays valid; its Tier 1 items do not touch qualification and
+can proceed in parallel.
+
+## State at v2.6.2
 
 v2.5–v2.6 delivered the guided setup wizard (`boi quickstart`), live model
 lists, and new providers (OpenCode Zen, Maxplus.ai). v2.6.2 (tag `v2.6.2`,
