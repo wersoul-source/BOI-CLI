@@ -11,7 +11,7 @@ func TestNamesWorkspaceFile(t *testing.T) {
 		"แก้บั๊กในไฟล์ calc.go ให้หน่อย":                      true,
 		"I updated `docs/guide.md`.":                          true,
 		"แก้ไข ไฟล์.txt ให้หน่อย":                             true,
-		"what is your name?":                     false,
+		"what is your name?": false,
 		"สวัสดี ช่วยอธิบายหน่อย":      false,
 		"see missing.go and other.md": false,
 		"the version is 1.2.3, done.": false,
@@ -33,16 +33,16 @@ func TestNamesNewWorkspaceFile(t *testing.T) {
 	}
 	cases := map[string]bool{
 		// A task that asks for a file that does not exist yet is file work.
-		"สร้าง report.md สรุปผลทดสอบ":   true,
+		"สร้าง report.md สรุปผลทดสอบ":  true,
 		"create notes/todo.txt please": true,
 		// A task about files that all exist is left to the existing check.
-		"fix the bug in calc.go":          false,
+		"fix the bug in calc.go": false,
 		// No path-like token: plain conversation.
-		"what is your name?":              false,
+		"what is your name?": false,
 		"สวัสดี ช่วยอธิบายหน่อย": false,
 		// Version numbers are not file names.
-		"the version is 1.2.3, done.":    false,
-		"":                               false,
+		"the version is 1.2.3, done.": false,
+		"":                            false,
 	}
 	for text, want := range cases {
 		if got := namesNewWorkspaceFile(text, exists); got != want {

@@ -194,6 +194,12 @@ func (t writeTool) Execute(_ context.Context, arguments map[string]any) (port.To
 	if err != nil {
 		return port.ToolOutput{}, err
 	}
+	// Checked on the resolved path too, so a link named notes.txt that points
+	// at .env is refused like .env itself. Overwriting .env could point a
+	// Provider at another host, which would then receive its API key.
+	if IsSecretFile(path) || IsSecretFile(resolved) {
+		return port.ToolOutput{}, fmt.Errorf("refusing to write a credential file: %s", path)
+	}
 	if err := os.WriteFile(resolved, []byte(content), 0o600); err != nil {
 		return port.ToolOutput{}, fmt.Errorf("write workspace file: %w", err)
 	}
