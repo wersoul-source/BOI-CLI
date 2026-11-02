@@ -1,5 +1,10 @@
 # BOI Agent Suit Work 1 Plan
 
+> Historical (Work 1). Qualification below is described as a fail-closed gate.
+> [ADR-006](../architecture/ADR-006-calibration.md) replaced that on 2026-11-02:
+> Core calibrates the environment to the model. The current design is
+> [Architecture IV](../architecture/ARCHITECTURE_IV.md).
+
 ## Outcome
 
 Deliver a production-usable single BOI Agent with one Core Persona, a user-named

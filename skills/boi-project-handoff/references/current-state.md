@@ -19,7 +19,7 @@
 - Legacy Persona files are preserved; switching to other Personas now returns an explicit compatibility error.
 - `boi provider qualify <name>` runs the versioned Provider behavioral probe suite and stores a credential-free profile under `.boi/provider-profiles`.
 - Provider candidates without a passing completion profile are excluded from the Agent Router.
-- Tool and Skill capability exposure is the fail-closed intersection of every qualified failover candidate.
+- Tool and Skill capability exposure is the fail-closed intersection of every qualified failover candidate. This is current behaviour, not the design: ADR-006 replaces it with per-endpoint Recipes in Architecture IV Phase 2.
 - `.boi/registry/skills.json` and `tools.json` are the only Local Registry entrypoints; loose files are not exposed.
 - Deterministic selection records installed, eligible, selected, active, disabled, and rejected states with reasons.
 - Runtime active sets are capped at 15 Skills and 15 Tools; Broker rejects inactive Tools even when registered.

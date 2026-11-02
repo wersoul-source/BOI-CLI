@@ -36,7 +36,7 @@ internal/
   block/                     shared vocabulary: Block IDs and Manifests (leaf)
   block/port/                plug-in contracts: Tool, ToolSpec, ToolResult (leaf)
 
-  core/                      Block 2 Core        FIXED  identity, qualification, environment policy
+  core/                      Block 2 Core        FIXED  identity, calibration (ADR-006), environment policy
   core/persona/                                  FIXED  embedded boi Persona
   runtime/                   Block 4 Runtime     FIXED  engine, broker, approval, service, lifecycle
   runtime/llm/                                   FIXED  Provider port, Router, error classes

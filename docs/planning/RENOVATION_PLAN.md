@@ -1,6 +1,6 @@
 # BOI Renovation Plan — calibrate the environment to the model
 
-Status: **draft, awaiting owner approval** · written 2026-10-29 at `master` `301bfc1` (v2.7.0)
+Status: **superseded** on 2026-11-02 by [`ARCHITECTURE_IV_RENOVATION.md`](ARCHITECTURE_IV_RENOVATION.md), which is the plan of record. This file stays as the evidence and history of R0–R5; its drift findings (§2) and the real qualification run (Appendix A) are still cited.
 
 This file is written to be picked up cold by another agent. Everything an agent
 needs to start a task is here or linked from here. Facts carry a label:
