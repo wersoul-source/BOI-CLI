@@ -61,6 +61,7 @@ func printReport(out io.Writer, report *app.AgentReport) {
 	}
 	fmt.Fprintf(out, "Providers:   %s\n", providers)
 	fmt.Fprintf(out, "Tool calling: %s   Native tools: %s\n\n", yesNo(report.ToolCalling), yesNo(report.NativeTools))
+	printProviderChecks(out, report.ProviderChecks)
 	for _, block := range report.Blocks {
 		required := "optional"
 		if block.Required {
@@ -182,4 +183,32 @@ func init() {
 	envUseCmd.Flags().BoolVar(&envReplace, "replace", false, "back up and replace an existing environment.json")
 	envCmd.AddCommand(envPresetsCmd, envUseCmd, envTrustCmd)
 	rootCmd.AddCommand(envCmd)
+}
+
+// printProviderChecks says, per configured Provider, why it is or is not
+// allowed Tools: no profile, an expired one, or the capabilities it did not
+// pass with what the model actually replied.
+func printProviderChecks(out io.Writer, checks []app.ProviderCheck) {
+	if len(checks) == 0 {
+		return
+	}
+	fmt.Fprintln(out, "Provider checks:")
+	for _, check := range checks {
+		line := fmt.Sprintf("  %s/%s   profile: %s", check.Provider, check.Model, check.Profile)
+		if check.Profile == app.ProfileMeasured {
+			line += "   tools: " + yesNo(check.ToolCalling)
+		}
+		fmt.Fprintln(out, line)
+		if check.ProfileError != "" {
+			fmt.Fprintf(out, "    %s\n", check.ProfileError)
+		}
+		for _, gap := range check.Gaps {
+			gapLine := fmt.Sprintf("    %-20s %s", gap.Capability, gap.Status)
+			if gap.Detail != "" {
+				gapLine += "  - " + gap.Detail
+			}
+			fmt.Fprintln(out, gapLine)
+		}
+	}
+	fmt.Fprintln(out)
 }

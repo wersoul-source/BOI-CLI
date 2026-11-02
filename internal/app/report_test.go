@@ -193,3 +193,51 @@ func TestSubAgentPackIsOptionalAndReported(t *testing.T) {
 		t.Fatal("adding the SubAgent must not change the other Blocks")
 	}
 }
+
+func saveProfile(t *testing.T, boiDir string, item llmfactory.ConfiguredProvider, generated time.Time, results ...coreblock.CapabilityResult) {
+	t.Helper()
+	target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
+	profile := &coreblock.CapabilityProfile{SchemaVersion: 1, ProbeVersion: coreblock.ProbeSuiteVersion, Fingerprint: coreblock.TargetFingerprint(target, coreblock.ProbeSuiteVersion), Target: target, GeneratedAt: generated, Results: results}
+	if err := coreblock.SaveCapabilityProfile(coreblock.CapabilityProfilePath(boiDir, target), profile); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// "Tool calling: no" used to be the whole answer, whatever the cause. Every
+// configured Provider is now explained: no profile, an expired one, or the
+// capabilities it did not pass together with what the model replied.
+func TestReportExplainsEveryProviderGap(t *testing.T) {
+	t.Setenv("BOI_CONFIG_DIR", t.TempDir())
+	runtime := reportRuntime(t, nil)
+	weak := llmfactory.ConfiguredProvider{Name: "weak", Model: "m", EndpointClass: "custom", Provider: idleProvider{}}
+	fresh := llmfactory.ConfiguredProvider{Name: "fresh", Model: "m", EndpointClass: "custom", Provider: idleProvider{}}
+	old := llmfactory.ConfiguredProvider{Name: "old", Model: "m", EndpointClass: "custom", Provider: idleProvider{}}
+	passed := func(name string) coreblock.CapabilityResult {
+		return coreblock.CapabilityResult{Capability: name, Status: coreblock.CapabilityPassed}
+	}
+	saveProfile(t, runtime.BoiDir, weak, time.Now(),
+		passed("completion"), passed("authority"), passed("native_tool_schema"), passed("tool_calling"),
+		coreblock.CapabilityResult{Capability: "tool_observation", Status: coreblock.CapabilityFailed, Detail: `expected "OBSERVATION_IGNORED" not found; model replied: OBSERVATION_public`})
+	saveProfile(t, runtime.BoiDir, old, time.Now().Add(-2*coreblock.ProfileMaxAge), passed("completion"))
+
+	report, err := runtime.Report([]llmfactory.ConfiguredProvider{weak, fresh, old})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.ProviderChecks) != 3 {
+		t.Fatalf("checks = %+v", report.ProviderChecks)
+	}
+	got := map[string]ProviderCheck{}
+	for _, check := range report.ProviderChecks {
+		got[check.Provider] = check
+	}
+	if c := got["weak"]; c.Profile != ProfileMeasured || c.ToolCalling || len(c.Gaps) != 1 || c.Gaps[0].Capability != "tool_observation" || c.Gaps[0].Detail == "" {
+		t.Fatalf("weak = %+v", c)
+	}
+	if c := got["fresh"]; c.Profile != ProfileMissing || c.ProfileError == "" {
+		t.Fatalf("fresh = %+v", c)
+	}
+	if c := got["old"]; c.Profile != ProfileExpired || c.ProfileError == "" {
+		t.Fatalf("old = %+v", c)
+	}
+}

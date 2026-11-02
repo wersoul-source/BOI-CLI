@@ -1,9 +1,12 @@
 package app
 
 import (
+	"errors"
+	"os"
 	"sort"
 
 	"github.com/boi-family/boi-cli/internal/block"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/runtime/agent"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
@@ -31,6 +34,71 @@ type AgentReport struct {
 	Blocks      []BlockReport `json:"blocks"`
 	// RuntimeTools are offered by the Runtime itself, not by a Block.
 	RuntimeTools []ToolReport `json:"runtime_tools"`
+	// ProviderChecks explains every configured Provider, qualified or not:
+	// whether it has a usable profile and which capabilities it did not pass,
+	// with the evidence. "Tool calling: no" alone gives one reason for many
+	// causes; this is what tells them apart (ADR-006, Capability Gap Report).
+	ProviderChecks []ProviderCheck `json:"provider_checks"`
+}
+
+// Profile states of a configured Provider.
+const (
+	ProfileMeasured = "measured"
+	ProfileMissing  = "missing"
+	ProfileExpired  = "expired"
+	ProfileInvalid  = "invalid"
+)
+
+// ProviderCheck is one configured Provider as qualification sees it.
+type ProviderCheck struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	// Profile is measured, missing, expired or invalid.
+	Profile string `json:"profile"`
+	// ProfileError says why a profile could not be used.
+	ProfileError string `json:"profile_error,omitempty"`
+	// Gaps are the capabilities the measured profile did not pass.
+	Gaps []CapabilityGap `json:"gaps"`
+	// ToolCalling is whether this Provider alone would be allowed Tools today.
+	ToolCalling bool `json:"tool_calling"`
+}
+
+// CapabilityGap is one capability a Provider did not pass, with the probe's
+// own evidence (for a failed probe, what the model actually replied).
+type CapabilityGap struct {
+	Capability string `json:"capability"`
+	Status     string `json:"status"`
+	Detail     string `json:"detail,omitempty"`
+}
+
+// providerChecks reads the profile of every configured Provider. It never
+// changes what the Router uses; it only explains it.
+func providerChecks(boiDir string, configured []llmfactory.ConfiguredProvider) []ProviderCheck {
+	checks := make([]ProviderCheck, 0, len(configured))
+	for _, item := range configured {
+		check := ProviderCheck{Provider: item.Name, Model: item.Model, Gaps: []CapabilityGap{}}
+		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
+		profile, _, err := LoadProfile(boiDir, target)
+		switch {
+		case err == nil:
+			check.Profile = ProfileMeasured
+			check.ToolCalling = coreblock.ComposeEnvironment(profile).ToolCalling
+			for _, result := range profile.Results {
+				if result.Status != coreblock.CapabilityPassed {
+					check.Gaps = append(check.Gaps, CapabilityGap{Capability: result.Capability, Status: string(result.Status), Detail: result.Detail})
+				}
+			}
+		case errors.Is(err, os.ErrNotExist):
+			check.Profile = ProfileMissing
+			check.ProfileError = "not qualified yet; run 'boi provider qualify " + item.Name + "'"
+		case errors.Is(err, ErrProfileExpired):
+			check.Profile, check.ProfileError = ProfileExpired, err.Error()
+		default:
+			check.Profile, check.ProfileError = ProfileInvalid, err.Error()
+		}
+		checks = append(checks, check)
+	}
+	return checks
 }
 
 type BlockReport struct {
@@ -59,7 +127,7 @@ type ToolReport struct {
 func (r *Runtime) Report(configured []llmfactory.ConfiguredProvider) (*AgentReport, error) {
 	qualified := QualifiedProviders(r.BoiDir, configured)
 	environment := ProviderEnvironment(r.BoiDir, qualified)
-	report := &AgentReport{ToolCalling: environment.ToolCalling, NativeTools: environment.NativeTools, Blocks: []BlockReport{}, RuntimeTools: []ToolReport{}}
+	report := &AgentReport{ToolCalling: environment.ToolCalling, NativeTools: environment.NativeTools, Blocks: []BlockReport{}, RuntimeTools: []ToolReport{}, ProviderChecks: providerChecks(r.BoiDir, configured)}
 	for _, item := range qualified {
 		report.Providers = append(report.Providers, item.Name+"/"+item.Model)
 	}
