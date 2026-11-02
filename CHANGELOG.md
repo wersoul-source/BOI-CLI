@@ -2,7 +2,7 @@
 
 All notable changes to BOI CLI.
 
-## v2.7.1 — Security and streaming fixes (unreleased)
+## v2.7.1 — Security and streaming fixes
 
 From the full audit in `docs/audit/2026-11-01-full-audit.md`. Every fix has a regression test that fails without it.
 
