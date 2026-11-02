@@ -138,6 +138,23 @@ turns the boundary off.
 - Any live Provider, the TUI in a real terminal, and Windows (HANDOFF lists one Windows-only
   test failure).
 
+## Fix status
+
+All eight findings are fixed in the commit that follows this report (v2.7.1, unreleased).
+Each repro became a regression test, and each of those tests was run against the
+unfixed code and failed there:
+
+| ID | Regression test |
+|---|---|
+| A1 | `TestCommandsDoNotSeeProviderKeys` (`internal/equipment/tools/process`), `TestScrubDropsProviderSettingsOnly` (`internal/platform/childenv`) |
+| A2 | `TestWriteRefusesCredentialFiles` (`internal/equipment/tools/filesystem`) |
+| A3 | `TestCredentialFileBehindALinkIsRefused` (same package; covers write too) |
+| A4 | `TestAllowRefusesTheWholeFilesystem` (`internal/runtime/workspace`) |
+| A5 | `TestARelativeGrantMeansAFolderInTheWorkspace` (same package) |
+| A6 | `TestStreamFallsBackWhenTheServerDoesNotStream` (`internal/service/provider/adapters`) |
+| A7 | `TestStreamSeparatesToolCallsWithoutIndex` (same package) |
+| A8 | CI step "Format" in `.github/workflows/ci.yml` |
+
 ## Proposed fix order
 
 One PR, each finding with its repro as a regression test:

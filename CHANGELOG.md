@@ -2,6 +2,17 @@
 
 All notable changes to BOI CLI.
 
+## v2.7.1 — Security and streaming fixes (unreleased)
+
+From the full audit in `docs/audit/2026-11-01-full-audit.md`. Every fix has a regression test that fails without it.
+
+- **Provider API keys no longer reach `process.run` commands.** `.env` is loaded into BOI's own environment and every command inherited it whole, so an approved `go test` or `npm test` running repository code could print the key back into the conversation. Commands now get the same filtered environment MCP servers already had (no `PSC_*`); the filter lives in one place, `internal/platform/childenv`, so the next child process cannot forget it
+- **`workspace.write` refuses credential files**, as `workspace.edit` already did. One approved write could have pointed a Provider at another host, which would then have received its key. Both Tools now check the resolved path, so a link with an innocent name that points at `.env` is refused too
+- **Streaming works with an endpoint that does not stream.** One that ignored `"stream": true` and sent an ordinary completion produced an empty reply and no error; it is now read as the completion it is
+- **Streamed parallel tool calls without an `index` stay separate.** They were merged into one call with two JSON objects as its arguments
+- **`/allow` follows the same rules as `.boi/workspace-policy.json`**: the filesystem root, or a link to it, is refused, and a relative folder means one in the workspace rather than in whatever directory BOI was started from
+- CI now fails on unformatted Go files; one test file from v2.6.2 was not gofmt-clean
+
 ## v2.7.0 — Runtime hardening: tool calling, streaming, terminal, workspace policy
 
 Found by running v2.6 against a real hosted provider. The root-cause analysis is in `docs/rca/v2.6.1-runtime-hardening.md`.

@@ -94,7 +94,9 @@ type openAIStreamChunk struct {
 		Delta struct {
 			Content   string `json:"content"`
 			ToolCalls []struct {
-				Index    int    `json:"index"`
+				// Index is a pointer because some gateways leave it out;
+				// absent and 0 must not mean the same call.
+				Index    *int   `json:"index"`
 				ID       string `json:"id"`
 				Function struct {
 					Name      string `json:"name"`
@@ -153,7 +155,11 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	if resp.StatusCode != http.StatusOK {
 		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
 	}
+	return p.decodeCompletion(respBody, resp.Header)
+}
 
+// decodeCompletion turns a non-streamed Chat Completions body into a response.
+func (p *OpenAIProvider) decodeCompletion(respBody []byte, header http.Header) (*llm.CompletionResponse, error) {
 	var result openAIResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("provider %s: %w", p.name, err)
@@ -163,7 +169,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 		return nil, fmt.Errorf("provider %s: no choices in response", p.name)
 	}
 
-	rateLimitRemaining, rateLimitTotal := parseRateLimitHeaders(resp.Header)
+	rateLimitRemaining, rateLimitTotal := parseRateLimitHeaders(header)
 
 	var calls []llm.ToolCallRequest
 	for _, call := range result.Choices[0].Message.ToolCalls {
@@ -272,10 +278,25 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
 	}
 
+	reader := bufio.NewReaderSize(resp.Body, 64<<10)
+	if startsWithJSONObject(reader) {
+		// The endpoint ignored "stream" and sent one ordinary completion.
+		// Reading it as events would find none and return an empty reply
+		// with no error, so it is decoded as what it is and shown once.
+		respBody, err := readBody(reader)
+		if err != nil {
+			return nil, fmt.Errorf("provider %s: %w", p.name, err)
+		}
+		result, err := p.decodeCompletion(respBody, resp.Header)
+		if err == nil && result.Content != "" {
+			req.OnText(result.Content)
+		}
+		return result, err
+	}
+
 	result := &llm.CompletionResponse{Provider: p.name, Model: p.model}
 	var content strings.Builder
 	calls := newToolCallAccumulator()
-	reader := bufio.NewReaderSize(resp.Body, 64<<10)
 	read := 0
 	for {
 		line, readErr := reader.ReadString('\n')
@@ -330,32 +351,48 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 }
 
 // toolCallAccumulator rebuilds streamed tool calls. Each call keeps the index
-// it was announced with, and its arguments are appended in arrival order.
+// it was announced with, and its arguments are appended in arrival order. A
+// gateway that leaves the index out is followed by id instead: a new id starts
+// a new call, and a piece with neither continues the last one. Without that,
+// two parallel calls collapsed into one with both argument objects glued
+// together.
 type toolCallAccumulator struct {
 	order     []int
 	byIndex   map[int]*llm.ToolCallRequest
 	arguments map[int]*strings.Builder
+	last      int
+	// unindexed hands out keys below zero, which no announced index uses.
+	unindexed int
 }
 
 func newToolCallAccumulator() *toolCallAccumulator {
 	return &toolCallAccumulator{byIndex: map[int]*llm.ToolCallRequest{}, arguments: map[int]*strings.Builder{}}
 }
 
-func (a *toolCallAccumulator) add(index int, id, name, arguments string) {
-	call, seen := a.byIndex[index]
+func (a *toolCallAccumulator) add(index *int, id, name, arguments string) {
+	key := a.last
+	switch {
+	case index != nil:
+		key = *index
+	case id != "" && (len(a.order) == 0 || a.byIndex[a.last].ID != id):
+		a.unindexed--
+		key = a.unindexed
+	}
+	call, seen := a.byIndex[key]
 	if !seen {
 		call = &llm.ToolCallRequest{}
-		a.byIndex[index] = call
-		a.arguments[index] = &strings.Builder{}
-		a.order = append(a.order, index)
+		a.byIndex[key] = call
+		a.arguments[key] = &strings.Builder{}
+		a.order = append(a.order, key)
 	}
+	a.last = key
 	if id != "" {
 		call.ID = id
 	}
 	if name != "" {
 		call.Name = name
 	}
-	a.arguments[index].WriteString(arguments)
+	a.arguments[key].WriteString(arguments)
 }
 
 func (a *toolCallAccumulator) requests() []llm.ToolCallRequest {
@@ -366,4 +403,29 @@ func (a *toolCallAccumulator) requests() []llm.ToolCallRequest {
 		out = append(out, call)
 	}
 	return out
+}
+
+// startsWithJSONObject reports whether the body's first non-space byte opens a
+// JSON object: an ordinary completion, not a server-sent event stream, whose
+// lines start with "data:", "event:" or a ":" comment. It only peeks, so the
+// stream reader still sees every byte.
+func startsWithJSONObject(reader *bufio.Reader) bool {
+	for size := 1; size <= 512; size++ {
+		peeked, err := reader.Peek(size)
+		if len(peeked) < size {
+			return false
+		}
+		switch peeked[size-1] {
+		case ' ', '\t', '\r', '\n':
+			if err != nil {
+				return false
+			}
+			continue
+		case '{':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
 }

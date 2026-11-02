@@ -202,3 +202,53 @@ func TestARelativePathAlwaysMeansThePrimaryRoot(t *testing.T) {
 		t.Fatal("a relative path reached into another allowed folder")
 	}
 }
+
+// /allow is a second way to widen the boundary and must obey the same rule as
+// the policy file: the filesystem root, or a link to it, is never allowed.
+func TestAllowRefusesTheWholeFilesystem(t *testing.T) {
+	root := t.TempDir()
+	sandbox, err := NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sandbox.GrantForTask(string(filepath.Separator)); err == nil {
+		t.Fatal("/allow / was accepted")
+	}
+	if err := sandbox.AddRoot(string(filepath.Separator)); err == nil {
+		t.Fatal("AddRoot(/) was accepted")
+	}
+	link := filepath.Join(t.TempDir(), "everything")
+	if err := os.Symlink(string(filepath.Separator), link); err == nil {
+		if err := sandbox.GrantForTask(link); err == nil {
+			t.Fatal("a link to / was accepted")
+		}
+	}
+	if len(sandbox.Roots()) != 1 {
+		t.Fatalf("roots = %q", sandbox.Roots())
+	}
+}
+
+// A relative folder means one in the workspace, as everywhere else in the
+// sandbox, not one in whatever directory the process happens to run from.
+func TestARelativeGrantMeansAFolderInTheWorkspace(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "project")
+	elsewhere := filepath.Join(base, "elsewhere")
+	for _, dir := range []string{filepath.Join(root, "data"), filepath.Join(elsewhere, "data")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sandbox, err := NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(elsewhere)
+	if err := sandbox.GrantForTask("data"); err != nil {
+		t.Fatal(err)
+	}
+	roots := sandbox.Roots()
+	if len(roots) != 2 || roots[1] != filepath.Join(root, "data") {
+		t.Fatalf("roots = %q, want the workspace's data folder", roots)
+	}
+}

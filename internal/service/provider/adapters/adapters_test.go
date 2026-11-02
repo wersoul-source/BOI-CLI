@@ -398,3 +398,52 @@ func TestOpenAISendsTemperatureZero(t *testing.T) {
 		t.Fatalf("temperature 0 must be sent, got %v (present=%v)", value, present)
 	}
 }
+
+// Every interactive turn asks to stream. An endpoint that ignores that and
+// sends one ordinary completion used to produce an empty reply and no error.
+func TestStreamFallsBackWhenTheServerDoesNotStream(t *testing.T) {
+	server := serve(t, 200, `{"model":"m","choices":[{"message":{"content":"สวัสดี from a non-streaming gateway"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2}}`, nil)
+	var seen []string
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(text string) { seen = append(seen, text) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "สวัสดี from a non-streaming gateway"
+	if resp.Content != want || resp.FinishReason != "stop" || resp.InputTokens != 4 {
+		t.Fatalf("resp = %+v", resp)
+	}
+	if len(seen) != 1 || seen[0] != want {
+		t.Fatalf("the reply must be shown once, got %q", seen)
+	}
+}
+
+// Parallel calls from a gateway that leaves out "index" must stay separate.
+// They used to merge into one call whose arguments were two JSON objects.
+func TestStreamSeparatesToolCallsWithoutIndex(t *testing.T) {
+	server := sseServer(t, []string{
+		`{"choices":[{"delta":{"tool_calls":[{"id":"a","function":{"name":"workspace__read","arguments":"{\"pa"}}]}}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"th\":\"a\"}"}}]}}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"id":"b","function":{"name":"workspace__list","arguments":"{\"path\":\"b\"}"}}]}}]}`,
+		"[DONE]",
+	}, nil)
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hi"}},
+		OnText:   func(string) {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.ToolCalls) != 2 {
+		t.Fatalf("want two calls, got %+v", resp.ToolCalls)
+	}
+	first, second := resp.ToolCalls[0], resp.ToolCalls[1]
+	if first.ID != "a" || first.Name != "workspace__read" || first.Arguments != `{"path":"a"}` {
+		t.Fatalf("first = %+v", first)
+	}
+	if second.ID != "b" || second.Name != "workspace__list" || second.Arguments != `{"path":"b"}` {
+		t.Fatalf("second = %+v", second)
+	}
+}

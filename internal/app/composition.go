@@ -238,7 +238,7 @@ var MCPDiscoveryTimeout = 15 * time.Second
 
 // resolveMCP starts an MCP server once to list its tools and adapts them.
 // Every MCP Tool is external and needs approval; the server never receives
-// the user's Provider keys (see mcp.serverEnvironment).
+// the user's Provider keys (see childenv.Scrub).
 func resolveMCP(item block.EnvironmentBlock, packs map[string]Pack, runtimeVersion string) ([]port.Tool, string) {
 	if _, builtin := packs[item.ID]; builtin {
 		return nil, "the id is already used by a built-in pack"

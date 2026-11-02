@@ -77,6 +77,10 @@ func (t editTool) plan(arguments map[string]any) (resolved, updated string, mode
 	if err != nil {
 		return "", "", 0, 0, err
 	}
+	// The name alone is not enough: a link to .env has another name.
+	if IsSecretFile(resolved) {
+		return "", "", 0, 0, fmt.Errorf("refusing to edit a credential file: %s", path)
+	}
 	info, err := os.Stat(resolved)
 	if err != nil {
 		return "", "", 0, 0, fmt.Errorf("stat %s: %w", path, err)

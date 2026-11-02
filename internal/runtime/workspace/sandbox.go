@@ -75,7 +75,7 @@ func newRoot(path string) (root, error) {
 // names a second project, a shared data folder or a scratch area without
 // moving the primary root or turning the boundary off.
 func (s *Sandbox) AddRoot(path string) error {
-	added, err := newRoot(path)
+	added, err := s.widening(path)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (s *Sandbox) AddRoot(path string) error {
 // Runtime does when the task ends. Permission given for one piece of work
 // therefore covers that work and nothing after it.
 func (s *Sandbox) GrantForTask(path string) error {
-	granted, err := newRoot(path)
+	granted, err := s.widening(path)
 	if err != nil {
 		return err
 	}
@@ -103,6 +103,36 @@ func (s *Sandbox) GrantForTask(path string) error {
 	}
 	s.granted = append(s.granted, granted)
 	return nil
+}
+
+// widening checks a folder before it is allowed, whichever way it arrives:
+// the policy file, /allow, or anything later. A relative folder means one in
+// the workspace, as a relative path does everywhere else in the sandbox; read
+// against the process directory, /allow data could grant a folder the user
+// never meant. The filesystem root is refused, checked after symlinks resolve
+// so a link to / is refused too: allowing it would not widen the boundary but
+// remove it.
+func (s *Sandbox) widening(path string) (root, error) {
+	if strings.TrimSpace(path) == "" {
+		return root{}, fmt.Errorf("folder to allow is empty")
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(s.primary.lexical, path)
+	}
+	candidate, err := newRoot(path)
+	if err != nil {
+		return root{}, err
+	}
+	if isFilesystemRoot(candidate.lexical) || isFilesystemRoot(candidate.resolved) {
+		return root{}, fmt.Errorf("cannot allow the whole filesystem: %q", path)
+	}
+	return candidate, nil
+}
+
+// isFilesystemRoot reports / on Unix and a drive root such as C:\ on Windows.
+func isFilesystemRoot(path string) bool {
+	cleaned := filepath.Clean(path)
+	return cleaned == filepath.VolumeName(cleaned)+string(filepath.Separator)
 }
 
 // ReleaseTaskGrants withdraws every folder granted for the current task.

@@ -9,6 +9,7 @@ import (
 	"runtime"
 
 	"github.com/boi-family/boi-cli/internal/block/port"
+	"github.com/boi-family/boi-cli/internal/platform/childenv"
 	logger "github.com/boi-family/boi-cli/internal/platform/logging"
 	"github.com/boi-family/boi-cli/internal/runtime/workspace"
 )
@@ -178,7 +179,9 @@ func (e *Executor) buildCommandContext(ctx context.Context, command, dir string)
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
 	cmd.Dir = dir
-	cmd.Env = os.Environ()
+	// Commands are proposed by the model and may run repository code, so they
+	// get the same environment an MCP server does: no Provider API keys.
+	cmd.Env = childenv.Scrub(os.Environ())
 	return cmd
 }
 

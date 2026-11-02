@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/boi-family/boi-cli/internal/platform/childenv"
 )
 
 const defaultMaxResponseBytes = 1024 * 1024
@@ -105,7 +107,7 @@ func (c *Client) request(ctx context.Context, serverName, method string, params 
 		return err
 	}
 	cmd := exec.CommandContext(ctx, server.Command, server.Args...)
-	cmd.Env = serverEnvironment(os.Environ())
+	cmd.Env = childenv.Scrub(os.Environ())
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("open MCP stdin: %w", err)
@@ -181,20 +183,6 @@ func (c *Client) clientVersion() string {
 		return "dev"
 	}
 	return c.Version
-}
-
-// serverEnvironment is the environment an MCP server starts with: the
-// parent's, minus BOI Provider settings, so a third-party server never sees
-// the user's model API keys.
-func serverEnvironment(parent []string) []string {
-	env := make([]string, 0, len(parent))
-	for _, item := range parent {
-		if strings.HasPrefix(strings.ToUpper(item), "PSC_") {
-			continue
-		}
-		env = append(env, item)
-	}
-	return env
 }
 
 type rpcResponse struct {

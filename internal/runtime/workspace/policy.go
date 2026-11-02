@@ -67,23 +67,9 @@ func (p *AccessPolicy) Apply(sandbox *Sandbox, base string) error {
 		if !filepath.IsAbs(folder) {
 			folder = filepath.Join(base, folder)
 		}
-		if err := guardPolicyFolder(folder); err != nil {
-			return err
-		}
 		if err := sandbox.AddRoot(folder); err != nil {
 			return fmt.Errorf("workspace access policy folder %q: %w", folder, err)
 		}
-	}
-	return nil
-}
-
-// guardPolicyFolder refuses a folder that would end the boundary instead of
-// widening it. Allowing the filesystem root, or a whole drive, is the same as
-// having no sandbox, which the policy exists to avoid.
-func guardPolicyFolder(folder string) error {
-	cleaned := filepath.Clean(folder)
-	if cleaned == string(filepath.Separator) || cleaned == filepath.VolumeName(cleaned)+string(filepath.Separator) {
-		return fmt.Errorf("workspace access policy cannot allow the whole filesystem: %q", folder)
 	}
 	return nil
 }
