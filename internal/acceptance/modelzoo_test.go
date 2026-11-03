@@ -42,15 +42,18 @@ type zooBaseline struct {
 	// assisted: the compensation native_tool_schema passed with, or "" when
 	// the model did it alone. It must never be empty for a compensated pass.
 	assisted string
+	// fallback: the route change the run must report ("" when none).
+	fallback string
 	gap      string
 }
 
 var zooExpectations = map[modelzoo.Trait]zooBaseline{
 	modelzoo.Native:          {marker: true, tools: true, completion: true},
-	modelzoo.NoStream:        {marker: true, tools: true, completion: true},
+	modelzoo.NoStream:        {marker: true, tools: true, completion: true, fallback: "stream→whole-response"},
 	modelzoo.SlowFirstLoad:   {marker: true, tools: true, completion: true},
 	modelzoo.MissingIndex:    {marker: true, tools: true, completion: true},
-	modelzoo.ReasoningReplay: {marker: true, rejected: true, tools: true, completion: true, gap: "P1.4/P1.5: reasoning_content not replayed; native replay rejected and downgraded silently"},
+	modelzoo.ReasoningReplay: {marker: true, tools: true, completion: true},
+	modelzoo.RejectsReplay:   {marker: true, rejected: true, tools: true, completion: true, fallback: "native→envelope"},
 	modelzoo.DSML:            {marker: true, tools: true, completion: true, assisted: "dialect:dsml"},
 	modelzoo.Hermes:          {marker: true, tools: true, completion: true, assisted: "dialect:hermes"},
 	modelzoo.QwenXML:         {marker: true, tools: true, completion: true, assisted: "dialect:qwen-xml"},
@@ -89,6 +92,18 @@ func TestModelZooScriptedTask(t *testing.T) {
 			}
 			if rejected := endpoint.Rejected() > 0; rejected != want.rejected {
 				t.Errorf("endpoint rejected a request = %v, baseline %v", rejected, want.rejected)
+			}
+			var kinds []string
+			if result != nil {
+				for _, fallback := range result.Fallbacks {
+					kinds = append(kinds, fallback.Kind)
+				}
+			}
+			if want.fallback == "" && len(kinds) != 0 || want.fallback != "" && (len(kinds) != 1 || kinds[0] != want.fallback) {
+				t.Errorf("fallbacks = %v, baseline %q", kinds, want.fallback)
+			}
+			if want.fallback != "" && (result == nil || !strings.Contains(result.Notice, want.fallback)) {
+				t.Errorf("a fallback must reach the user's notice; notice = %q", describeResult(result))
 			}
 			t.Logf("%-16s marker=%-5v requests=%d rejected=%d streamed=%d gap=%q", trait, got, endpoint.Requests(), endpoint.Rejected(), endpoint.Streamed(), want.gap)
 		})

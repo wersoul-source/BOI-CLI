@@ -49,6 +49,10 @@ const (
 	// later request whose assistant tool-call message does not carry it back,
 	// as DeepSeek's thinking mode does.
 	ReasoningReplay Trait = "reasoning-replay"
+	// RejectsReplay accepts tool definitions and returns native tool calls,
+	// then answers HTTP 400 to any request that replays a tool result, as
+	// some gateways do. The Runtime must finish the task another way and say so.
+	RejectsReplay Trait = "rejects-replay"
 	// MissingIndex streams two parallel tool calls without "index".
 	MissingIndex Trait = "missing-index"
 	// CorruptToken answers correctly in shape but corrupts one token, as
@@ -61,7 +65,7 @@ const (
 )
 
 // Traits lists every trait the zoo serves, in a stable order.
-var Traits = []Trait{Native, NoStream, DSML, Hermes, QwenXML, ReasoningReplay, MissingIndex, CorruptToken, SlowFirstLoad, Down}
+var Traits = []Trait{Native, NoStream, DSML, Hermes, QwenXML, ReasoningReplay, RejectsReplay, MissingIndex, CorruptToken, SlowFirstLoad, Down}
 
 // SlowDelay is how long a SlowFirstLoad endpoint waits before its first answer.
 const SlowDelay = 300 * time.Millisecond
@@ -92,7 +96,8 @@ func Start(t testing.TB, trait Trait) *Endpoint {
 // Requests is how many requests the endpoint received.
 func (e *Endpoint) Requests() int { e.mu.Lock(); defer e.mu.Unlock(); return e.requests }
 
-// Rejected is how many requests it refused with HTTP 400 (ReasoningReplay).
+// Rejected is how many requests it refused with HTTP 400 (ReasoningReplay,
+// RejectsReplay).
 func (e *Endpoint) Rejected() int { e.mu.Lock(); defer e.mu.Unlock(); return e.rejected }
 
 // Streamed is how many answers it sent as server-sent events.
@@ -150,6 +155,16 @@ func (e *Endpoint) serve(w http.ResponseWriter, r *http.Request) {
 	case SlowFirstLoad:
 		if first {
 			time.Sleep(SlowDelay)
+		}
+	case RejectsReplay:
+		for _, m := range req.Messages {
+			if m.Role == "tool" {
+				e.mu.Lock()
+				e.rejected++
+				e.mu.Unlock()
+				writeError(w, http.StatusBadRequest, "messages with role tool are not supported by this gateway")
+				return
+			}
 		}
 	case ReasoningReplay:
 		for _, m := range req.Messages {

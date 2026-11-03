@@ -1,6 +1,10 @@
 package agent
 
-import "time"
+import (
+	"time"
+
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+)
 
 type AgentState struct {
 	ID          string
@@ -82,6 +86,9 @@ type AgentResult struct {
 	// Notice is a host statement the user must see next to the Response, for
 	// example that no Tool ran although the Agent could have acted.
 	Notice string
+	// Fallbacks are the route changes this run made, each with its reason. A
+	// fallback is never silent (Architecture IV, P1.5).
+	Fallbacks []llm.Fallback
 	// Outcome and ChangedPaths are what the host recorded: see Outcome.
 	Outcome      Outcome
 	ChangedPaths []string

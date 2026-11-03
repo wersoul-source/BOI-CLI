@@ -51,6 +51,10 @@ type openAIMessage struct {
 	Content    *string          `json:"content"`
 	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
+	// ReasoningContent is sent back only when the endpoint produced it for
+	// this message, so an endpoint that never returns reasoning never
+	// receives the field.
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 }
 
 type openAIToolCall struct {
@@ -93,8 +97,9 @@ type openAIStreamOptions struct {
 type openAIStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content   string `json:"content"`
-			ToolCalls []struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
 				// Index is a pointer because some gateways leave it out;
 				// absent and 0 must not mean the same call.
 				Index    *int   `json:"index"`
@@ -117,8 +122,9 @@ type openAIStreamChunk struct {
 type openAIResponse struct {
 	Choices []struct {
 		Message struct {
-			Content   string           `json:"content"`
-			ToolCalls []openAIToolCall `json:"tool_calls"`
+			Content          string           `json:"content"`
+			ReasoningContent string           `json:"reasoning_content"`
+			ToolCalls        []openAIToolCall `json:"tool_calls"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -197,6 +203,7 @@ func (p *OpenAIProvider) decodeCompletion(respBody []byte, header http.Header) (
 
 	return &llm.CompletionResponse{
 		Content:            result.Choices[0].Message.Content,
+		ReasoningContent:   result.Choices[0].Message.ReasoningContent,
 		ToolCalls:          calls,
 		FinishReason:       result.Choices[0].FinishReason,
 		InputTokens:        result.Usage.PromptTokens,
@@ -213,6 +220,9 @@ func toOpenAIMessages(messages []llm.Message) []openAIMessage {
 	for i, m := range messages {
 		content := m.Content
 		out[i] = openAIMessage{Role: m.Role, Content: &content, ToolCallID: m.ToolCallID}
+		if m.Role == "assistant" {
+			out[i].ReasoningContent = m.ReasoningContent
+		}
 		if len(m.ToolCalls) > 0 && content == "" {
 			out[i].Content = nil
 		}
@@ -311,6 +321,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 			return nil, err
 		}
 		result = recoverDialect(result, req.Tools)
+		result.Fallbacks = append(result.Fallbacks, llm.Fallback{Kind: "stream→whole-response", Reason: "the endpoint ignored stream:true and sent one JSON completion"})
 		if result.Content != "" {
 			req.OnText(result.Content)
 		}
@@ -318,7 +329,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 	}
 
 	result := &llm.CompletionResponse{Provider: p.name, Model: p.model}
-	var content strings.Builder
+	var content, reasoning strings.Builder
 	calls := newToolCallAccumulator()
 	read := 0
 	for {
@@ -349,6 +360,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 					for _, call := range choice.Delta.ToolCalls {
 						calls.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
 					}
+					reasoning.WriteString(choice.Delta.ReasoningContent)
 					if choice.Delta.Content != "" {
 						content.WriteString(choice.Delta.Content)
 						if len(req.Tools) > 0 {
@@ -374,6 +386,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 	}
 
 	result.Content = content.String()
+	result.ReasoningContent = reasoning.String()
 	result.ToolCalls = calls.requests()
 	result.RateLimitRemaining, result.RateLimitTotal = parseRateLimitHeaders(resp.Header)
 	return recoverDialect(result, req.Tools), nil
