@@ -58,3 +58,18 @@ func TestQualifyPrintsTheReasonForEveryResult(t *testing.T) {
 	}
 	t.Fatalf("no native_tool_schema line in:\n%s", out.String())
 }
+
+// A Provider whose Tools work only through a recovered dialect says so: "tools:
+// yes (assisted)" and the capability with its compensation, never a bare yes.
+func TestEnvMarksAssistedTools(t *testing.T) {
+	var out bytes.Buffer
+	printProviderChecks(&out, []app.ProviderCheck{
+		{Provider: "maxplus", Model: "m", Profile: app.ProfileMeasured, ToolCalling: true, Assisted: []app.CapabilityGap{{Capability: "native_tool_schema", Status: "assisted (dialect:dsml)", Detail: "recovered from dsml markup"}}},
+	})
+	text := out.String()
+	for _, want := range []string{"tools: yes (assisted)", "native_tool_schema", "dialect:dsml"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q in:\n%s", want, text)
+		}
+	}
+}

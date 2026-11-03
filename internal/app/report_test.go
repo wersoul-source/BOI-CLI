@@ -241,3 +241,25 @@ func TestReportExplainsEveryProviderGap(t *testing.T) {
 		t.Fatalf("old = %+v", c)
 	}
 }
+
+// A capability that passed only because the Connector recovered the call
+// from markup is listed as assisted, never folded into the native passes.
+func TestReportListsAssistedCapabilities(t *testing.T) {
+	t.Setenv("BOI_CONFIG_DIR", t.TempDir())
+	runtime := reportRuntime(t, nil)
+	item := llmfactory.ConfiguredProvider{Name: "dsml", Model: "m", EndpointClass: "custom", Provider: idleProvider{}}
+	passed := func(name string) coreblock.CapabilityResult {
+		return coreblock.CapabilityResult{Capability: name, Status: coreblock.CapabilityPassed}
+	}
+	saveProfile(t, runtime.BoiDir, item, time.Now(),
+		passed("completion"), passed("authority"), passed("tool_observation"),
+		coreblock.CapabilityResult{Capability: "native_tool_schema", Status: coreblock.CapabilityPassed, Assisted: "dialect:dsml", Detail: "assisted: recovered from dsml markup"})
+	report, err := runtime.Report([]llmfactory.ConfiguredProvider{item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := report.ProviderChecks[0]
+	if !c.ToolCalling || len(c.Gaps) != 0 || len(c.Assisted) != 1 || c.Assisted[0].Capability != "native_tool_schema" || !strings.Contains(c.Assisted[0].Status, "dialect:dsml") {
+		t.Fatalf("check = %+v", c)
+	}
+}

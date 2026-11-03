@@ -447,3 +447,50 @@ func TestStreamSeparatesToolCallsWithoutIndex(t *testing.T) {
 		t.Fatalf("second = %+v", second)
 	}
 }
+
+// A model that writes its tool call as Hermes markup in the text gets the call
+// recovered, marked as assisted, and the markup is never shown as reply text
+// while it streams (Architecture IV, P1.3).
+func TestStreamRecoversDialectToolCallsAndHidesTheMarkup(t *testing.T) {
+	server := sseServer(t, []string{
+		`{"model":"m","choices":[{"delta":{"content":"Reading it.\n<tool_"}}]}`,
+		`{"choices":[{"delta":{"content":"call>{\"name\": \"workspace__read\", "}}]}`,
+		`{"choices":[{"delta":{"content":"\"arguments\": {\"path\": \"README.md\"}}</tool_call>"},"finish_reason":"stop"}]}`,
+		"[DONE]",
+	}, nil)
+	var seen []string
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "read"}},
+		Tools:    []llm.ToolDefinition{{Name: "workspace__read"}},
+		OnText:   func(text string) { seen = append(seen, text) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ToolCallDialect != "hermes" || len(resp.ToolCalls) != 1 || resp.ToolCalls[0].Name != "workspace__read" || resp.ToolCalls[0].Arguments != `{"path":"README.md"}` {
+		t.Fatalf("response = %+v", resp)
+	}
+	if resp.Content != "Reading it." {
+		t.Fatalf("content = %q", resp.Content)
+	}
+	for _, text := range seen {
+		if strings.Contains(text, "tool_call") || strings.Contains(text, "workspace__read") {
+			t.Fatalf("streamed text showed the markup: %q", seen)
+		}
+	}
+}
+
+// Without Tools in the request nothing is recovered: markup is only a call
+// when the host offered that Tool.
+func TestDialectIsNotRecoveredWithoutOfferedTools(t *testing.T) {
+	body := `{"choices":[{"message":{"role":"assistant","content":"<tool_call>{\"name\": \"workspace__read\", \"arguments\": {}}</tool_call>"},"finish_reason":"stop"}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
+	t.Cleanup(server.Close)
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{{Role: "user", Content: "x"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.ToolCalls) != 0 || resp.ToolCallDialect != "" {
+		t.Fatalf("recovered a call no Tool was offered for: %+v", resp)
+	}
+}

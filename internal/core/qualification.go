@@ -48,6 +48,10 @@ type CapabilityResult struct {
 	Status     CapabilityStatus `json:"status"`
 	Detail     string           `json:"detail,omitempty"`
 	InputBytes int              `json:"input_bytes,omitempty"`
+	// Assisted names the compensation the capability passed with, such as
+	// "dialect:dsml". Empty means the model did it alone. A capability that
+	// passed with help is ASSISTED and is never reported as NATIVE (ADR-006).
+	Assisted string `json:"assisted,omitempty"`
 }
 
 type CapabilityProfile struct {
@@ -287,7 +291,7 @@ func (q Qualifier) Run(ctx context.Context, target ProviderTarget, provider llm.
 	native := q.probeNativeTools(ctx, provider)
 	if native.Status == CapabilityFailed {
 		if retry := q.probeNativeTools(ctx, provider); retry.Status == CapabilityPassed {
-			retry.Detail = "passed on retry; first attempt: " + native.Detail
+			retry.Detail = strings.TrimPrefix(retry.Detail+"; passed on retry; first attempt: "+native.Detail, "; ")
 			native = retry
 		}
 	}
@@ -401,6 +405,10 @@ func (q Qualifier) probeNativeTools(ctx context.Context, provider llm.Provider) 
 		return result
 	}
 	result.Status = CapabilityPassed
+	if response.ToolCallDialect != "" {
+		result.Assisted = "dialect:" + response.ToolCallDialect
+		result.Detail = "assisted: the model wrote the call as " + response.ToolCallDialect + " markup in its text and the Connector recovered it; the model did not use the native tool_calls field"
+	}
 	return result
 }
 
