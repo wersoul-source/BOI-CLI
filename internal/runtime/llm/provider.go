@@ -26,6 +26,24 @@ type Message struct {
 	ToolCalls []ToolCallRequest
 	// ToolCallID links a "tool" role message to the call it answers.
 	ToolCallID string
+	// ReasoningContent is the reasoning an assistant message came with. It is
+	// replayed to the endpoint that produced it, because some endpoints
+	// (DeepSeek thinking mode) answer HTTP 400 when it is missing from a later
+	// request. It is never set on a message the endpoint did not produce
+	// reasoning for, and it is never shown as an answer.
+	ReasoningContent string
+}
+
+// Fallback records that the Connector or the Runtime took a second route
+// because the first did not work. A fallback is never silent: it is carried to
+// the result so the user and the trace can see which route was used and why
+// (Architecture IV, P1.5).
+type Fallback struct {
+	// Kind names the route change, such as "native→envelope" or
+	// "stream→whole-response".
+	Kind string
+	// Reason is the evidence: what the endpoint did or said.
+	Reason string
 }
 
 // ToolDefinition describes one callable tool in a Provider-neutral form.
@@ -60,6 +78,10 @@ type CompletionResponse struct {
 	// the protocol's tool-call field. Such calls are a compensation: the
 	// capability they show is ASSISTED, never NATIVE (ADR-006).
 	ToolCallDialect string
+	// ReasoningContent is the reasoning the endpoint returned, if any.
+	ReasoningContent string
+	// Fallbacks are the route changes the adapter made to produce this reply.
+	Fallbacks []Fallback
 	// Rate-limit info from API headers (0 if unknown)
 	RateLimitRemaining int
 	RateLimitTotal     int

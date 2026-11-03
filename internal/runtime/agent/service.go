@@ -342,6 +342,19 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	if !interactive {
 		systemPrompt += "\n\nThis run is non-interactive: any capability that needs approval will be denied and ends the task. Use read-only capabilities."
 	}
+	// reasoning keeps what the endpoint reasoned for each native tool turn,
+	// by the first call of the turn, to replay it with that turn. fallbacks
+	// are the route changes of this run, each reported once.
+	reasoning := map[string]string{}
+	var fallbacks []llm.Fallback
+	noteFallback := func(fallback llm.Fallback) {
+		for _, seen := range fallbacks {
+			if seen == fallback {
+				return
+			}
+		}
+		fallbacks = append(fallbacks, fallback)
+	}
 	decider := decisionFunc(func(decideCtx context.Context, input DecisionInput) (Decision, error) {
 		// The host Task Plan stays in the manifest; sending it every turn only
 		// cost tokens and told the model nothing it could act on.
@@ -350,7 +363,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			messages = append(messages, history...)
 			messages = append(messages, llm.Message{Role: "user", Content: query})
 			if native {
-				messages = append(messages, nativeObservationMessages(input, store)...)
+				messages = append(messages, nativeObservationMessages(input, store, reasoning)...)
 			} else {
 				messages = append(messages, observationMessages(input, store)...)
 			}
@@ -374,11 +387,15 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			// Some endpoints accept tool definitions but reject the replayed
 			// tool_calls and tool messages that follow. Finish the task with
 			// text envelopes; the Tools and their authority are unchanged.
+			noteFallback(llm.Fallback{Kind: "native→envelope", Reason: "the endpoint rejected the replayed native tool calls (" + err.Error() + "); the rest of this task used text envelopes"})
 			native, definitions, toolPrompt = false, nil, ToolPrompt(s.broker)
 			response, err = request()
 		}
 		if err != nil {
 			return Decision{}, fmt.Errorf("agent provider call: %w", err)
+		}
+		for _, fallback := range response.Fallbacks {
+			noteFallback(fallback)
 		}
 		usage := Usage{InputTokens: response.InputTokens, OutputTokens: response.OutputTokens, ProviderCalls: 1}
 		var decision Decision
@@ -420,6 +437,9 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 				prepared = append(prepared, &item)
 			}
 			decision.ToolCall, decision.ToolCalls = prepared[0], prepared
+			if response.ReasoningContent != "" && native {
+				reasoning[prepared[0].ID] = response.ReasoningContent
+			}
 		}
 		decision.Provider = response.Provider
 		decision.Model = response.Model
@@ -467,6 +487,17 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err
+	}
+	if len(fallbacks) > 0 {
+		result.Fallbacks = fallbacks
+		lines := make([]string, 0, len(fallbacks)+1)
+		if result.Notice != "" {
+			lines = append(lines, result.Notice)
+		}
+		for _, fallback := range fallbacks {
+			lines = append(lines, "Route changed ("+fallback.Kind+"): "+fallback.Reason)
+		}
+		result.Notice = strings.Join(lines, "\n")
 	}
 	if ownBudget {
 		// Report what the whole task used, delegated children included.
@@ -674,7 +705,7 @@ func observationMessages(input DecisionInput, store *contextStore) []llm.Message
 // nativeObservationMessages renders observations as the assistant tool calls
 // and tool replies the native protocol expects. Calls made in the same step
 // share one assistant message, and every listed call has its reply.
-func nativeObservationMessages(input DecisionInput, store *contextStore) []llm.Message {
+func nativeObservationMessages(input DecisionInput, store *contextStore, reasoning map[string]string) []llm.Message {
 	var messages []llm.Message
 	var pending []llm.Message
 	lastStep := -1
@@ -693,7 +724,9 @@ func nativeObservationMessages(input DecisionInput, store *contextStore) []llm.M
 		request := llm.ToolCallRequest{ID: item.call.ID, Name: NativeToolName(item.call.Tool), Arguments: string(arguments)}
 		if item.step != lastStep || len(pending) == 0 {
 			flush()
-			pending = append(pending, llm.Message{Role: "assistant"})
+			// The assistant turn is replayed with the reasoning the endpoint
+			// gave for it, found by the first call of the turn.
+			pending = append(pending, llm.Message{Role: "assistant", ReasoningContent: reasoning[item.call.ID]})
 			lastStep = item.step
 		}
 		pending[0].ToolCalls = append(pending[0].ToolCalls, request)

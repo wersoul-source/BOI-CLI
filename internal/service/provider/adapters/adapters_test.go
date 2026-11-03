@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -492,5 +493,97 @@ func TestDialectIsNotRecoveredWithoutOfferedTools(t *testing.T) {
 	}
 	if len(resp.ToolCalls) != 0 || resp.ToolCallDialect != "" {
 		t.Fatalf("recovered a call no Tool was offered for: %+v", resp)
+	}
+}
+
+// Reasoning an endpoint returns is carried on the response and replayed with
+// the assistant turn that produced it (P1.4). An assistant message with no
+// reasoning sends no reasoning_content field, so endpoints that never return
+// it never see it.
+func TestReasoningContentIsReturnedAndReplayed(t *testing.T) {
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(raw))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"","reasoning_content":"read the file first","tool_calls":[{"id":"c1","type":"function","function":{"name":"workspace__read","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`))
+	}))
+	t.Cleanup(server.Close)
+	provider := NewOpenAIProvider("openai", "k", server.URL, "m")
+	first, err := provider.Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{{Role: "user", Content: "go"}}, Tools: []llm.ToolDefinition{{Name: "workspace__read"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ReasoningContent != "read the file first" {
+		t.Fatalf("reasoning = %q", first.ReasoningContent)
+	}
+	_, err = provider.Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{
+		{Role: "user", Content: "go"},
+		{Role: "assistant", ToolCalls: first.ToolCalls, ReasoningContent: first.ReasoningContent},
+		{Role: "tool", ToolCallID: "c1", Content: "result"},
+		{Role: "assistant", Content: "done"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sent struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	if err := json.Unmarshal([]byte(bodies[1]), &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.Messages[1]["reasoning_content"] != "read the file first" {
+		t.Fatalf("assistant turn lost its reasoning: %v", sent.Messages[1])
+	}
+	for _, i := range []int{0, 2, 3} {
+		if _, has := sent.Messages[i]["reasoning_content"]; has {
+			t.Fatalf("message %d carries reasoning_content: %v", i, sent.Messages[i])
+		}
+	}
+	if strings.Contains(bodies[0], "reasoning_content") {
+		t.Fatal("the first request carried reasoning_content")
+	}
+}
+
+func TestStreamCollectsReasoningWithoutShowingIt(t *testing.T) {
+	server := sseServer(t, []string{
+		`{"choices":[{"delta":{"reasoning_content":"think "}}]}`,
+		`{"choices":[{"delta":{"reasoning_content":"hard"}}]}`,
+		`{"choices":[{"delta":{"content":"answer"},"finish_reason":"stop"}]}`,
+		"[DONE]",
+	}, nil)
+	var seen []string
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "x"}},
+		OnText:   func(text string) { seen = append(seen, text) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ReasoningContent != "think hard" || resp.Content != "answer" {
+		t.Fatalf("response = %q / %q", resp.ReasoningContent, resp.Content)
+	}
+	for _, text := range seen {
+		if strings.Contains(text, "think") {
+			t.Fatalf("reasoning was shown as reply text: %q", seen)
+		}
+	}
+}
+
+// An endpoint that ignores stream:true is a route change, and the response
+// says so (P1.5).
+func TestNonStreamingEndpointIsRecordedAsAFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}`))
+	}))
+	t.Cleanup(server.Close)
+	resp, err := NewOpenAIProvider("openai", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{
+		Messages: []llm.Message{{Role: "user", Content: "x"}},
+		OnText:   func(string) {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Fallbacks) != 1 || resp.Fallbacks[0].Kind != "stream→whole-response" || resp.Fallbacks[0].Reason == "" {
+		t.Fatalf("fallbacks = %+v", resp.Fallbacks)
 	}
 }

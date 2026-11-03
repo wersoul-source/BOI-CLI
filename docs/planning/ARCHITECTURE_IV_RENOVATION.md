@@ -151,8 +151,9 @@ contracts frozen; rollback path documented.
 | P0.6 | done | PR #27. Its DSML fixture had a format bug (parameter name held the tool name); fixed with P1.3 |
 | P0.7 | todo | needs a recorded real run from the owner |
 | P0.8 | review | this PR; F9 (transcript store) waits for the owner |
-| P1.3 | review | this PR: `internal/service/provider/dialect`; DSML, Hermes, Qwen XML complete the zoo task as `ASSISTED` (`dialect:<name>`), never `NATIVE` |
-| P1.1, P1.2, P1.4–P1.7 | todo | P1.4/P1.5 next (reasoning replay row of the zoo) |
+| P1.3 | done | PR #28 |
+| P1.4, P1.5 | review | this PR: `reasoning_content` carried and replayed (zoo `reasoning-replay` no longer rejected); every fallback carried to the result and notice (`native→envelope`, `stream→whole-response`); zoo gains `rejects-replay` |
+| P1.1, P1.2, P1.6, P1.7 | todo | P1.7 (event envelope) next; P1.1/P1.2 split the adapter |
 | Phase 2 | todo | D1–D3 approved; zoo fixtures ready (corrupt-token row is P2.3) |
 | Phases 3–6 | todo | |
 
