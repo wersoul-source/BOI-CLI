@@ -2,6 +2,11 @@
 
 Do not treat this plan as permission to implement every phase at once. Complete one acceptance gate, update the handoff, then continue.
 
+**Since 2026-11-02 the plan of record is Architecture IV:**
+[`docs/planning/ARCHITECTURE_IV_RENOVATION.md`](../../../docs/planning/ARCHITECTURE_IV_RENOVATION.md)
+(phases 0–6, tasks P0.1–P6.4, status board). Start from `HANDOFF.md` "State at
+master `a05923f`". The H-phase list below is history.
+
 The authoritative plan for the 90% target is
 [`docs/planning/WORK_1_PLAN.md`](../../../docs/planning/WORK_1_PLAN.md). The
 historical H-phase mapping below remains only for traceability.
