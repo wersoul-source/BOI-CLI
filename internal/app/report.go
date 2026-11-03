@@ -61,6 +61,9 @@ type ProviderCheck struct {
 	Gaps []CapabilityGap `json:"gaps"`
 	// ToolCalling is whether this Provider alone would be allowed Tools today.
 	ToolCalling bool `json:"tool_calling"`
+	// Assisted are the capabilities that passed only with a compensation
+	// (status "assisted", Detail names it). They are never shown as native.
+	Assisted []CapabilityGap `json:"assisted"`
 }
 
 // CapabilityGap is one capability a Provider did not pass, with the probe's
@@ -76,7 +79,7 @@ type CapabilityGap struct {
 func providerChecks(boiDir string, configured []llmfactory.ConfiguredProvider) []ProviderCheck {
 	checks := make([]ProviderCheck, 0, len(configured))
 	for _, item := range configured {
-		check := ProviderCheck{Provider: item.Name, Model: item.Model, Gaps: []CapabilityGap{}}
+		check := ProviderCheck{Provider: item.Name, Model: item.Model, Gaps: []CapabilityGap{}, Assisted: []CapabilityGap{}}
 		target := coreblock.ProviderTarget{Provider: item.Name, Model: item.Model, EndpointClass: item.EndpointClass}
 		profile, _, err := LoadProfile(boiDir, target)
 		switch {
@@ -84,8 +87,11 @@ func providerChecks(boiDir string, configured []llmfactory.ConfiguredProvider) [
 			check.Profile = ProfileMeasured
 			check.ToolCalling = coreblock.ComposeEnvironment(profile).ToolCalling
 			for _, result := range profile.Results {
-				if result.Status != coreblock.CapabilityPassed {
+				switch {
+				case result.Status != coreblock.CapabilityPassed:
 					check.Gaps = append(check.Gaps, CapabilityGap{Capability: result.Capability, Status: string(result.Status), Detail: result.Detail})
+				case result.Assisted != "":
+					check.Assisted = append(check.Assisted, CapabilityGap{Capability: result.Capability, Status: "assisted (" + result.Assisted + ")", Detail: result.Detail})
 				}
 			}
 		case errors.Is(err, os.ErrNotExist):

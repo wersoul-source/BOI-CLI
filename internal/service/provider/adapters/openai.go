@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
+	"github.com/boi-family/boi-cli/internal/service/provider/dialect"
 )
 
 type OpenAIProvider struct {
@@ -155,7 +156,25 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	if resp.StatusCode != http.StatusOK {
 		return nil, llm.NewHTTPError(p.name, resp.StatusCode, string(respBody), resp.Header)
 	}
-	return p.decodeCompletion(respBody, resp.Header)
+	result, err := p.decodeCompletion(respBody, resp.Header)
+	if err != nil {
+		return nil, err
+	}
+	return recoverDialect(result, req.Tools), nil
+}
+
+// recoverDialect turns tool-call markup in the reply text into ToolCalls when
+// the request offered Tools and the endpoint returned none natively. The
+// response says which dialect it came from, so the call is reported as
+// assisted (ADR-006).
+func recoverDialect(result *llm.CompletionResponse, offered []llm.ToolDefinition) *llm.CompletionResponse {
+	if result == nil || len(result.ToolCalls) > 0 || len(offered) == 0 {
+		return result
+	}
+	if parsed, ok := dialect.Parse(result.Content, offered); ok {
+		result.ToolCalls, result.Content, result.ToolCallDialect = parsed.Calls, parsed.Text, string(parsed.Dialect)
+	}
+	return result
 }
 
 // decodeCompletion turns a non-streamed Chat Completions body into a response.
@@ -288,10 +307,14 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 			return nil, fmt.Errorf("provider %s: %w", p.name, err)
 		}
 		result, err := p.decodeCompletion(respBody, resp.Header)
-		if err == nil && result.Content != "" {
+		if err != nil {
+			return nil, err
+		}
+		result = recoverDialect(result, req.Tools)
+		if result.Content != "" {
 			req.OnText(result.Content)
 		}
-		return result, err
+		return result, nil
 	}
 
 	result := &llm.CompletionResponse{Provider: p.name, Model: p.model}
@@ -328,7 +351,13 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 					}
 					if choice.Delta.Content != "" {
 						content.WriteString(choice.Delta.Content)
-						req.OnText(content.String())
+						if len(req.Tools) > 0 {
+							// Markup that is about to become a tool call is
+							// not part of the visible reply.
+							req.OnText(dialect.Visible(content.String()))
+						} else {
+							req.OnText(content.String())
+						}
 					}
 				}
 			}
@@ -347,7 +376,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 	result.Content = content.String()
 	result.ToolCalls = calls.requests()
 	result.RateLimitRemaining, result.RateLimitTotal = parseRateLimitHeaders(resp.Header)
-	return result, nil
+	return recoverDialect(result, req.Tools), nil
 }
 
 // toolCallAccumulator rebuilds streamed tool calls. Each call keeps the index

@@ -384,6 +384,13 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		var decision Decision
 		if native && len(response.ToolCalls) > 0 {
 			decision, err = nativeDecision(response.ToolCalls, nativeNames, fmt.Sprintf("%s_%d", runNonce, input.Step))
+			if err == nil && response.ToolCallDialect != "" {
+				// The trace keeps that the call was recovered from markup,
+				// so the run never reads as the model's native tool use.
+				for _, call := range decision.ToolCalls {
+					call.Purpose = "tool call recovered from " + response.ToolCallDialect + " markup"
+				}
+			}
 		} else {
 			// A model may still answer with a text envelope; it is accepted
 			// as a fallback in both modes.

@@ -13,7 +13,8 @@ folded into the phases below.
 
 ## 0. Rules for the agent picking this up
 
-**Read order:** ADR-006 → `ARCHITECTURE_IV.md` → this file →
+**Read order:** ADR-006 → `ARCHITECTURE_IV.md` (§5.5 foundation amendments,
+§6 Experience Contract) → this file →
 [`HANDOFF.md`](../../HANDOFF.md) →
 [`docs/audit/2026-11-01-full-audit.md`](../audit/2026-11-01-full-audit.md).
 
@@ -39,6 +40,12 @@ folded into the phases below.
    `test -z "$(gofmt -l .)"`, `go vet ./...`, `staticcheck ./...`,
    `go test -race -count=1 ./...`, `go build ./cmd/boi`.
 10. Update the status board (§3) in the same PR as the work.
+11. Rule 4 (ADR-006): before building a feature, check whether it touches a
+    Foundation amendment F1–F9 (ARCHITECTURE_IV §5.5). Build to that shape;
+    never invent a parallel one. Ideas from other platforms come in as
+    principles restated in BOI's terms, never as copies.
+12. Experience acceptance: a PR that changes what the user sees names which
+    Experience Contract rows (E1–E9) it affects and how they were checked.
 
 ---
 
@@ -73,6 +80,7 @@ of the Trusted Foundation.
 | P0.5 | Capability Gap Report v0: `boi env` explains every configured Provider (profile state, gaps with evidence); `qualify` prints the reason for every non-passed result | `internal/app/report.go`, `internal/transport/cli/env.go`, `provider.go` | `TestReportExplainsEveryProviderGap`, `TestEnvPrintsEachProviderGap`, `TestQualifyPrintsTheReasonForEveryResult` |
 | P0.6 | **Simulated model zoo**: `httptest` endpoints that reproduce each trait and source seen or expected — no streaming, DSML tool calls, Hermes and Qwen XML, `reasoning_content` required, tool calls without `index`, a corrupted token, slow first load, a failing replica | new test package under `internal/` | one scripted task runs against every simulated endpoint in CI, and each records its expected status |
 | P0.7 | Record and replay real conversations so a bug seen with a real Provider becomes a deterministic test | test helper + fixture format | a recorded maxplus probe run replays in CI |
+| P0.8 | **Foundation amendments (Rule 4)**: lock the shapes F1–F9 and the Experience Contract E1–E9, from a shallow survey of five platforms | `ADR-006` Rule 4, `ARCHITECTURE_IV.md` §5.5 and §6, `docs/research/2026-11-03-platform-principles.md` | documents merged; each F item named in the phase that builds it; F9 has an owner decision |
 
 ### Phase 1 — Connector and protocol
 
@@ -83,6 +91,8 @@ of the Trusted Foundation.
 | P1.3 | Dialect parsers: DSML, Hermes, Qwen XML (the 2026-10-24 DSML reply is the first fixture) |
 | P1.4 | Carry and replay `reasoning_content` |
 | P1.5 | Record every fallback with its reason; `rejectsNativeReplay` no longer downgrades silently |
+| P1.6 | Typed content parts on `Message` (F3), text only; endpoint facts declare accepted part types |
+| P1.7 | Event envelope v0 (F2): `schema_version`, `seq`, ids (F1), `recipe_version`; N-1 reader and unknown-kind skip, with a conformance test |
 
 ### Phase 2 — Calibration Core
 
@@ -94,17 +104,24 @@ of the Trusted Foundation.
 | P2.4 | Recipe per endpoint and a shared Policy Floor in the Router (D3) |
 | P2.5 | Drive the Service switches from the Recipe; keep exclusion only for no profile and failed completion |
 | P2.6 | Text, planning and analysis stay available when Tools are `UNVERIFIED` or `BLOCKED`, with the limitation stated |
+| P2.7 | Model switch (F4) by failover or by the user: `model.switched`, new Recipe, approvals re-checked, non-portable state dropped with a reason; zoo test for E3 |
+| P2.8 | Permission modes as narrowing only (F8): `plan`, `default`, `confirm-all`, with enforcement tests |
 
 ### Phase 3 — Recoverable Runtime
 
 Checkpoint and resume through the Agent Folder; no side-effecting Tool replays
 without approval or a proven idempotency guarantee; compaction by summary;
-budgets from the Recipe; circuit breaker and replica affinity.
+budgets from the Recipe; circuit breaker and replica affinity. Built to the
+Foundation shapes: ids and reserved lease fields (F1), persisted approvals
+(F5), effect records with pre-image and undo (F6), transcript store (F9, once
+the owner decides).
 
 ### Phase 4 — Composable Extensions
 
-`extension.yaml` (extends `PackManifest`), validator, Extension Registry and
-SDK; approval per D5; Extension Isolation tests; OS-level sandbox on Linux for
+`extension.yaml` (extends `PackManifest`) with contract majors, namespace and
+`depends_on` (F7), validator, Extension Registry and SDK; approval per D5;
+hooks as Event subscribers plus one authorisation point that can only deny or
+ask (F8); Extension Isolation tests; OS-level sandbox on Linux for
 `process.run` and code Extensions (D7); Agent-built Extensions.
 
 ### Phase 5 — Measure and adapt
@@ -131,10 +148,12 @@ contracts frozen; rollback path documented.
 | P0.3 | done | PR #26 |
 | P0.4 | done | PR #26 |
 | P0.5 | done | PR #26 |
-| P0.6 | review | `internal/acceptance/modelzoo` + `modelzoo_test.go`; baseline: 5 traits pass, 5 gaps recorded (DSML, Hermes, Qwen XML → P1.3; reasoning replay → P1.4/P1.5; corrupt token → P2.3); dead replica fails over |
+| P0.6 | done | PR #27. Its DSML fixture had a format bug (parameter name held the tool name); fixed with P1.3 |
 | P0.7 | todo | needs a recorded real run from the owner |
-| Phase 1 | todo | next; the zoo rows for DSML, Hermes, Qwen XML and reasoning replay are its acceptance |
-| Phase 2 | todo | D1–D3 approved; needs P0.6 fixtures |
+| P0.8 | review | this PR; F9 (transcript store) waits for the owner |
+| P1.3 | review | this PR: `internal/service/provider/dialect`; DSML, Hermes, Qwen XML complete the zoo task as `ASSISTED` (`dialect:<name>`), never `NATIVE` |
+| P1.1, P1.2, P1.4–P1.7 | todo | P1.4/P1.5 next (reasoning replay row of the zoo) |
+| Phase 2 | todo | D1–D3 approved; zoo fixtures ready (corrupt-token row is P2.3) |
 | Phases 3–6 | todo | |
 
 ---

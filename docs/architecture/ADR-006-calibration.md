@@ -1,6 +1,8 @@
 # ADR-006: Calibrate the environment to the model
 
 Status: **accepted** by the owner on 2026-11-02, together with decisions D1–D7.
+Rule 4 and Experience acceptance added on 2026-11-03 from the owner's
+direction ("สร้างฐานให้รองรับการพัฒนาในอนาคต … ความรู้สึกการใช้งานสำคัญ").
 Scope: the whole of Architecture IV ([`ARCHITECTURE_IV.md`](ARCHITECTURE_IV.md)).
 Plan: [`docs/planning/ARCHITECTURE_IV_RENOVATION.md`](../planning/ARCHITECTURE_IV_RENOVATION.md).
 
@@ -59,6 +61,22 @@ comparable conditions, on at least four dimensions: **correctness, safety,
 stability and resource cost**. It is enabled only if it meets criteria set in
 advance. Without evidence it stays `UNVERIFIED`. Every confirmed bug gets a
 regression test.
+
+### Rule 4 — Support before building
+
+Before a capability that other agent platforms have is needed, ask one
+question: if BOI had to add it later, would that change Core, rewrite stored
+data, or break a contract? If yes, fix the contract now (its data shape,
+identity, event, security boundary or version) and build nothing else. If no,
+leave it for later.
+
+Limit: do not create interfaces from guesses. Only what is hard to change
+later is locked now; the rest gets an extension point and a compatibility test
+when it is built. The current list is in ARCHITECTURE_IV §5 ("Foundation
+amendments") and comes from
+[`docs/research/2026-11-03-platform-principles.md`](../research/2026-11-03-platform-principles.md).
+Other platforms are a source of principles, never a template: each idea is
+restated in BOI's own terms (Block, contract, status) or left out.
 
 ### Capability status
 
@@ -122,6 +140,15 @@ From 2026-11-02 every PR answers three questions in its description:
 
 A PR that does not change what a model can do (documentation, tooling) answers
 `N/A` with a reason. `.github/PULL_REQUEST_TEMPLATE.md` carries the questions.
+
+### Experience acceptance
+
+Inside, BOI is modular; outside, it must feel like one complete agent. Every
+change is accepted on two counts: **architecture acceptance** (contracts and
+tests hold) and **experience acceptance** (the Experience Contract in
+ARCHITECTURE_IV §6 still holds for the user, whatever model, runtime or
+Extension is in use). A missing or failed Block shows its limit and keeps the
+work done so far; it never pretends to have succeeded.
 
 ### Worked example: Maxplus
 

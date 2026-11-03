@@ -155,7 +155,11 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 		fmt.Fprintf(out, "Endpoint: %s\n", item.Host)
 	}
 	for _, result := range profile.Results {
-		line := fmt.Sprintf("  %-20s %s", result.Capability, result.Status)
+		status := string(result.Status)
+		if result.Assisted != "" {
+			status += " (assisted: " + result.Assisted + ")"
+		}
+		line := fmt.Sprintf("  %-20s %s", result.Capability, status)
 		// Every detail is printed, not only a failure's: "unsupported" says
 		// why the endpoint refused tool definitions, and a pass on retry
 		// records the first attempt, which is how an unstable endpoint shows.

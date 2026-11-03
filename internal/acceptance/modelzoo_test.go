@@ -2,7 +2,11 @@ package acceptance_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +39,10 @@ type zooBaseline struct {
 	tools bool
 	// completion: the completion probe passes.
 	completion bool
-	gap        string
+	// assisted: the compensation native_tool_schema passed with, or "" when
+	// the model did it alone. It must never be empty for a compensated pass.
+	assisted string
+	gap      string
 }
 
 var zooExpectations = map[modelzoo.Trait]zooBaseline{
@@ -44,9 +51,9 @@ var zooExpectations = map[modelzoo.Trait]zooBaseline{
 	modelzoo.SlowFirstLoad:   {marker: true, tools: true, completion: true},
 	modelzoo.MissingIndex:    {marker: true, tools: true, completion: true},
 	modelzoo.ReasoningReplay: {marker: true, rejected: true, tools: true, completion: true, gap: "P1.4/P1.5: reasoning_content not replayed; native replay rejected and downgraded silently"},
-	modelzoo.DSML:            {completion: true, gap: "P1.3: DSML tool markup not parsed"},
-	modelzoo.Hermes:          {completion: true, gap: "P1.3: Hermes <tool_call> not parsed"},
-	modelzoo.QwenXML:         {completion: true, gap: "P1.3: Qwen XML tool markup not parsed"},
+	modelzoo.DSML:            {marker: true, tools: true, completion: true, assisted: "dialect:dsml"},
+	modelzoo.Hermes:          {marker: true, tools: true, completion: true, assisted: "dialect:hermes"},
+	modelzoo.QwenXML:         {marker: true, tools: true, completion: true, assisted: "dialect:qwen-xml"},
 	modelzoo.CorruptToken:    {completion: true, gap: "P2.3: one corrupted token withholds every Tool; the task reply is wrong and not flagged"},
 	modelzoo.Down:            {gap: "none: completion fails, exclusion is correct (ADR-006)"},
 }
@@ -131,7 +138,16 @@ func TestModelZooQualification(t *testing.T) {
 			if env.ToolCalling != want.tools {
 				t.Errorf("tool calling = %v, baseline %v\n%s", env.ToolCalling, want.tools, describeProfile(profile))
 			}
-			t.Logf("%-16s completion=%-5v tools=%-5v native=%-5v gap=%q", trait, env.Completion, env.ToolCalling, env.NativeTools, want.gap)
+			var assisted string
+			for _, result := range profile.Results {
+				if result.Capability == "native_tool_schema" {
+					assisted = result.Assisted
+				}
+			}
+			if assisted != want.assisted {
+				t.Errorf("native_tool_schema assisted = %q, baseline %q: an assisted pass must never read as native\n%s", assisted, want.assisted, describeProfile(profile))
+			}
+			t.Logf("%-16s completion=%-5v tools=%-5v native=%-5v assisted=%q gap=%q", trait, env.Completion, env.ToolCalling, env.NativeTools, assisted, want.gap)
 		})
 	}
 }
@@ -172,7 +188,60 @@ func describeResult(result *agent.AgentResult) string {
 func describeProfile(profile *coreblock.CapabilityProfile) string {
 	var b strings.Builder
 	for _, r := range profile.Results {
-		fmt.Fprintf(&b, "  %s: %s %s\n", r.Capability, r.Status, r.Detail)
+		fmt.Fprintf(&b, "  %s: %s [%s] %s\n", r.Capability, r.Status, r.Assisted, r.Detail)
 	}
 	return b.String()
+}
+
+// TestRecoveredToolCallStillNeedsApproval: a call recovered from markup goes
+// through the same Broker as a native one. A write that the user refuses is
+// not performed, whatever dialect asked for it (ADR-006: no compensation may
+// bypass a safety rule).
+func TestRecoveredToolCallStillNeedsApproval(t *testing.T) {
+	markup := "<tool_call>\n{\"name\": \"workspace__write\", \"arguments\": {\"path\": \"owned.txt\", \"content\": \"pwned\"}}\n</tool_call>"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		content := markup
+		if strings.Contains(string(body), `"role":"tool"`) {
+			content = "The write was not approved."
+		}
+		w.Header().Set("Content-Type", "application/json")
+		encoded, _ := json.Marshal(content)
+		fmt.Fprintf(w, `{"choices":[{"message":{"role":"assistant","content":%s},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`, encoded)
+	}))
+	t.Cleanup(server.Close)
+	root := t.TempDir()
+	sandbox, err := workspace.NewSandbox(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := adapters.NewOpenAIProvider("zoo-hermes-write", "fixture-key", server.URL, "zoo-model")
+	service := agent.NewService(persona.CorePersona(), llm.NewRouter([]llm.Provider{provider}), nil, sandbox)
+	var names []string
+	for _, tool := range filesystem.Tools(sandbox) {
+		if err := service.RegisterTool(tool); err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, tool.Spec().Name)
+	}
+	if err := service.SetActiveTools(names); err != nil {
+		t.Fatal(err)
+	}
+	service.SetToolCallingAllowed(true)
+	service.SetNativeToolCalling(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	approvals := 0
+	for event := range service.Start(ctx, "Write owned.txt with the word pwned.") {
+		if event.Approval != nil {
+			approvals++
+			event.Approval.Decisions <- agent.ApprovalDecision{RequestID: event.Approval.Request.ID, State: agent.ApprovalRejected, DecidedAt: time.Now()}
+		}
+	}
+	if approvals == 0 {
+		t.Fatal("a write recovered from Hermes markup ran without asking for approval")
+	}
+	if _, err := os.Stat(filepath.Join(root, "owned.txt")); !os.IsNotExist(err) {
+		t.Fatalf("a refused write recovered from markup changed the workspace: %v", err)
+	}
 }

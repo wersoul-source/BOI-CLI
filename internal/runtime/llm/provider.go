@@ -55,6 +55,11 @@ type CompletionResponse struct {
 	// endpoint does not report one. "length" tells a truncated reply apart
 	// from a wrong one.
 	FinishReason string
+	// ToolCallDialect is set when the adapter recovered ToolCalls from markup
+	// the model wrote into Content ("dsml", "hermes", "qwen-xml") instead of
+	// the protocol's tool-call field. Such calls are a compensation: the
+	// capability they show is ASSISTED, never NATIVE (ADR-006).
+	ToolCallDialect string
 	// Rate-limit info from API headers (0 if unknown)
 	RateLimitRemaining int
 	RateLimitTotal     int

@@ -259,7 +259,7 @@ func call(id, name, arguments string) toolCall {
 // documents it: invoke and parameter elements inside a tool_calls block.
 func dsmlCall(name, parameter, value string) string {
 	const bar = "｜"
-	return fmt.Sprintf("<%[1]sDSML%[1]stool_calls>\n<%[1]sDSML%[1]sinvoke name=%q>\n<%[1]sDSML%[1]sparameter name=%q string=\"true\">%s</%[1]sDSML%[1]sparameter>\n</%[1]sDSML%[1]sinvoke>\n</%[1]sDSML%[1]stool_calls>", bar, name, parameter, value)
+	return fmt.Sprintf("<%[1]sDSML%[1]stool_calls>\n<%[1]sDSML%[1]sinvoke name=%[2]q>\n<%[1]sDSML%[1]sparameter name=%[3]q string=\"true\">%[4]s</%[1]sDSML%[1]sparameter>\n</%[1]sDSML%[1]sinvoke>\n</%[1]sDSML%[1]stool_calls>", bar, name, parameter, value)
 }
 
 func writeError(w http.ResponseWriter, status int, text string) {

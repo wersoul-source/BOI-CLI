@@ -197,12 +197,15 @@ func printProviderChecks(out io.Writer, checks []app.ProviderCheck) {
 		line := fmt.Sprintf("  %s/%s   profile: %s", check.Provider, check.Model, check.Profile)
 		if check.Profile == app.ProfileMeasured {
 			line += "   tools: " + yesNo(check.ToolCalling)
+			if check.ToolCalling && len(check.Assisted) > 0 {
+				line += " (assisted)"
+			}
 		}
 		fmt.Fprintln(out, line)
 		if check.ProfileError != "" {
 			fmt.Fprintf(out, "    %s\n", check.ProfileError)
 		}
-		for _, gap := range check.Gaps {
+		for _, gap := range append(append([]app.CapabilityGap{}, check.Gaps...), check.Assisted...) {
 			gapLine := fmt.Sprintf("    %-20s %s", gap.Capability, gap.Status)
 			if gap.Detail != "" {
 				gapLine += "  - " + gap.Detail
