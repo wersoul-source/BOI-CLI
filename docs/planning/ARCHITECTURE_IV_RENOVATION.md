@@ -126,14 +126,14 @@ contracts frozen; rollback path documented.
 
 | ID | Status | Note |
 |---|---|---|
-| P0.1 | review | this PR |
-| P0.2 | review | this PR |
-| P0.3 | review | this PR |
-| P0.4 | review | this PR |
-| P0.5 | review | this PR |
-| P0.6 | todo | next PR |
+| P0.1 | done | PR #26 |
+| P0.2 | done | PR #26 |
+| P0.3 | done | PR #26 |
+| P0.4 | done | PR #26 |
+| P0.5 | done | PR #26 |
+| P0.6 | review | `internal/acceptance/modelzoo` + `modelzoo_test.go`; baseline: 5 traits pass, 5 gaps recorded (DSML, Hermes, Qwen XML → P1.3; reasoning replay → P1.4/P1.5; corrupt token → P2.3); dead replica fails over |
 | P0.7 | todo | needs a recorded real run from the owner |
-| Phase 1 | todo | may start alongside P0.6 |
+| Phase 1 | todo | next; the zoo rows for DSML, Hermes, Qwen XML and reasoning replay are its acceptance |
 | Phase 2 | todo | D1–D3 approved; needs P0.6 fixtures |
 | Phases 3–6 | todo | |
 
