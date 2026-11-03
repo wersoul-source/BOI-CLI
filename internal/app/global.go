@@ -43,6 +43,14 @@ func profileDirs(boiDir string) []string {
 	return dirs
 }
 
+// ErrProfileExpired marks a profile that exists but is too old to trust.
+var ErrProfileExpired = errors.New("qualification profile expired")
+
+type expiredProfileError struct{ message string }
+
+func (e expiredProfileError) Error() string        { return e.message }
+func (e expiredProfileError) Is(target error) bool { return target == ErrProfileExpired }
+
 // LoadProfile returns the first valid profile for target and the path it came from.
 func LoadProfile(boiDir string, target coreblock.ProviderTarget) (*coreblock.CapabilityProfile, string, error) {
 	var lastErr error
@@ -50,8 +58,8 @@ func LoadProfile(boiDir string, target coreblock.ProviderTarget) (*coreblock.Cap
 		path := coreblock.CapabilityProfilePath(dir, target)
 		profile, err := coreblock.LoadCapabilityProfile(path)
 		if err == nil && profile.Expired(time.Now()) {
-			err = fmt.Errorf("qualification of %s/%s from %s is older than %d days; run 'boi provider qualify %s'",
-				target.Provider, target.Model, profile.GeneratedAt.Format("2006-01-02"), int(coreblock.ProfileMaxAge.Hours()/24), target.Provider)
+			err = expiredProfileError{fmt.Sprintf("qualification of %s/%s from %s is older than %d days; run 'boi provider qualify %s'",
+				target.Provider, target.Model, profile.GeneratedAt.Format("2006-01-02"), int(coreblock.ProfileMaxAge.Hours()/24), target.Provider)}
 		}
 		if err == nil {
 			return profile, path, nil

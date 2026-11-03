@@ -11,9 +11,9 @@ A semi-SDK of optional facilities that Core may compose. It detects the environm
 
 ## 2. Core
 
-Owns the BOI constitution, the single `boi` Persona, Agent identity, Provider Model tests, capability profiling, Tool/Skill/Knowledge calibration, environment composition, and qualification gate.
+Owns the BOI constitution, the single `boi` Persona, Agent identity, Provider Model tests, capability profiling and the Capability Gap Report, Tool/Skill/Knowledge calibration into an Environment Recipe, and environment composition. Core calibrates the environment to the model; it does not exclude a model for being weak ([ADR-006](../../../docs/architecture/ADR-006-calibration.md)). A Provider stays out of the Router only without a measured profile or when completion fails.
 
-Provider Model -> Core tests -> Capability Profile -> composed Agent environment.
+Provider Model -> Core tests -> Capability Gap Report -> Environment Recipe -> composed Agent environment.
 
 ## 3. Various Equipment
 

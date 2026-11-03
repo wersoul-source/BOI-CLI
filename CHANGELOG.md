@@ -2,6 +2,14 @@
 
 All notable changes to BOI CLI.
 
+## Unreleased — Architecture IV, Phase 0
+
+The owner approved Architecture IV on 2026-11-02: BOI adapts its environment to the model instead of excluding a weak one, and never pretends a model can do what it cannot. See `docs/architecture/ADR-006-calibration.md`.
+
+- **`boi env` explains every configured Provider.** "Tool calling: no" used to be the whole answer whatever the cause. Each Provider now shows whether it has a usable profile (measured, missing, expired, invalid), whether it alone would be allowed Tools, and every capability it did not pass with the probe's evidence, such as what the model actually replied. `boi env --json` carries the same as `provider_checks`. What the Router uses is unchanged
+- **`boi provider qualify` prints the reason for every result**, not only failures: an endpoint that refuses tool definitions now says so, and a pass on retry shows what the first attempt was
+- Design records: ADR-006, `ARCHITECTURE_IV.md` with four v0 contracts, and the seven-phase plan `ARCHITECTURE_IV_RENOVATION.md`. Documents that still described qualification as a gate are reworded, and the PR template asks every change for its Gap, Composition and Evidence
+
 ## v2.7.1 — Security and streaming fixes
 
 From the full audit in `docs/audit/2026-11-01-full-audit.md`. Every fix has a regression test that fails without it.

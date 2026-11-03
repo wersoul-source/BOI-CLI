@@ -156,7 +156,10 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 	}
 	for _, result := range profile.Results {
 		line := fmt.Sprintf("  %-20s %s", result.Capability, result.Status)
-		if result.Status == coreblock.CapabilityFailed && result.Detail != "" {
+		// Every detail is printed, not only a failure's: "unsupported" says
+		// why the endpoint refused tool definitions, and a pass on retry
+		// records the first attempt, which is how an unstable endpoint shows.
+		if result.Detail != "" {
 			line += "  - " + result.Detail
 		}
 		fmt.Fprintln(out, line)

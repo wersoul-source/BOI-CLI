@@ -43,7 +43,7 @@ main path or not general), **Proposed** (no code), **Blocked** (intentionally of
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Failed Tool-calling probe → completion-only Agent | Implemented | `ComposeEnvironment`, `Broker.SetToolCallingAllowed` |
+| Failed Tool-calling probe → completion-only Agent | Superseded by ADR-006 | Still the behaviour of `ComposeEnvironment` and `Broker.SetToolCallingAllowed` until Architecture IV Phase 2; the design is now to compensate, not withhold |
 | Native rejected → envelope | Implemented | `rejectsNativeReplay` |
 | Skill without its Tools is rejected, not loaded broken | Implemented | `Requires` check |
 | Missing optional Block reported, Runtime continues | Partial | Only for Skills and Provider capabilities; no notion of optional Tool/MCP/SubAgent Blocks |

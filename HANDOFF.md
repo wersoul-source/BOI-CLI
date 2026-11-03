@@ -8,7 +8,7 @@ This is the entry point for Kampun or any Agent continuing BOI CLI.
 - Primary branch: `master`
 - Historical architecture baseline: `f5c0934`
 - Pre-W1.7 rollback baseline: `f3db72b`
-- Product version in source: `2.4.0` (BOI Agent Suite v2.4; branch `agent-suite-v2.4` until merged)
+- Product version in source: `2.7.1` (released, tag `v2.7.1`). Architecture IV targets `3.0.0`
 - Language: Go `1.24.2` or later compatible toolchain
 - Main interfaces: TUI (`boi`) and non-interactive CLI (`boi ask`)
 
@@ -16,17 +16,25 @@ Always inspect the live commit and working tree; this file records a handoff bas
 
 ## Read in this order
 
+Architecture IV is the design of record since 2026-11-02. Read these three first:
+
+1. [`ADR-006-calibration.md`](docs/architecture/ADR-006-calibration.md) — the principle, the four capability statuses, decisions D1–D7, and what every PR must answer
+2. [`ARCHITECTURE_IV.md`](docs/architecture/ARCHITECTURE_IV.md) — the six Blocks restated, what is locked, the two axes of model support, the four contracts
+3. [`ARCHITECTURE_IV_RENOVATION.md`](docs/planning/ARCHITECTURE_IV_RENOVATION.md) — the seven phases and the status board
+
+Then the background:
+
 1. [`skills/boi-project-handoff/SKILL.md`](skills/boi-project-handoff/SKILL.md)
 2. [`current-state.md`](skills/boi-project-handoff/references/current-state.md)
 3. [`architecture-6-blocks.md`](skills/boi-project-handoff/references/architecture-6-blocks.md)
 4. [`remaining-plan.md`](skills/boi-project-handoff/references/remaining-plan.md)
 5. [`s25-plus.md`](skills/boi-project-handoff/references/s25-plus.md)
 6. [`WORK_1_PLAN.md`](docs/planning/WORK_1_PLAN.md)
-7. [`RENOVATION_PLAN.md`](docs/planning/RENOVATION_PLAN.md) — **draft, awaiting owner approval**; the foundation track (calibrate the environment to the model). Read it before starting any Provider, qualification or runtime work.
+7. [`RENOVATION_PLAN.md`](docs/planning/RENOVATION_PLAN.md) — superseded by Architecture IV; kept for its evidence (drift findings, the real maxplus qualification run).
 
 ## Owner-approved direction
 
-BOI Agent Suit has six Blocks: Service, Core, Various Equipment, Runtime, Agent Folder, and SubAgent. It has one Core Persona, `boi`; the user names their Agent instance during first TUI/GUI onboarding. Core evaluates each Provider Model and composes an environment from a bounded active registry of at most 15 Skills and 15 Tools. BOI Agent Suit is network-capable but is not an offline-first system.
+BOI Agent Suit has six Blocks: Service, Core, Various Equipment, Runtime, Agent Folder, and SubAgent. It has one Core Persona, `boi`; the user names their Agent instance during first TUI/GUI onboarding. Core evaluates each Provider Model and composes an environment from a bounded active registry of at most 15 Skills and 15 Tools. Since ADR-006 (2026-11-02) that evaluation calibrates: BOI adapts the environment to the model and never pretends the model can do what it cannot. BOI Agent Suit is network-capable but is not an offline-first system.
 
 ## Current continuation gate
 
@@ -102,7 +110,23 @@ local-model run on Windows PowerShell, and the second-Provider verification.
 Locked and not started: step 6 (Agent packs, organisations, factory) and the
 browser UI (`docs/planning/BOI_WEB_UI_PLAN.md`, proposal only).
 
-## State at v2.7.0 (latest)
+## State at v2.7.1 (latest)
+
+v2.7.1 (tag `v2.7.1`, `master` `eab3452`) fixes the eight findings of
+[`docs/audit/2026-11-01-full-audit.md`](docs/audit/2026-11-01-full-audit.md):
+Provider keys no longer reach `process.run` commands (`internal/platform/childenv`
+is the one filter for every child process), `workspace.write` and `edit` refuse
+credential files including through a link, streaming falls back when an
+endpoint does not stream, streamed tool calls without `index` stay separate,
+`/allow` obeys the policy file's rules, and CI checks gofmt.
+
+On 2026-11-02 the owner approved Architecture IV, ADR-006 and D1–D7. Phase 0 is
+in progress; see the status board in
+[`ARCHITECTURE_IV_RENOVATION.md`](docs/planning/ARCHITECTURE_IV_RENOVATION.md).
+The maxplus Provider still has every Tool withheld by today's gate; Phase 2 is
+where that changes.
+
+## State at v2.7.0
 
 v2.7.0 (tag `v2.7.0`, `master` `301bfc1`) is runtime hardening found by running
 v2.6 against a real hosted provider. Root-cause analysis:
