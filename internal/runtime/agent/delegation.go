@@ -50,6 +50,8 @@ func budgetFrom(ctx context.Context) *sharedBudget {
 type runScope struct {
 	authorizer Authorizer
 	depth      int
+	// agentID is the agent that delegates; its child records it as parent.
+	agentID string
 }
 
 type runScopeKey struct{}
@@ -126,5 +128,5 @@ func (s *Service) RunChild(ctx context.Context, task string, tools []string) (*A
 	}
 	child.nativeTools = native
 	child.limits = ChildLimits
-	return child.runScoped(ctx, task, scope.authorizer, scope.depth+1)
+	return child.runScoped(ctx, task, scope.authorizer, scope.depth+1, scope.agentID)
 }

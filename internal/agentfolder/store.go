@@ -158,6 +158,30 @@ func (s *Store) RecordEvent(session *agent.TaskSession, event agent.EngineEvent)
 	return s.writeCheckpoint(session, value)
 }
 
+// eventLogName is the task's event log inside its bin directory: one JSON
+// event per line, metadata only (see agent.Event).
+const eventLogName = "events.jsonl"
+
+// RecordStamped appends one event to the task's event log.
+func (s *Store) RecordStamped(session *agent.TaskSession, event agent.Event) error {
+	if err := s.validateSession(session); err != nil {
+		return err
+	}
+	line, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("encode event: %w", err)
+	}
+	file, err := os.OpenFile(filepath.Join(session.BinDir, eventLogName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open task event log: %w", err)
+	}
+	if _, err := file.Write(append(line, '\n')); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write task event log: %w", err)
+	}
+	return file.Close()
+}
+
 func (s *Store) Finalize(session *agent.TaskSession, result *agent.AgentResult) error {
 	if err := s.validateSession(session); err != nil {
 		return err

@@ -244,15 +244,15 @@ func (s *Service) ResetConversation() {
 }
 
 func (s *Service) run(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), onText func(string), idempotencyKey string, remember bool) (*AgentResult, error) {
-	return s.runWith(ctx, query, authorizer, onEngine, onText, idempotencyKey, remember, 0)
+	return s.runWith(ctx, query, authorizer, onEngine, onText, idempotencyKey, remember, 0, "")
 }
 
 // runScoped runs a delegated child task at the given depth.
-func (s *Service) runScoped(ctx context.Context, query string, authorizer Authorizer, depth int) (*AgentResult, error) {
-	return s.runWith(ctx, query, authorizer, nil, nil, "", false, depth)
+func (s *Service) runScoped(ctx context.Context, query string, authorizer Authorizer, depth int, parentAgentID string) (*AgentResult, error) {
+	return s.runWith(ctx, query, authorizer, nil, nil, "", false, depth, parentAgentID)
 }
 
-func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), onText func(string), idempotencyKey string, remember bool, depth int) (*AgentResult, error) {
+func (s *Service) runWith(ctx context.Context, query string, authorizer Authorizer, onEngine func(EngineEvent), onText func(string), idempotencyKey string, remember bool, depth int, parentAgentID string) (*AgentResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("agent query is empty")
@@ -347,13 +347,36 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	// are the route changes of this run, each reported once.
 	reasoning := map[string]string{}
 	var fallbacks []llm.Fallback
-	noteFallback := func(fallback llm.Fallback) {
+	// Events (Architecture IV, F1/F2): every one is stamped with the task's
+	// host-assigned ids and a sequence number, and kept when the recorder
+	// keeps an event log. A failure to keep it ends the run like any other
+	// Agent Folder failure.
+	var recordErr error
+	var stamper *eventStamper
+	agentID := ""
+	if taskSession != nil {
+		agentID = "agent-" + taskSession.ID
+		stamper = newEventStamper(taskSession.ID, agentID, parentAgentID)
+	}
+	eventRecorder, _ := taskRecorder.(EventRecorder)
+	record := func(kind string, step int, callID string, payload any) {
+		if stamper == nil || eventRecorder == nil || recordErr != nil {
+			return
+		}
+		event, err := stamper.stamp(kind, step, callID, payload)
+		if err == nil {
+			err = eventRecorder.RecordStamped(taskSession, event)
+		}
+		recordErr = err
+	}
+	noteFallback := func(step int, fallback llm.Fallback) {
 		for _, seen := range fallbacks {
 			if seen == fallback {
 				return
 			}
 		}
 		fallbacks = append(fallbacks, fallback)
+		record(EventRouteChanged, step, "", routeChangedPayload(fallback.Kind, fallback.Reason))
 	}
 	decider := decisionFunc(func(decideCtx context.Context, input DecisionInput) (Decision, error) {
 		// The host Task Plan stays in the manifest; sending it every turn only
@@ -387,7 +410,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			// Some endpoints accept tool definitions but reject the replayed
 			// tool_calls and tool messages that follow. Finish the task with
 			// text envelopes; the Tools and their authority are unchanged.
-			noteFallback(llm.Fallback{Kind: "native→envelope", Reason: "the endpoint rejected the replayed native tool calls (" + err.Error() + "); the rest of this task used text envelopes"})
+			noteFallback(input.Step, llm.Fallback{Kind: "native→envelope", Reason: "the endpoint rejected the replayed native tool calls (" + err.Error() + "); the rest of this task used text envelopes"})
 			native, definitions, toolPrompt = false, nil, ToolPrompt(s.broker)
 			response, err = request()
 		}
@@ -395,7 +418,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			return Decision{}, fmt.Errorf("agent provider call: %w", err)
 		}
 		for _, fallback := range response.Fallbacks {
-			noteFallback(fallback)
+			noteFallback(input.Step, fallback)
 		}
 		usage := Usage{InputTokens: response.InputTokens, OutputTokens: response.OutputTokens, ProviderCalls: 1}
 		var decision Decision
@@ -453,11 +476,12 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		}
 		return item.Instructions, nil
 	})
-	var recordErr error
 	emit := func(event EngineEvent) {
 		if taskRecorder != nil && recordErr == nil {
 			recordErr = taskRecorder.RecordEvent(taskSession, event)
 		}
+		kind, callID, payload := eventFor(event)
+		record(kind, event.Step, callID, payload)
 		if onEngine != nil {
 			onEngine(event)
 		}
@@ -483,7 +507,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 		budget = &sharedBudget{maxTokens: limits.MaxTokens, maxToolCalls: limits.MaxToolCalls}
 		runCtx = context.WithValue(runCtx, budgetKey{}, budget)
 	}
-	runCtx = context.WithValue(runCtx, runScopeKey{}, runScope{authorizer: authorizer, depth: depth})
+	runCtx = context.WithValue(runCtx, runScopeKey{}, runScope{authorizer: authorizer, depth: depth, agentID: agentID})
 	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err

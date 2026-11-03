@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/boi-family/boi-cli/internal/acceptance/modelzoo"
+	"github.com/boi-family/boi-cli/internal/agentfolder"
 	coreblock "github.com/boi-family/boi-cli/internal/core"
 	"github.com/boi-family/boi-cli/internal/core/persona"
 	"github.com/boi-family/boi-cli/internal/equipment/tools/filesystem"
@@ -169,6 +170,14 @@ func TestModelZooQualification(t *testing.T) {
 
 func runZooTask(t *testing.T, providers []llm.Provider) (*agent.AgentResult, error) {
 	t.Helper()
+	result, _, err := runZooTaskIn(t, providers)
+	return result, err
+}
+
+// runZooTaskIn also returns the workspace root, where the Agent Folder keeps
+// the task's checkpoint and event log.
+func runZooTaskIn(t *testing.T, providers []llm.Provider) (*agent.AgentResult, string, error) {
+	t.Helper()
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte(modelzoo.Marker+"\nsecond line\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -188,9 +197,15 @@ func runZooTask(t *testing.T, providers []llm.Provider) (*agent.AgentResult, err
 	if err := service.SetActiveTools(names); err != nil {
 		t.Fatal(err)
 	}
+	store, err := agentfolder.NewStore(filepath.Join(root, "agent-folder"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.SetTaskRecorder(store)
 	service.SetToolCallingAllowed(true)
 	service.SetNativeToolCalling(true)
-	return runInteractive(t, service, zooTask, agent.ApprovalRejected)
+	result, runErr := runInteractive(t, service, zooTask, agent.ApprovalRejected)
+	return result, root, runErr
 }
 
 func describeResult(result *agent.AgentResult) string {

@@ -110,30 +110,55 @@ of the Trusted Foundation.
 ### Phase 3 — Recoverable Runtime
 
 Checkpoint and resume through the Agent Folder; no side-effecting Tool replays
-without approval or a proven idempotency guarantee; compaction by summary;
-budgets from the Recipe; circuit breaker and replica affinity. Built to the
-Foundation shapes: ids and reserved lease fields (F1), persisted approvals
-(F5), effect records with pre-image and undo (F6), transcript store (F9, once
-the owner decides).
+without approval or a proven idempotency guarantee. Built to the Foundation
+shapes F1, F5, F6, F9. Task breakdown proposed 2026-11-03 (re-check against
+the code before starting).
+
+| ID | Task |
+|---|---|
+| P3.1 | Owner decision on the transcript store (F9), then the opt-in store with redaction and retention; resume and fork need it |
+| P3.2 | Checkpoint carries the F1 ids and the reserved `owner` / `lease_expires`; resume reads checkpoint plus event log |
+| P3.3 | Persisted approval (F5): `approval.requested` / `approval.decided` bound to call fingerprint, Recipe version and Provider; resume re-checks all three |
+| P3.4 | Effect record with pre-image (F6) and undo for file edits; `process.run` and network effects listed as not reversible |
+| P3.5 | Tool Replay guard: a resumed task never repeats a side effect without approval or a proven idempotency key |
+| P3.6 | Context compaction by summary with a `context.compacted` event; budgets taken from the Recipe |
+| P3.7 | Circuit breaker and replica affinity in the Router |
+| P3.8 | Crash Recovery acceptance: kill a task mid-way, resume, no repeated side effect (E4) |
 
 ### Phase 4 — Composable Extensions
 
-`extension.yaml` (extends `PackManifest`) with contract majors, namespace and
-`depends_on` (F7), validator, Extension Registry and SDK; approval per D5;
-hooks as Event subscribers plus one authorisation point that can only deny or
-ask (F8); Extension Isolation tests; OS-level sandbox on Linux for
-`process.run` and code Extensions (D7); Agent-built Extensions.
+`extension.yaml` extends `PackManifest`. Built to F7 and F8, D5 and D7. No
+Extension may replace any part of the Trusted Foundation.
+
+| ID | Task |
+|---|---|
+| P4.1 | `extension.yaml` schema and validator: contract majors, namespace `<publisher>/<id>`, requested rights, `depends_on` ranges (F7) |
+| P4.2 | Extension Registry: install, enable, disable, remove; dependency resolution; a contract mismatch reports `BLOCKED: incompatible contract` |
+| P4.3 | Approval per D5: before install and first enable, and again when rights or trusted code change |
+| P4.4 | Extension Isolation tests: no secrets, no widened workspace scope, Trusted Foundation untouchable |
+| P4.5 | Hooks as Event subscribers plus one authorisation point that can answer only `deny` or `ask` (F8) |
+| P4.6 | `SandboxBackend` interface that reports its guarantees, and the Linux OS-level implementation for `process.run` and code Extensions (D7) |
+| P4.7 | Extension SDK; skill authoring and MCP connect delivered as Extensions |
+| P4.8 | Agent-built Extensions: generate, manifest, test, approval, install |
 
 ### Phase 5 — Measure and adapt
 
-`codingbench` per source and trait, before/after each compensation on
-correctness, safety, stability and cost; Recipe versions, shadow runs, promotion
-and rollback; Provider drift detection.
+| ID | Task |
+|---|---|
+| P5.1 | `codingbench` per source and trait: one task set, before and after each compensation |
+| P5.2 | Numbers on correctness, safety, stability and resource cost per compensation, against criteria set in advance (Rule 3) |
+| P5.3 | Recipe versions, shadow runs, promotion and rollback |
+| P5.4 | Provider drift detection: re-probe when behaviour or fingerprint changes |
+| P5.5 | Remove every compensation that does not help |
 
 ### Phase 6 — Migrate and release
 
-Config migration and a v2 → v3 guide; real acceptance on the D6 model set;
-contracts frozen; rollback path documented.
+| ID | Task |
+|---|---|
+| P6.1 | Config migration and the v2 → v3 guide |
+| P6.2 | Real acceptance on the D6 set (small local model, direct API, Maxplus, DeepSeek direct) on Windows, Linux and Android |
+| P6.3 | Freeze the four contracts (Connector, Recipe, Extension, Event) |
+| P6.4 | Documented rollback path; release v3.0.0 (the owner pushes the tag) |
 
 ---
 
@@ -150,12 +175,14 @@ contracts frozen; rollback path documented.
 | P0.5 | done | PR #26 |
 | P0.6 | done | PR #27. Its DSML fixture had a format bug (parameter name held the tool name); fixed with P1.3 |
 | P0.7 | todo | needs a recorded real run from the owner |
-| P0.8 | review | this PR; F9 (transcript store) waits for the owner |
+| P0.8 | done | PR #28; F9 (transcript store) waits for the owner, now P3.1 |
 | P1.3 | done | PR #28 |
-| P1.4, P1.5 | review | this PR: `reasoning_content` carried and replayed (zoo `reasoning-replay` no longer rejected); every fallback carried to the result and notice (`native→envelope`, `stream→whole-response`); zoo gains `rejects-replay` |
-| P1.1, P1.2, P1.6, P1.7 | todo | P1.7 (event envelope) next; P1.1/P1.2 split the adapter |
-| Phase 2 | todo | D1–D3 approved; zoo fixtures ready (corrupt-token row is P2.3) |
-| Phases 3–6 | todo | |
+| P1.4, P1.5 | done | PR #29 |
+| P1.7 | review | this PR: `internal/runtime/agent/event.go` (envelope, kinds, N-1 reader), `events.jsonl` per task in the Agent Folder, metadata only; `route.changed` added to the kinds. SubAgent runs are not recorded yet (they have no task session), so `parent_agent_id` is wired but unexercised until P3.2 |
+| P1.1, P1.2, P1.6 | todo | P1.1/P1.2 split the adapter and report endpoint facts; P1.6 typed content parts |
+| Phase 2 (P2.1–P2.8) | todo | D1–D3 approved; zoo fixtures ready (corrupt-token row is P2.3) |
+| Phase 3 (P3.1–P3.8) | todo | P3.1 needs the owner's decision first |
+| Phases 4–6 (P4.1–P6.4) | todo | |
 
 ---
 

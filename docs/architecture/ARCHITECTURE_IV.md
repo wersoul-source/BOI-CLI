@@ -198,6 +198,20 @@ v0 adds: a schema version, the Recipe version in force, each capability's
 status as it was used, and the recorded reason for any fallback. Invariant: no
 event carries a secret.
 
+Implemented (P1.7): `agent.Event` in `internal/runtime/agent/event.go` is the
+envelope (`schema_version`, `seq`, `time`, `task_id`, `agent_id`,
+`parent_agent_id`, `step`, `call_id`, `recipe_version`, `kind`, `payload`).
+The Runtime stamps every engine event and every route change, and the Agent
+Folder appends them to `events.jsonl` in the task's bin directory. A payload
+holds names, classes, counts and statuses only: never a Tool argument, a Tool
+output, an error message or model text. `agent.ReadEvents` reads a log with
+the compatibility rule (own version and the one before; anything else, and any
+unknown kind, is skipped and listed with its reason, never fatal). Emitted
+kinds: `task.started`, `phase.changed`, `tool.proposed`, `approval.requested`,
+`tool.result`, `verification.recorded`, `task.stopped`, `route.changed`. The
+`RecipeVersion` field stays empty until Phase 2. SubAgent runs have no task
+session yet, so their events are not recorded (P3.2).
+
 ### 5.5 Foundation amendments (Rule 4, 2026-11-03)
 
 Contracts locked now because adding them later would change Core or stored
@@ -207,7 +221,7 @@ Source: [`platform-principles`](../research/2026-11-03-platform-principles.md) �
 | # | Amendment | Contract | Built in |
 |---|---|---|---|
 | F1 | **Identity.** Every event, checkpoint and effect carries host-assigned `task_id`, `agent_id`, `parent_agent_id`, `step`, `call_id`; checkpoints reserve `owner` and `lease_expires` (empty until a Cluster is observed). The model never names its own id. | Event, Agent Folder | Phase 3 |
-| F2 | **Event envelope.** `schema_version`, a monotonic `seq` per task, `time`, the F1 ids, `recipe_version`, `kind`, a versioned `payload`. A reader accepts its own version and the one before; an unknown `kind` is skipped, never fatal. Reserved kinds: `model.switched`, `context.compacted`, `approval.requested`, `approval.decided`, `effect.recorded`, `mode.changed`, `capability.used`. | Event | Phase 1–3 |
+| F2 | **Event envelope.** `schema_version`, a monotonic `seq` per task, `time`, the F1 ids, `recipe_version`, `kind`, a versioned `payload`. A reader accepts its own version and the one before; an unknown `kind` is skipped, never fatal. Reserved kinds: `model.switched`, `context.compacted`, `approval.decided`, `effect.recorded`, `mode.changed`, `capability.used` (`route.changed` and the engine kinds are already emitted). | Event | Phase 1–3 |
 | F3 | **Typed content parts.** `Message` content becomes parts (`text` now; `image` and others later). A part type the endpoint facts do not declare is refused with a reason, never dropped. `vision` is a capability, `UNVERIFIED` by default; captioning through Equipment would be `ASSISTED`. | Connector | Phase 1 |
 | F4 | **Model switch.** A switch, by failover or by the user, emits `model.switched`, uses the new endpoint's Recipe, re-checks approvals, and drops non-portable state (such as `reasoning_content`) with a recorded reason. | Connector, Recipe (D3) | Phase 2 |
 | F5 | **Persisted approval.** An approval is an event bound to the call fingerprint, the Recipe version and the Provider. Resume re-checks all three; a change invalidates it. An expired request is never approved by default (D2). | Event, Agent Folder | Phase 3 |
