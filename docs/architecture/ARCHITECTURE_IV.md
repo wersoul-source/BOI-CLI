@@ -197,3 +197,44 @@ Today: `agent.EngineEvent` (`Kind`, `Phase`, `Step`, `ToolCall`, `ToolResult`,
 v0 adds: a schema version, the Recipe version in force, each capability's
 status as it was used, and the recorded reason for any fallback. Invariant: no
 event carries a secret.
+
+### 5.5 Foundation amendments (Rule 4, 2026-11-03)
+
+Contracts locked now because adding them later would change Core or stored
+data. Only the shapes are fixed; each is built in the phase shown.
+Source: [`platform-principles`](../research/2026-11-03-platform-principles.md) §4.
+
+| # | Amendment | Contract | Built in |
+|---|---|---|---|
+| F1 | **Identity.** Every event, checkpoint and effect carries host-assigned `task_id`, `agent_id`, `parent_agent_id`, `step`, `call_id`; checkpoints reserve `owner` and `lease_expires` (empty until a Cluster is observed). The model never names its own id. | Event, Agent Folder | Phase 3 |
+| F2 | **Event envelope.** `schema_version`, a monotonic `seq` per task, `time`, the F1 ids, `recipe_version`, `kind`, a versioned `payload`. A reader accepts its own version and the one before; an unknown `kind` is skipped, never fatal. Reserved kinds: `model.switched`, `context.compacted`, `approval.requested`, `approval.decided`, `effect.recorded`, `mode.changed`, `capability.used`. | Event | Phase 1–3 |
+| F3 | **Typed content parts.** `Message` content becomes parts (`text` now; `image` and others later). A part type the endpoint facts do not declare is refused with a reason, never dropped. `vision` is a capability, `UNVERIFIED` by default; captioning through Equipment would be `ASSISTED`. | Connector | Phase 1 |
+| F4 | **Model switch.** A switch, by failover or by the user, emits `model.switched`, uses the new endpoint's Recipe, re-checks approvals, and drops non-portable state (such as `reasoning_content`) with a recorded reason. | Connector, Recipe (D3) | Phase 2 |
+| F5 | **Persisted approval.** An approval is an event bound to the call fingerprint, the Recipe version and the Provider. Resume re-checks all three; a change invalidates it. An expired request is never approved by default (D2). | Event, Agent Folder | Phase 3 |
+| F6 | **Effect record with pre-image.** A verified change records `call_id`, `path`, `pre_sha256`, `pre_ref`, `post_sha256`. `process.run` and network effects are `reversible: false`. Undo is a capability with a status: file edits can be undone; shell effects cannot, and the user is told. | Event, Agent Folder | Phase 3 |
+| F7 | **Extension compatibility.** `extension.yaml` names the contract majors it targets, a namespace (`<publisher>/<id>`), the rights it requests and `depends_on` with version ranges. A mismatch is `BLOCKED: incompatible contract`. | Extension | Phase 4 |
+| F8 | **Modes and hooks only narrow.** A permission mode (at most three: `plan` read-only, `default`, `confirm-all`) removes rights from the Policy Floor and never adds any. An authorisation hook or Extension may answer `deny` or `ask`, never `allow` past the floor; changing arguments after fingerprinting creates a new call that is authorised again. | Policy Floor (Trusted Foundation) | Phase 2 (modes), 4 (hooks) |
+| F9 | **Transcript store.** Resume and fork need the conversation, which `TaskRecorder` today must not keep. Proposed: a separate opt-in store in the Agent Folder with redaction and retention. **Needs the owner's decision before any code** (plan rule 6). | Agent Folder | Phase 3 |
+
+Not locked (would bloat Core if done now): agent-team messaging, a scheduler,
+telemetry SDKs, vector stores, LSP clients, multimodal adapters before a vision
+endpoint is in the zoo, distributed leases before a Cluster is observed, a
+seventh Block.
+
+## 6. Experience Contract
+
+Guarantees the user sees whatever model, runtime or Extension is in use.
+Each is checked by a test before it may be claimed (ADR-006, Experience
+acceptance).
+
+| # | Guarantee | Delivered by | Proof |
+|---|---|---|---|
+| E1 | One instruction carries through; every stop says why and what the user can do next | Runtime lifecycle, `StopReason` | every exit path across the model zoo yields a valid stop and a notice |
+| E2 | Progress is visible; the screen shows only what events say | Event contract, Transport | replaying a recorded event log reproduces the timeline |
+| E3 | Switching the model does not break the task, and no right grows | Recipe, Connector, D3, F4 | zoo test: switch native → dialect endpoint mid-task |
+| E4 | A crash loses no work and repeats no side effect | Agent Folder, Broker idempotency | Crash Recovery and Tool Replay rows |
+| E5 | Changes can be undone, and what cannot be undone is said | F6 | undo restores pre-image hashes; `process.run` listed as not reversible |
+| E6 | Limits are honest: `ASSISTED` is never shown as `NATIVE` | Gap Report, `capability.used` | rendered status equals the Recipe status for every zoo capability |
+| E7 | Nothing is approved silently | Broker, Policy Floor, D1/D2/D5, F8 | a hook answering `allow` on a floor-denied call is still denied |
+| E8 | Cost and budget are visible, with where the numbers came from | Runtime budgets, `Usage` | budget test stops with `budget_exhausted`; unknown cost shown as unknown |
+| E9 | The same guarantees hold in every front end | Transport decides nothing | one scripted task through each Transport yields the same event kinds |
