@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 )
 
 func TestEventVersionRule(t *testing.T) {
@@ -99,10 +101,19 @@ func TestEventsNeverCarryArgumentsOutputOrErrorText(t *testing.T) {
 	}
 }
 
-func TestRouteChangedReasonIsBounded(t *testing.T) {
-	raw, _ := json.Marshal(routeChangedPayload("native→envelope", strings.Repeat("x", 5000)))
-	if len(raw) > 400 {
-		t.Fatalf("a route.changed payload of %d bytes is not bounded", len(raw))
+// A route change is recorded by its route and the class of the failure. The
+// reason may quote the endpoint's error body, so it never reaches an event
+// (audit M2).
+func TestRouteChangedNeverCarriesTheEndpointsWords(t *testing.T) {
+	raw, err := json.Marshal(routeChangedPayload(llm.Fallback{Kind: "native→envelope", Reason: "endpoint said: key sk-live-SECRET is invalid", ErrorClass: "invalid_request", StatusCode: 400}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "SECRET") || strings.Contains(string(raw), "endpoint said") {
+		t.Fatalf("route.changed leaked the reason: %s", raw)
+	}
+	if string(raw) != `{"route":"native→envelope","error_class":"invalid_request","http_status":400}` {
+		t.Fatalf("payload = %s", raw)
 	}
 }
 

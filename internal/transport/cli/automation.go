@@ -38,11 +38,20 @@ func (e *CommandError) Error() string {
 	if e == nil {
 		return ""
 	}
-	if e.Message != "" {
-		return e.Message
-	}
+	// The cause is part of the message: "load providers" alone tells the
+	// person nothing they can act on. It is added once, also when one
+	// CommandError wraps another whose text already carries it.
+	cause := ""
 	if e.Cause != nil {
-		return e.Cause.Error()
+		cause = e.Cause.Error()
+	}
+	switch {
+	case e.Message != "" && cause != "" && !strings.Contains(e.Message, cause):
+		return e.Message + ": " + cause
+	case e.Message != "":
+		return e.Message
+	case cause != "":
+		return cause
 	}
 	return e.Class
 }

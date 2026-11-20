@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"strings"
 	"testing"
 
 	registry "github.com/boi-family/boi-cli/internal/service/provider/catalog"
@@ -90,5 +91,37 @@ func TestEveryCatalogProviderCanBeBuilt(t *testing.T) {
 		if createProvider(ProviderConfig{Name: name, APIKey: "k", Model: "m"}) == nil {
 			t.Errorf("provider %q is in the catalog but the factory cannot build it", name)
 		}
+	}
+}
+
+// An API key is not sent over plain http to a public host unless the person
+// accepts that for the slot (audit M8). A server on this machine or on the
+// local network is unaffected.
+func TestAKeyIsNotSentInClearToAPublicHost(t *testing.T) {
+	cases := []struct {
+		name, baseURL, allow string
+		usable               bool
+	}{
+		{"https", "https://api.example.com/v1", "", true},
+		{"public http", "http://api.example.com/v1", "", false},
+		{"public http accepted", "http://api.example.com/v1", "true", true},
+		{"public ip http", "http://203.0.113.7:8000/v1", "", false},
+		{"localhost http", "http://localhost:8080/v1", "", true},
+		{"lan http", "http://192.168.1.20:11434/v1", "", true},
+		{"lan 10/8 http", "http://10.0.0.5:8000/v1", "", true},
+		{"mdns http", "http://gpu-box.local:8000/v1", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setProvider(t, "openai", "fixture-key", tc.baseURL, "m")
+			t.Setenv("PSC_1_ALLOW_HTTP", tc.allow)
+			configured, err := LoadConfiguredProvidersFromEnv()
+			if usable := err == nil && len(configured) == 1; usable != tc.usable {
+				t.Fatalf("usable = %v, want %v (err=%v)", usable, tc.usable, err)
+			}
+			if !tc.usable && (err == nil || !strings.Contains(err.Error(), "plain http") || !strings.Contains(err.Error(), "PSC_1") || strings.Contains(err.Error(), "fixture-key")) {
+				t.Fatalf("the error must name the slot and the reason, never the key: %v", err)
+			}
+		})
 	}
 }

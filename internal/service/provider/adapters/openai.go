@@ -138,7 +138,7 @@ type openAIResponse struct {
 func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	body := openAIRequest{
 		Model:       p.model,
-		Messages:    toOpenAIMessages(req.Messages),
+		Messages:    p.toMessages(req.Messages),
 		Tools:       toOpenAITools(req.Tools),
 		MaxTokens:   req.MaxTokens,
 		Temperature: &req.Temperature,
@@ -166,7 +166,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req llm.CompletionRequest
 	if err != nil {
 		return nil, err
 	}
-	return recoverDialect(result, req.Tools), nil
+	return p.noteDroppedReasoning(recoverDialect(result, req.Tools), req.Messages), nil
 }
 
 // recoverDialect turns tool-call markup in the reply text into ToolCalls when
@@ -215,12 +215,36 @@ func (p *OpenAIProvider) decodeCompletion(respBody []byte, header http.Header) (
 	}, nil
 }
 
-func toOpenAIMessages(messages []llm.Message) []openAIMessage {
+// reasoningDropped is the route change recorded when a request carried
+// reasoning that another Provider produced.
+const reasoningDropped = "reasoning→dropped"
+
+// foreignReasoning reports whether any message carries reasoning this
+// Provider did not produce. Such reasoning is not sent: it is state of the
+// endpoint that made it, and a strict gateway rejects the unknown field.
+func (p *OpenAIProvider) foreignReasoning(messages []llm.Message) bool {
+	for _, m := range messages {
+		if m.Role == "assistant" && m.ReasoningContent != "" && m.ReasoningProvider != p.name {
+			return true
+		}
+	}
+	return false
+}
+
+// noteDroppedReasoning records the drop on the response, so it is never silent.
+func (p *OpenAIProvider) noteDroppedReasoning(result *llm.CompletionResponse, messages []llm.Message) *llm.CompletionResponse {
+	if result != nil && p.foreignReasoning(messages) {
+		result.Fallbacks = append(result.Fallbacks, llm.Fallback{Kind: reasoningDropped, Reason: "reasoning produced by another Provider was not sent to " + p.name})
+	}
+	return result
+}
+
+func (p *OpenAIProvider) toMessages(messages []llm.Message) []openAIMessage {
 	out := make([]openAIMessage, len(messages))
 	for i, m := range messages {
 		content := m.Content
 		out[i] = openAIMessage{Role: m.Role, Content: &content, ToolCallID: m.ToolCallID}
-		if m.Role == "assistant" {
+		if m.Role == "assistant" && m.ReasoningProvider == p.name {
 			out[i].ReasoningContent = m.ReasoningContent
 		}
 		if len(m.ToolCalls) > 0 && content == "" {
@@ -325,7 +349,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 		if result.Content != "" {
 			req.OnText(result.Content)
 		}
-		return result, nil
+		return p.noteDroppedReasoning(result, req.Messages), nil
 	}
 
 	result := &llm.CompletionResponse{Provider: p.name, Model: p.model}
@@ -389,7 +413,7 @@ func (p *OpenAIProvider) stream(ctx context.Context, req llm.CompletionRequest, 
 	result.ReasoningContent = reasoning.String()
 	result.ToolCalls = calls.requests()
 	result.RateLimitRemaining, result.RateLimitTotal = parseRateLimitHeaders(resp.Header)
-	return recoverDialect(result, req.Tools), nil
+	return p.noteDroppedReasoning(recoverDialect(result, req.Tools), req.Messages), nil
 }
 
 // toolCallAccumulator rebuilds streamed tool calls. Each call keeps the index

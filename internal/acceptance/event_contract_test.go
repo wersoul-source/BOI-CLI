@@ -90,12 +90,19 @@ func TestRouteChangeIsAnEvent(t *testing.T) {
 	for _, event := range log.Events {
 		if event.Kind == agent.EventRouteChanged {
 			found = true
-			if !strings.Contains(string(event.Payload), "native→envelope") || !strings.Contains(string(event.Payload), "status 400") {
-				t.Errorf("route.changed lacks its route or evidence: %s", event.Payload)
+			if !strings.Contains(string(event.Payload), "native→envelope") || !strings.Contains(string(event.Payload), `"http_status":400`) || !strings.Contains(string(event.Payload), `"error_class"`) {
+				t.Errorf("route.changed lacks its route or the class of the failure: %s", event.Payload)
+			}
+			// The gateway's own words are for the notice, never for the log.
+			if strings.Contains(string(event.Payload), "messages with role tool") {
+				t.Errorf("route.changed holds the endpoint's error text: %s", event.Payload)
 			}
 		}
 	}
 	if !found {
 		t.Fatal("the fallback is in the result but not in the event log")
+	}
+	if !strings.Contains(result.Notice, "messages with role tool") {
+		t.Errorf("the person no longer sees the endpoint's reason: %q", result.Notice)
 	}
 }

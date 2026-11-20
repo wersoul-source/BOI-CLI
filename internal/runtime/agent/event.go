@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 )
 
 // Event is the envelope of the Event contract, version 0 of Architecture IV
@@ -118,17 +120,6 @@ func (s *eventStamper) stamp(kind string, step int, callID string, payload any) 
 	return Event{SchemaVersion: EventSchemaVersion, Seq: s.seq, Time: s.now().UTC(), TaskID: s.taskID, AgentID: s.agentID, ParentAgentID: s.parentAgentID, Step: step, CallID: callID, Kind: kind, Payload: raw}, nil
 }
 
-// maxReasonRunes bounds free text copied from an endpoint into an event.
-const maxReasonRunes = 200
-
-func clip(text string) string {
-	runes := []rune(strings.TrimSpace(text))
-	if len(runes) > maxReasonRunes {
-		return string(runes[:maxReasonRunes]) + "…"
-	}
-	return string(runes)
-}
-
 // eventFor maps an engine event to the envelope kind and a payload that holds
 // metadata only: names, classes, counts and statuses. It never copies a Tool
 // argument, a Tool output or an error message, which may carry file content
@@ -196,12 +187,15 @@ func eventFor(event EngineEvent) (kind, callID string, payload any) {
 	return "engine." + event.Kind, callID, nil
 }
 
-// routeChangedPayload is the payload of EventRouteChanged (P1.5).
-func routeChangedPayload(kind, reason string) any {
+// routeChangedPayload is the payload of EventRouteChanged (P1.5). It names
+// the route and classifies the failure. The free-text reason, which may
+// quote the endpoint's own error body, stays out of the event log.
+func routeChangedPayload(fallback llm.Fallback) any {
 	return struct {
-		Route  string `json:"route"`
-		Reason string `json:"reason"`
-	}{kind, clip(reason)}
+		Route      string `json:"route"`
+		ErrorClass string `json:"error_class,omitempty"`
+		HTTPStatus int    `json:"http_status,omitempty"`
+	}{fallback.Kind, fallback.ErrorClass, fallback.StatusCode}
 }
 
 // SkippedEvent is an event ReadEvents did not return, with the reason.

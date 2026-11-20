@@ -129,3 +129,26 @@ func TestAutomationExitCodeMapping(t *testing.T) {
 		t.Fatal("fallback exit mapping changed")
 	}
 }
+
+// A command error tells the person the cause, once. "Error: load providers"
+// used to be the whole message when no Provider was configured (audit M3).
+func TestCommandErrorCarriesItsCauseOnce(t *testing.T) {
+	inner := unavailable("no Provider is configured; run 'boi setup' or 'boi quickstart'", errors.New("no valid providers found in environment (PSC_1..PSC_9)"))
+	text := inner.Error()
+	for _, want := range []string{"boi setup", "no valid providers found"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("message lacks %q: %s", want, text)
+		}
+	}
+	// finishAsk wraps the error again with its own text as the message.
+	outer := &CommandError{Code: ExitUnavailable, Class: "unavailable", Message: inner.Error(), Cause: inner}
+	if outer.Error() != text {
+		t.Fatalf("the cause was repeated:\n%s", outer.Error())
+	}
+	if got := (&CommandError{Message: "only a message"}).Error(); got != "only a message" {
+		t.Fatalf("got %q", got)
+	}
+	if got := (&CommandError{Class: "internal", Cause: errors.New("boom")}).Error(); got != "boom" {
+		t.Fatalf("got %q", got)
+	}
+}
