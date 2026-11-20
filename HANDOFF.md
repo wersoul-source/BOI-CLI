@@ -20,7 +20,8 @@ Architecture IV is the design of record since 2026-11-02. Read these three first
 
 1. [`ADR-006-calibration.md`](docs/architecture/ADR-006-calibration.md) — the principle, the four capability statuses, decisions D1–D7, and what every PR must answer
 2. [`ARCHITECTURE_IV.md`](docs/architecture/ARCHITECTURE_IV.md) — the six Blocks restated, what is locked, the two axes of model support, the four contracts
-3. [`ARCHITECTURE_IV_RENOVATION.md`](docs/planning/ARCHITECTURE_IV_RENOVATION.md) — the seven phases and the status board
+3. [`ARCHITECTURE_IV_RENOVATION.md`](docs/planning/ARCHITECTURE_IV_RENOVATION.md) — the seven phases, every task P0.1–P6.4 with its acceptance, and the status board
+4. [`docs/research/2026-11-03-platform-principles.md`](docs/research/2026-11-03-platform-principles.md) — where foundation amendments F1–F9 and Experience Contract E1–E9 come from (some sources unverified; the note says which)
 
 Then the background:
 
@@ -110,7 +111,79 @@ local-model run on Windows PowerShell, and the second-Provider verification.
 Locked and not started: step 6 (Agent packs, organisations, factory) and the
 browser UI (`docs/planning/BOI_WEB_UI_PLAN.md`, proposal only).
 
-## State at v2.7.1 (latest)
+## State at master `a05923f` (latest, 2026-11-03, unreleased since v2.7.1)
+
+Architecture IV work merged to `master` through PRs #26–#30. Nothing here is
+tagged: the last tag is `v2.7.1`, and the next release number is the owner's
+call (`CHANGELOG.md`, "Unreleased — Architecture IV, Phase 0").
+
+**Done**
+
+| Task | PR | What is in the code now |
+|---|---|---|
+| P0.1–P0.5 | #26 | ADR-006, Architecture IV, wording fixes, PR template (Gap · Composition · Evidence), Capability Gap Report v0 (`boi env` and `boi provider qualify` explain every gap) |
+| P0.6 | #27 | `internal/acceptance/modelzoo`: ten simulated endpoints (native, no-stream, DSML, Hermes, Qwen XML, reasoning-replay, rejects-replay, missing-index, corrupt-token, slow-first-load, down); `modelzoo_test.go` pins each trait's baseline |
+| P0.8 | #28 | ADR-006 Rule 4 and Experience acceptance; ARCHITECTURE_IV §5.5 (F1–F9) and §6 (E1–E9); the research note |
+| P1.3 | #28 | `internal/service/provider/dialect`: DSML, Hermes, Qwen XML recovered into tool calls. Always `ASSISTED` (`CapabilityResult.Assisted`, `CompletionResponse.ToolCallDialect`), never `NATIVE`; the Broker and approvals are unchanged |
+| P1.4, P1.5 | #29 | `reasoning_content` read and replayed per tool turn (only to an endpoint that produced it); `llm.Fallback` and `AgentResult.Fallbacks`: every route change is reported in the notice (`Route changed (native→envelope): …`) |
+| P1.7 | #30 | `agent.Event` envelope, `agent.ReadEvents` (own version and N-1; unknown kinds skipped), `events.jsonl` per task in the Agent Folder bin directory, metadata only |
+
+**Remaining: 37 tasks** after P1.7. The full list with acceptance is in the
+plan; the counts are:
+
+| Phase | Tasks | Count |
+|---|---|---|
+| 0 | P0.7 record and replay a real conversation | 1 (needs the owner) |
+| 1 | P1.1 split the adapter, P1.2 endpoint facts, P1.6 typed content parts | 3 |
+| 2 | P2.1–P2.8 Recipe, statuses, approval floor, per-endpoint Recipe, model switch, modes | 8 |
+| 3 | P3.1–P3.8 recoverable runtime (P3.1 needs an owner decision first) | 8 |
+| 4 | P4.1–P4.8 extensions, hooks, OS sandbox | 8 |
+| 5 | P5.1–P5.5 measure and adapt | 5 |
+| 6 | P6.1–P6.4 migrate, accept on the D6 set, freeze contracts, release v3.0.0 | 4 |
+
+**Recommended next: P2.1** (`Recipe` type and `ComposeRecipe` in Core,
+table-tested). Phase 2 is the heart of ADR-006 and it is where the one hazard
+the zoo still shows gets fixed: the `corrupt-token` trait completes with a
+wrong answer that nothing flags (P2.3). P1.1, P1.2 and P1.6 are structure and
+can be done at any time.
+
+**Waiting on the owner (do not guess these)**
+
+1. **P0.7**: run `boi provider qualify maxplus` again and keep the output, so
+   a real run can become a replay fixture. Also tells us whether the
+   `OBSERVATION_public` corruption is deterministic. Never paste an API key.
+2. **F9 / P3.1**: may BOI keep conversations on disk if the user turns it on,
+   with secret redaction and a retention period? Today `TaskRecorder` forbids
+   it; resume and fork need it. No code until answered (plan rule 6).
+3. **Tags**: cloud sessions get HTTP 403 on tag push. The owner pushes
+   `vX.Y.Z` tags.
+
+**Things that bit this session (check before repeating them)**
+
+- A fixture that is wrong makes a baseline wrong: the P0.6 DSML fixture put the
+  tool name in the parameter slot, so "DSML fails" was measured against
+  malformed markup. Fixed in #28. Read a fixture's output before trusting a
+  row built on it.
+- An `ASSISTED` pass must never read as `NATIVE`. The zoo test asserts the
+  `assisted` value for every trait; keep that assertion when adding traits.
+- Events are metadata. `TestEventsNeverCarryArgumentsOutputOrErrorText` and
+  `TestEventLogHonoursTheContract` fail if a Tool argument, output, error
+  message, file content, task text or key reaches `events.jsonl`. Do not
+  weaken them to add a field.
+- SubAgent runs have no task session, so their events are not recorded;
+  `parent_agent_id` is wired but unexercised until P3.2.
+- Merge with the real head SHA (`expectedHeadSha`), never a remembered one.
+  Never push to `master`. Move a branch forward with
+  `git merge --ff-only origin/master`, not force-push.
+- Gates, each confirming itself: `test -z "$(gofmt -l .)"`, `go vet ./...`,
+  `~/go/bin/staticcheck ./...` (it is not on `PATH` in the cloud container),
+  `go test -race -count=1 ./...`, `go build ./cmd/boi`. `govulncheck` cannot
+  reach its database from the sandbox.
+- Many Provider hosts (OpenAI, DeepSeek, Hugging Face, maxplus) are blocked
+  from the cloud sandbox. Everything above was measured on simulated
+  endpoints, not on a real Provider; the plan says so wherever it matters.
+
+## State at v2.7.1
 
 v2.7.1 (tag `v2.7.1`, `master` `eab3452`) fixes the eight findings of
 [`docs/audit/2026-11-01-full-audit.md`](docs/audit/2026-11-01-full-audit.md):
@@ -120,8 +193,8 @@ credential files including through a link, streaming falls back when an
 endpoint does not stream, streamed tool calls without `index` stay separate,
 `/allow` obeys the policy file's rules, and CI checks gofmt.
 
-On 2026-11-02 the owner approved Architecture IV, ADR-006 and D1–D7. Phase 0 is
-in progress; see the status board in
+On 2026-11-02 the owner approved Architecture IV, ADR-006 and D1–D7. For the
+state after that, read the section above and the status board in
 [`ARCHITECTURE_IV_RENOVATION.md`](docs/planning/ARCHITECTURE_IV_RENOVATION.md).
 The maxplus Provider still has every Tool withheld by today's gate; Phase 2 is
 where that changes.
