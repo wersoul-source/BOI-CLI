@@ -5,23 +5,21 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-      - run: go test -count=1 ./...
-      - run: go vet ./...
-      - run: go build ./...
+  # The same gates as every pull request: format, vet, race tests with the
+  # coverage floor, staticcheck, the built-binary acceptance, govulncheck and
+  # the cross-compile checks. A tag on a commit that fails any of them does
+  # not produce a release.
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   release:
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
