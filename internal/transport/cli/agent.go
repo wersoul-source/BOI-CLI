@@ -56,7 +56,7 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 
 		configured, err := llmfactory.LoadConfiguredProvidersFromEnv()
 		if err != nil {
-			return finishAsk(cmd, nil, unavailable("load providers", err))
+			return finishAsk(cmd, nil, unavailable("no Provider is configured; run 'boi setup' or 'boi quickstart'", err))
 		}
 		if len(app.QualifiedProviders(runtime.BoiDir, configured)) == 0 {
 			return finishAsk(cmd, nil, unavailable("no qualified providers; run 'boi provider qualify <name>'", nil))
