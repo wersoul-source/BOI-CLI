@@ -33,6 +33,20 @@
 
 ---
 
+### สถานะ S1 (อัปเดต 2026-11-21)
+
+| ID | สถานะ | หมายเหตุ |
+|---|---|---|
+| S1.1 | done | PR #31 merge แล้วที่ `8aace34` (รายงานสองไฟล์ไม่ได้ไปด้วย จึงมากับ PR ของ S1) |
+| S1.2 | review | `TestReasoningDoesNotCrossProviders`, `TestForeignReasoningIsNotSentAndIsReported` — ยืนยันว่าล้มเมื่อถอดการแก้ |
+| S1.3 | review | `TestRouteChangeIsAnEvent`, `TestRouteChangedNeverCarriesTheEndpointsWords` — ยืนยันว่าล้มเมื่อถอดการแก้ |
+| S1.4 | review | `TestCommandErrorCarriesItsCauseOnce`; รันด้วยมือแล้วเห็นสาเหตุและทางแก้ |
+| S1.5 | review | `TestDoctorVerdict`, `TestDoctorFailsOutsideAWorkspace`; รันด้วยมือได้ exit 5 |
+| S1.6 | review | `release.yml` เรียก `ci.yml`; **ยังไม่ได้พิสูจน์บน tag จริง** จนกว่าจะมีการ push tag ครั้งถัดไป |
+| S1.7 | review | job `govulncheck` + `dependabot.yml`; ผลจริงดูจาก CI ของ PR |
+| S1.8 | review | `TestAKeyIsNotSentInClearToAPublicHost` (8 กรณี); ไม่ได้แสดงใน `boi env` ตามที่วางแผนไว้ — เหตุผลอยู่ใน log และในข้อความ error เมื่อไม่เหลือ Provider |
+| S1.9 | review (บางส่วน) | L1, L7 เสร็จ (L4 ทำใน S1.7); **L9 ยังไม่ทำ**: "Chimera" และ "Phantom DB" อยู่บนหน้า splash ของ TUI ด้วย จึงเป็นชื่อของผลิตภัณฑ์ ต้องให้เจ้าของตัดสินว่าจะเปลี่ยนหรือเก็บ |
+
 ## ชั้น S2 — ทำให้ใช้งานได้จริงบนโมเดลอ่อน
 
 เป้าหมาย: ปิด H1 และ H2 ด้วยเส้นทางที่สั้นที่สุดบนสถาปัตยกรรมเดิม เลือกเฉพาะงานของระยะ 2–3 ที่จำเป็น งานที่เหลือของแผนใหญ่ไม่ถูกยกเลิก แค่มาทีหลัง

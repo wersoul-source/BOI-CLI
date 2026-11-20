@@ -208,7 +208,9 @@ output, an error message or model text. `agent.ReadEvents` reads a log with
 the compatibility rule (own version and the one before; anything else, and any
 unknown kind, is skipped and listed with its reason, never fatal). Emitted
 kinds: `task.started`, `phase.changed`, `tool.proposed`, `approval.requested`,
-`tool.result`, `verification.recorded`, `task.stopped`, `route.changed`. The
+`tool.result`, `verification.recorded`, `task.stopped`, `route.changed` (its
+payload is the route, the error class and the HTTP status; the reason, which
+may quote the endpoint, goes to the notice only). The
 `RecipeVersion` field stays empty until Phase 2. SubAgent runs have no task
 session yet, so their events are not recorded (P3.2).
 
