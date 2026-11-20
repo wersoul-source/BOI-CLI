@@ -177,8 +177,29 @@ var doctorCmd = &cobra.Command{
 			fmt.Printf("\nTip: Set PSC_* in .env to enable AI providers.\n")
 		}
 
-		return nil
+		return doctorVerdict(checks)
 	},
+}
+
+// requiredDoctorChecks are the checks BOI cannot work without. The others
+// (Agent name, Skills, Memory, Providers) describe a workspace that is not
+// finished being set up, which is a state, not a fault.
+var requiredDoctorChecks = map[string]bool{"Go": true, "Workspace": true, "Config": true, "Binary": true, "OS": true}
+
+// doctorVerdict turns the checks into the command's result: an error, and so
+// a non-zero exit, when a required check failed. Exit 0 with failed checks
+// made the command useless in a script.
+func doctorVerdict(checks []checkResult) error {
+	var failed []string
+	for _, check := range checks {
+		if !check.ok && requiredDoctorChecks[check.label] {
+			failed = append(failed, check.label)
+		}
+	}
+	if len(failed) == 0 {
+		return nil
+	}
+	return &CommandError{Code: ExitUnavailable, Class: "unavailable", Message: "required checks failed: " + strings.Join(failed, ", ")}
 }
 
 func checkGoVersion(v string) bool {
