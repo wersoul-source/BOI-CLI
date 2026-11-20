@@ -345,7 +345,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	// reasoning keeps what the endpoint reasoned for each native tool turn,
 	// by the first call of the turn, to replay it with that turn. fallbacks
 	// are the route changes of this run, each reported once.
-	reasoning := map[string]string{}
+	reasoning := map[string]turnReasoning{}
 	var fallbacks []llm.Fallback
 	// Events (Architecture IV, F1/F2): every one is stamped with the task's
 	// host-assigned ids and a sequence number, and kept when the recorder
@@ -461,7 +461,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			}
 			decision.ToolCall, decision.ToolCalls = prepared[0], prepared
 			if response.ReasoningContent != "" && native {
-				reasoning[prepared[0].ID] = response.ReasoningContent
+				reasoning[prepared[0].ID] = turnReasoning{provider: response.Provider, text: response.ReasoningContent}
 			}
 		}
 		decision.Provider = response.Provider
@@ -729,7 +729,14 @@ func observationMessages(input DecisionInput, store *contextStore) []llm.Message
 // nativeObservationMessages renders observations as the assistant tool calls
 // and tool replies the native protocol expects. Calls made in the same step
 // share one assistant message, and every listed call has its reply.
-func nativeObservationMessages(input DecisionInput, store *contextStore, reasoning map[string]string) []llm.Message {
+// turnReasoning is the reasoning one native tool turn came with, and the
+// Provider that produced it.
+type turnReasoning struct {
+	provider string
+	text     string
+}
+
+func nativeObservationMessages(input DecisionInput, store *contextStore, reasoning map[string]turnReasoning) []llm.Message {
 	var messages []llm.Message
 	var pending []llm.Message
 	lastStep := -1
@@ -750,7 +757,8 @@ func nativeObservationMessages(input DecisionInput, store *contextStore, reasoni
 			flush()
 			// The assistant turn is replayed with the reasoning the endpoint
 			// gave for it, found by the first call of the turn.
-			pending = append(pending, llm.Message{Role: "assistant", ReasoningContent: reasoning[item.call.ID]})
+			turn := reasoning[item.call.ID]
+			pending = append(pending, llm.Message{Role: "assistant", ReasoningContent: turn.text, ReasoningProvider: turn.provider})
 			lastStep = item.step
 		}
 		pending[0].ToolCalls = append(pending[0].ToolCalls, request)

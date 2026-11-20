@@ -32,6 +32,10 @@ type Message struct {
 	// request. It is never set on a message the endpoint did not produce
 	// reasoning for, and it is never shown as an answer.
 	ReasoningContent string
+	// ReasoningProvider names the Provider that produced ReasoningContent.
+	// An adapter sends the reasoning back only to that Provider: after a
+	// failover the next Provider never receives another one's reasoning.
+	ReasoningProvider string
 }
 
 // Fallback records that the Connector or the Runtime took a second route

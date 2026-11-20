@@ -80,6 +80,8 @@ type Endpoint struct {
 	requests  int
 	rejected  int
 	streamed  int
+	reasoned  int
+	failAfter int
 	firstDone bool
 }
 
@@ -99,6 +101,14 @@ func (e *Endpoint) Requests() int { e.mu.Lock(); defer e.mu.Unlock(); return e.r
 // Rejected is how many requests it refused with HTTP 400 (ReasoningReplay,
 // RejectsReplay).
 func (e *Endpoint) Rejected() int { e.mu.Lock(); defer e.mu.Unlock(); return e.rejected }
+
+// ReasoningReceived is how many requests carried reasoning_content on an
+// assistant message.
+func (e *Endpoint) ReasoningReceived() int { e.mu.Lock(); defer e.mu.Unlock(); return e.reasoned }
+
+// FailAfter makes the endpoint answer HTTP 503 to every request after the
+// first n, like a replica that dies in the middle of a task.
+func (e *Endpoint) FailAfter(n int) { e.mu.Lock(); e.failAfter = n; e.mu.Unlock() }
 
 // Streamed is how many answers it sent as server-sent events.
 func (e *Endpoint) Streamed() int { e.mu.Lock(); defer e.mu.Unlock(); return e.streamed }
@@ -146,7 +156,18 @@ func (e *Endpoint) serve(w http.ResponseWriter, r *http.Request) {
 	e.requests++
 	first := !e.firstDone
 	e.firstDone = true
+	dead := e.failAfter > 0 && e.requests > e.failAfter
+	for _, m := range req.Messages {
+		if m.Role == "assistant" && m.ReasoningContent != nil {
+			e.reasoned++
+			break
+		}
+	}
 	e.mu.Unlock()
+	if dead {
+		writeError(w, http.StatusServiceUnavailable, "replica unavailable")
+		return
+	}
 
 	switch e.Trait {
 	case Down:

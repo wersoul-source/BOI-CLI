@@ -518,7 +518,7 @@ func TestReasoningContentIsReturnedAndReplayed(t *testing.T) {
 	}
 	_, err = provider.Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{
 		{Role: "user", Content: "go"},
-		{Role: "assistant", ToolCalls: first.ToolCalls, ReasoningContent: first.ReasoningContent},
+		{Role: "assistant", ToolCalls: first.ToolCalls, ReasoningContent: first.ReasoningContent, ReasoningProvider: first.Provider},
 		{Role: "tool", ToolCallID: "c1", Content: "result"},
 		{Role: "assistant", Content: "done"},
 	}})
@@ -584,6 +584,31 @@ func TestNonStreamingEndpointIsRecordedAsAFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(resp.Fallbacks) != 1 || resp.Fallbacks[0].Kind != "stream→whole-response" || resp.Fallbacks[0].Reason == "" {
+		t.Fatalf("fallbacks = %+v", resp.Fallbacks)
+	}
+}
+
+// Reasoning another Provider produced is not sent, and the response says so.
+func TestForeignReasoningIsNotSentAndIsReported(t *testing.T) {
+	var body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		body = string(raw)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`))
+	}))
+	t.Cleanup(server.Close)
+	resp, err := NewOpenAIProvider("second", "k", server.URL, "m").Complete(context.Background(), llm.CompletionRequest{Messages: []llm.Message{
+		{Role: "user", Content: "go"},
+		{Role: "assistant", ToolCalls: []llm.ToolCallRequest{{ID: "c1", Name: "workspace__read", Arguments: "{}"}}, ReasoningContent: "private chain of thought", ReasoningProvider: "first"},
+		{Role: "tool", ToolCallID: "c1", Content: "result"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(body, "reasoning_content") || strings.Contains(body, "private chain of thought") {
+		t.Fatalf("another Provider's reasoning was sent: %s", body)
+	}
+	if len(resp.Fallbacks) != 1 || resp.Fallbacks[0].Kind != "reasoning→dropped" {
 		t.Fatalf("fallbacks = %+v", resp.Fallbacks)
 	}
 }
