@@ -376,7 +376,7 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			}
 		}
 		fallbacks = append(fallbacks, fallback)
-		record(EventRouteChanged, step, "", routeChangedPayload(fallback.Kind, fallback.Reason))
+		record(EventRouteChanged, step, "", routeChangedPayload(fallback))
 	}
 	decider := decisionFunc(func(decideCtx context.Context, input DecisionInput) (Decision, error) {
 		// The host Task Plan stays in the manifest; sending it every turn only
@@ -410,7 +410,12 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 			// Some endpoints accept tool definitions but reject the replayed
 			// tool_calls and tool messages that follow. Finish the task with
 			// text envelopes; the Tools and their authority are unchanged.
-			noteFallback(input.Step, llm.Fallback{Kind: "native→envelope", Reason: "the endpoint rejected the replayed native tool calls (" + err.Error() + "); the rest of this task used text envelopes"})
+			rejected := llm.Fallback{Kind: "native→envelope", Reason: "the endpoint rejected the replayed native tool calls (" + err.Error() + "); the rest of this task used text envelopes"}
+			var providerErr *llm.ProviderError
+			if errors.As(err, &providerErr) {
+				rejected.ErrorClass, rejected.StatusCode = string(providerErr.Class), providerErr.StatusCode
+			}
+			noteFallback(input.Step, rejected)
 			native, definitions, toolPrompt = false, nil, ToolPrompt(s.broker)
 			response, err = request()
 		}
