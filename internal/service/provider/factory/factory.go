@@ -2,6 +2,8 @@ package factory
 
 import (
 	"fmt"
+	"log/slog"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -57,6 +59,9 @@ func LoadConfiguredProvidersFromEnv() ([]ConfiguredProvider, error) {
 		}
 	}
 	if len(result) == 0 {
+		if insecure := InsecureProviderSlots(); len(insecure) > 0 {
+			return nil, fmt.Errorf("no usable providers: %s would send an API key over plain http; use https, or set PSC_<n>_ALLOW_HTTP=true to accept that", strings.Join(insecure, ", "))
+		}
 		return nil, fmt.Errorf("no valid providers found in environment (PSC_1..PSC_%d)", maxProviders)
 	}
 	return result, nil
@@ -85,7 +90,47 @@ func providerConfigFromEnv(n int) (ProviderConfig, bool) {
 	if cfg.APIKey == "" && classifyEndpoint(cfg.Name, cfg.BaseURL) != "local" {
 		return cfg, false
 	}
+	if cfg.APIKey != "" && sendsKeyInClear(cfg.BaseURL) && !strings.EqualFold(strings.TrimSpace(os.Getenv(prefix+"ALLOW_HTTP")), "true") {
+		slog.Warn("provider skipped: its API key would be sent unencrypted", "name", cfg.Name, "host", endpointHost(cfg.BaseURL), "fix", "use https, or set "+prefix+"ALLOW_HTTP=true")
+		return cfg, false
+	}
 	return cfg, true
+}
+
+// sendsKeyInClear reports a base URL that would carry an API key over plain
+// HTTP to a host outside this machine and its own network. A server on
+// localhost or on a private address (a model server on the LAN) is allowed:
+// there the traffic does not cross the public internet.
+func sendsKeyInClear(baseURL string) bool {
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil || !strings.EqualFold(u.Scheme, "http") {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast())
+	}
+	return true
+}
+
+// InsecureProviderSlots lists the PSC slots skipped because their key would
+// be sent unencrypted, so a command can tell the person why a configured
+// Provider is missing.
+func InsecureProviderSlots() []string {
+	var slots []string
+	for i := 1; i <= maxProviders; i++ {
+		prefix := fmt.Sprintf("PSC_%d_", i)
+		if os.Getenv(prefix+"NAME") == "" || os.Getenv(prefix+"API_KEY") == "" {
+			continue
+		}
+		if sendsKeyInClear(os.Getenv(prefix+"BASE_URL")) && !strings.EqualFold(strings.TrimSpace(os.Getenv(prefix+"ALLOW_HTTP")), "true") {
+			slots = append(slots, fmt.Sprintf("PSC_%d (%s)", i, os.Getenv(prefix+"NAME")))
+		}
+	}
+	return slots
 }
 
 // endpointHost returns the host (and port) of a base URL, or "" when there is

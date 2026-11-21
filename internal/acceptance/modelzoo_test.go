@@ -275,3 +275,33 @@ func TestRecoveredToolCallStillNeedsApproval(t *testing.T) {
 		t.Fatalf("a refused write recovered from markup changed the workspace: %v", err)
 	}
 }
+
+// TestReasoningDoesNotCrossProviders: reasoning is state of the endpoint that
+// produced it. When that replica dies mid-task and the Router fails over, the
+// next Provider must not receive it, and the drop is reported (audit M1, F4).
+func TestReasoningDoesNotCrossProviders(t *testing.T) {
+	thinker := modelzoo.Start(t, modelzoo.ReasoningReplay)
+	thinker.FailAfter(1)
+	other := modelzoo.Start(t, modelzoo.Native)
+	providers := []llm.Provider{
+		adapters.NewOpenAIProvider("zoo-thinker", "fixture-key", thinker.URL, "zoo-model"),
+		adapters.NewOpenAIProvider("zoo-other", "fixture-key", other.URL, "zoo-model"),
+	}
+	result, err := runZooTask(t, providers)
+	if err != nil || result == nil || !strings.Contains(result.Response, modelzoo.Marker) {
+		t.Fatalf("the task did not complete through the second Provider: err=%v result=%s", err, describeResult(result))
+	}
+	if other.Requests() == 0 {
+		t.Fatal("the second Provider was never used; the test does not exercise failover")
+	}
+	if got := other.ReasoningReceived(); got != 0 {
+		t.Fatalf("the second Provider received another Provider's reasoning in %d request(s)", got)
+	}
+	reported := false
+	for _, fallback := range result.Fallbacks {
+		reported = reported || fallback.Kind == "reasoning→dropped"
+	}
+	if !reported || !strings.Contains(result.Notice, "reasoning→dropped") {
+		t.Fatalf("the dropped reasoning was not reported: fallbacks=%+v notice=%q", result.Fallbacks, result.Notice)
+	}
+}

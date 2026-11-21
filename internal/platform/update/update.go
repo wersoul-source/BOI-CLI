@@ -308,9 +308,13 @@ func extractTarGz(tarGzPath, dest string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			os.MkdirAll(target, 0755)
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
 		case tar.TypeReg:
-			os.MkdirAll(filepath.Dir(target), 0755)
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
 			outFile, err := os.Create(target)
 			if err != nil {
 				return err
@@ -323,8 +327,14 @@ func extractTarGz(tarGzPath, dest string) error {
 				outFile.Close()
 				return err
 			}
-			outFile.Close()
-			os.Chmod(target, os.FileMode(header.Mode))
+			if err := outFile.Close(); err != nil {
+				return err
+			}
+			// Keep only the permission bits, and never more than rwxr-xr-x:
+			// an archive does not get to set setuid or world-writable files.
+			if err := os.Chmod(target, os.FileMode(header.Mode)&0o755); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

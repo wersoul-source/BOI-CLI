@@ -32,6 +32,10 @@ type Message struct {
 	// request. It is never set on a message the endpoint did not produce
 	// reasoning for, and it is never shown as an answer.
 	ReasoningContent string
+	// ReasoningProvider names the Provider that produced ReasoningContent.
+	// An adapter sends the reasoning back only to that Provider: after a
+	// failover the next Provider never receives another one's reasoning.
+	ReasoningProvider string
 }
 
 // Fallback records that the Connector or the Runtime took a second route
@@ -42,8 +46,14 @@ type Fallback struct {
 	// Kind names the route change, such as "native→envelope" or
 	// "stream→whole-response".
 	Kind string
-	// Reason is the evidence: what the endpoint did or said.
+	// Reason is the evidence, for the person: what the endpoint did or said.
+	// It may quote the endpoint, so it is shown in the notice and never
+	// written to the event log.
 	Reason string
+	// ErrorClass and StatusCode classify the failure that caused the change,
+	// when there was one. They are safe to record.
+	ErrorClass string
+	StatusCode int
 }
 
 // ToolDefinition describes one callable tool in a Provider-neutral form.

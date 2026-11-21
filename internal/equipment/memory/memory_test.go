@@ -3,6 +3,7 @@ package memory
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -102,5 +103,30 @@ func TestSearchMemoryRanksKeyAboveContent(t *testing.T) {
 	res, err := s.SearchMemory("deploy", 0)
 	if err != nil || len(res) != 2 || res[0].Entry.MemID != "key" {
 		t.Fatalf("ranking wrong: %+v %v", res, err)
+	}
+}
+
+// Memory entries are readable by their owner only, including one an older
+// version wrote world-readable (audit L7).
+func TestMemoryEntriesArePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	s, dir := newStore(t)
+	old := filepath.Join(dir, "old.json")
+	if err := os.WriteFile(old, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"new", "old"} {
+		if err := s.Save(&MemoryEntry{MemID: id, Type: "fact", Key: "k", Content: "c", CreatedAt: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(filepath.Join(dir, id+".json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if mode := info.Mode().Perm(); mode != 0o600 {
+			t.Errorf("%s.json has mode %o, want 600", id, mode)
+		}
 	}
 }

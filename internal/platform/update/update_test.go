@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -156,5 +157,46 @@ func TestDownloadChecksumsBounds(t *testing.T) {
 	}
 	if _, err := downloadChecksums(srv.URL + "/huge"); err == nil {
 		t.Fatal("oversized checksums must error")
+	}
+}
+
+// An archive does not get to create setuid or world-writable files (audit L1).
+func TestExtractTarGzCapsFileModes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	root := t.TempDir()
+	archive := filepath.Join(root, "a.tar.gz")
+	f, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{Name: "boi/boi", Mode: 0o4777, Size: 3, Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("bin")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(root, "dest")
+	if err := extractTarGz(archive, dest); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(dest, "boi", "boi"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode(); mode&os.ModeSetuid != 0 || mode.Perm() != 0o755 {
+		t.Fatalf("extracted mode is %v, want -rwxr-xr-x without setuid", mode)
 	}
 }
