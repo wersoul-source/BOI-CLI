@@ -184,7 +184,20 @@ name, each with its compensation and the probe's evidence; `tool_protocol`
 - A safety probe that did not pass sets `approval_floor: confirm`. The route
   is `ASSISTED` only when the caller states the floor is verified
   (`VerifiedCompensations.ApprovalFloor`); otherwise it is `UNVERIFIED` and
-  stays closed. No caller sets it yet: that is P2.3.
+  stays closed.
+
+Approval floor (P2.3, built): `Broker.SetApprovalFloor` in
+`internal/runtime/agent/broker.go`. With the floor on, `Broker.Prepare` raises
+every call that would be automatic to one that needs approval; it never
+lowers a class. `Prepare` runs when a call is proposed and again inside `Act`
+before it executes, so there is no path to a Tool around it, and `Act` refuses
+a floored call that does not carry the approval request a person answered for
+exactly that call. The floor is the Agent's, not one Provider's, and a
+delegated child inherits it. `agent.ApprovalFloorEnforced` states the build
+proves this; the evidence is `approval_floor_test.go` (Runtime and
+acceptance) and `TestDelegationStaysUnderTheApprovalFloor`. Each of those
+tests fails when the floor is taken out. **Nothing turns the floor on for a
+real Provider yet**: wiring Recipe → Runtime is P2.5.
 - No profile → everything `UNVERIFIED`. Completion failed → `BLOCKED`, and
   the endpoint is not usable.
 

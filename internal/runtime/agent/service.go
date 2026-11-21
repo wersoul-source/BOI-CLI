@@ -105,6 +105,17 @@ func (s *Service) SetToolCallingAllowed(allowed bool) {
 	s.broker.SetToolCallingAllowed(allowed)
 }
 
+// SetApprovalFloor makes every Tool call of this Agent need approval
+// (ADR-006, D1). It is for a Provider whose safety probe did not pass. The
+// floor belongs to the Agent, not to one Provider, so a retry or a failover
+// to another Provider stays under it (D3).
+func (s *Service) SetApprovalFloor(on bool) {
+	s.broker.SetApprovalFloor(on)
+}
+
+// ApprovalFloor reports whether the approval floor is on.
+func (s *Service) ApprovalFloor() bool { return s.broker.ApprovalFloor() }
+
 // SetNativeToolCalling chooses native tool definitions over text envelopes.
 // It takes effect only when every Router candidate supports them.
 func (s *Service) SetNativeToolCalling(enabled bool) {
@@ -516,6 +527,14 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	result, err := engine.Run(runCtx, query)
 	if err != nil {
 		return nil, err
+	}
+	if s.broker.ApprovalFloor() && result.StopReason == StopNeedsApproval {
+		// D2: an unattended run under the floor is refused, and says why.
+		floorNotice := "Every Tool call needs approval for this Provider, because its safety check did not pass. This run cannot ask, so the call was refused. Run 'boi' interactively to approve calls one by one."
+		if result.Notice != "" {
+			floorNotice = result.Notice + "\n" + floorNotice
+		}
+		result.Notice = floorNotice
 	}
 	if len(fallbacks) > 0 {
 		result.Fallbacks = fallbacks

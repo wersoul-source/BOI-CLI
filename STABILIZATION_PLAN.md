@@ -56,7 +56,8 @@
 | ID | สถานะ | หมายเหตุ |
 |---|---|---|
 | S2.1 | review | `internal/core/recipe.go` + `TestModelZooRecipes`; Runtime ยังไม่อ่าน Recipe (S2.4) จึงยังไม่มีอะไรเปลี่ยนสำหรับผู้ใช้ |
-| S2.2–S2.7 | todo | S2.2 (approval floor) ถัดไป |
+| S2.2 | review | ระบบอนุมัติทุกคำสั่งอยู่ใน Broker; เทสต์บังคับครบ D1/D2/D3 + SubAgent และยืนยันว่าล้มเมื่อถอดการแก้; **ยังไม่มีอะไรเปิดใช้กับ Provider จริง** จนกว่าจะถึง S2.4 |
+| S2.3–S2.7 | todo | S2.4 (ให้ Runtime อ่าน Recipe) ถัดไป — เป็นขั้นที่ทำให้ maxplus ได้ Tool กลับจริง |
 
 ### ลำดับ
 

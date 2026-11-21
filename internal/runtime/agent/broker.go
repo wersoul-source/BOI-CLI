@@ -113,7 +113,19 @@ type Broker struct {
 	executionMu        sync.Mutex
 	toolCallingAllowed bool
 	activeCapabilities map[string]bool
+	// approvalFloor raises every call that would run without approval to
+	// one that needs it. See SetApprovalFloor.
+	approvalFloor bool
 }
+
+// ApprovalFloorEnforced states that this build proves the approval floor: the
+// tests in approval_floor_test.go and the acceptance test
+// TestApprovalFloorOnTheModelZoo show that every Tool call on a floored
+// Broker reaches approval, that a non-interactive run refuses it, and that no
+// retry, batch, delegated child or Provider switch escapes it. Core may treat
+// a floored Tool route as ASSISTED only because of this (ADR-006, "How D1
+// meets Rule 3"). Do not keep it true if those tests are removed or weakened.
+const ApprovalFloorEnforced = true
 
 func NewBroker() *Broker {
 	return &Broker{tools: make(map[string]port.Tool), executed: make(map[string]executionRecord), toolCallingAllowed: true, activeCapabilities: make(map[string]bool)}
@@ -142,6 +154,26 @@ func (b *Broker) SetToolCallingAllowed(allowed bool) {
 	b.registryMu.Lock()
 	b.toolCallingAllowed = allowed
 	b.registryMu.Unlock()
+}
+
+// SetApprovalFloor turns the approval floor on or off (ADR-006, D1). With the
+// floor on, no Tool call is automatic: a call its Tool would let run without
+// approval is prepared as one that needs it. The floor only raises. It never
+// lowers a Tool's own approval class, and it replaces neither the workspace
+// boundary nor any other policy: the person approving may not see every
+// effect of a command, so approval is added to those checks, not traded for
+// them.
+func (b *Broker) SetApprovalFloor(on bool) {
+	b.registryMu.Lock()
+	b.approvalFloor = on
+	b.registryMu.Unlock()
+}
+
+// ApprovalFloor reports whether the approval floor is on.
+func (b *Broker) ApprovalFloor() bool {
+	b.registryMu.RLock()
+	defer b.registryMu.RUnlock()
+	return b.approvalFloor
 }
 
 func (b *Broker) SetActiveCapabilities(names []string) error {
@@ -252,11 +284,16 @@ func (b *Broker) Prepare(proposed ToolCall) (ToolCall, error) {
 		}
 		call.Risk, call.Approval = risk, approval
 	}
+	if b.approvalFloor && call.Approval == ApprovalAuto {
+		// Applied here, in the one place every call is prepared and
+		// re-prepared before it runs, so no path to a Tool goes around it.
+		call.Approval = ApprovalConfirm
+	}
 	call.Timeout = spec.Timeout
 	preview := tool.Describe(call.Arguments)
 	call.Target = preview.Target
 	call.Preview = preview.Preview
-	if spec.Approval != ApprovalAuto && call.IdempotencyKey == "" {
+	if call.Approval != ApprovalAuto && call.IdempotencyKey == "" {
 		call.IdempotencyKey = call.ID
 	}
 	if err := call.Validate(); err != nil {
@@ -277,8 +314,14 @@ func (b *Broker) Act(ctx context.Context, call ToolCall, authorization Authoriza
 	if want != got {
 		return result, fmt.Errorf("tool call differs from host-authorized capability")
 	}
-	if call.Approval != ApprovalAuto && !authorization.Allowed {
+	// The class the host prepared decides, not the one the caller carries.
+	if prepared.Approval != ApprovalAuto && !authorization.Allowed {
 		return result, fmt.Errorf("tool call lacks explicit approval")
+	}
+	if prepared.Approval != ApprovalAuto && authorization.Request == nil {
+		// "Allowed" alone is what an automatic read gets. A call that needs
+		// approval must carry the request a person answered.
+		return result, fmt.Errorf("tool call lacks an approval request")
 	}
 	if authorization.Request != nil && authorization.Request.CallFingerprint != got {
 		return result, fmt.Errorf("approved tool call fingerprint mismatch")
