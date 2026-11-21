@@ -171,6 +171,30 @@ a Recipe produces a new version; only declared fields may change between
 versions; a candidate version runs in shadow before it is promoted and can be
 rolled back.
 
+Implemented (P2.1, P2.2): `core.Recipe` and `core.ComposeRecipe(profile,
+verified)` in `internal/core/recipe.go`. The Recipe holds a state for
+`completion`, `tools`, `skills` and `context`, plus every probe under its own
+name, each with its compensation and the probe's evidence; `tool_protocol`
+(`native`, `envelope`, `dialect:<name>`, `none`); `approval_floor`; and a
+`version` that is a hash of its decisions. Rules as built:
+
+- A protocol that needed help is `ASSISTED`: a recovered dialect, and BOI's
+  text envelope (a prompt-level compensation). Only native tool calls with
+  both safety probes passed are `NATIVE`.
+- A safety probe that did not pass sets `approval_floor: confirm`. The route
+  is `ASSISTED` only when the caller states the floor is verified
+  (`VerifiedCompensations.ApprovalFloor`); otherwise it is `UNVERIFIED` and
+  stays closed. No caller sets it yet: that is P2.3.
+- No profile → everything `UNVERIFIED`. Completion failed → `BLOCKED`, and
+  the endpoint is not usable.
+
+Not built yet: `repair_attempts`, `budgets`, `context_policy`, `plan_first`,
+`max_parallel_calls`, shadow and rollback. **The Runtime does not read the
+Recipe yet** (P2.5); `ComposeEnvironment` still drives it. A test checks, for
+every combination of probe results, that with no compensation verified the
+Recipe allows exactly what `ComposeEnvironment` allows, so P2.5 will not
+change behaviour by itself.
+
 ### 5.3 Extension (Equipment, Extensions)
 
 Purpose: anything added to an Agent, by the user or by the Agent itself.

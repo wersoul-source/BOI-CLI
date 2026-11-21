@@ -180,7 +180,8 @@ Extension may replace any part of the Trusted Foundation.
 | P1.4, P1.5 | done | PR #29 |
 | P1.7 | review | this PR: `internal/runtime/agent/event.go` (envelope, kinds, N-1 reader), `events.jsonl` per task in the Agent Folder, metadata only; `route.changed` added to the kinds. SubAgent runs are not recorded yet (they have no task session), so `parent_agent_id` is wired but unexercised until P3.2 |
 | P1.1, P1.2, P1.6 | todo | P1.1/P1.2 split the adapter and report endpoint facts; P1.6 typed content parts |
-| Phase 2 (P2.1–P2.8) | todo | D1–D3 approved; zoo fixtures ready (corrupt-token row is P2.3) |
+| P2.1, P2.2 | review | this PR: `internal/core/recipe.go`; not yet read by the Runtime (P2.5) |
+| P2.3–P2.8 | todo | P2.3 (approval floor) next; it is what turns the zoo's `corrupt-token` row from `UNVERIFIED` to `ASSISTED` |
 | Phase 3 (P3.1–P3.8) | todo | P3.1 needs the owner's decision first |
 | Phases 4–6 (P4.1–P6.4) | todo | |
 
