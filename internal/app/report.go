@@ -25,13 +25,16 @@ const (
 
 // AgentReport describes the Agent a workspace composes, as the Runtime holds it.
 type AgentReport struct {
-	Environment string        `json:"environment"`
-	Providers   []string      `json:"providers"`
-	ToolCalling bool          `json:"tool_calling"`
-	NativeTools bool          `json:"native_tools"`
-	Ready       bool          `json:"ready"`
-	Problem     string        `json:"problem,omitempty"`
-	Blocks      []BlockReport `json:"blocks"`
+	Environment string   `json:"environment"`
+	Providers   []string `json:"providers"`
+	ToolCalling bool     `json:"tool_calling"`
+	NativeTools bool     `json:"native_tools"`
+	// ApprovalFloor: every Tool call of this Agent needs approval, because a
+	// Provider in the Router did not pass a safety check.
+	ApprovalFloor bool          `json:"approval_floor"`
+	Ready         bool          `json:"ready"`
+	Problem       string        `json:"problem,omitempty"`
+	Blocks        []BlockReport `json:"blocks"`
 	// RuntimeTools are offered by the Runtime itself, not by a Block.
 	RuntimeTools []ToolReport `json:"runtime_tools"`
 	// ProviderChecks explains every configured Provider, qualified or not:
@@ -59,8 +62,17 @@ type ProviderCheck struct {
 	ProfileError string `json:"profile_error,omitempty"`
 	// Gaps are the capabilities the measured profile did not pass.
 	Gaps []CapabilityGap `json:"gaps"`
-	// ToolCalling is whether this Provider alone would be allowed Tools today.
+	// ToolCalling is whether this Provider's Recipe lets it use Tools.
 	ToolCalling bool `json:"tool_calling"`
+	// The rest is the Provider's Recipe (ADR-006): the state of its Tool
+	// route, what that state rests on, how calls travel, and whether every
+	// call needs approval.
+	ToolState        string `json:"tool_state,omitempty"`
+	ToolCompensation string `json:"tool_compensation,omitempty"`
+	ToolEvidence     string `json:"tool_evidence,omitempty"`
+	ToolProtocol     string `json:"tool_protocol,omitempty"`
+	ApprovalFloor    bool   `json:"approval_floor"`
+	RecipeVersion    string `json:"recipe_version,omitempty"`
 	// Assisted are the capabilities that passed only with a compensation
 	// (status "assisted", Detail names it). They are never shown as native.
 	Assisted []CapabilityGap `json:"assisted"`
@@ -85,7 +97,12 @@ func providerChecks(boiDir string, configured []llmfactory.ConfiguredProvider) [
 		switch {
 		case err == nil:
 			check.Profile = ProfileMeasured
-			check.ToolCalling = coreblock.ComposeEnvironment(profile).ToolCalling
+			recipe := coreblock.ComposeRecipe(profile, verifiedCompensations())
+			tools, _ := recipe.Capability(coreblock.RecipeTools)
+			check.ToolCalling = tools.State.Usable()
+			check.ToolState, check.ToolCompensation, check.ToolEvidence = string(tools.State), tools.Compensation, tools.Evidence
+			check.ToolProtocol, check.RecipeVersion = recipe.ToolProtocol, recipe.Version
+			check.ApprovalFloor = recipe.Environment().ApprovalFloor
 			for _, result := range profile.Results {
 				switch {
 				case result.Status != coreblock.CapabilityPassed:
@@ -133,7 +150,7 @@ type ToolReport struct {
 func (r *Runtime) Report(configured []llmfactory.ConfiguredProvider) (*AgentReport, error) {
 	qualified := QualifiedProviders(r.BoiDir, configured)
 	environment := ProviderEnvironment(r.BoiDir, qualified)
-	report := &AgentReport{ToolCalling: environment.ToolCalling, NativeTools: environment.NativeTools, Blocks: []BlockReport{}, RuntimeTools: []ToolReport{}, ProviderChecks: providerChecks(r.BoiDir, configured)}
+	report := &AgentReport{ToolCalling: environment.ToolCalling, NativeTools: environment.NativeTools, ApprovalFloor: environment.ApprovalFloor, Blocks: []BlockReport{}, RuntimeTools: []ToolReport{}, ProviderChecks: providerChecks(r.BoiDir, configured)}
 	for _, item := range qualified {
 		report.Providers = append(report.Providers, item.Name+"/"+item.Model)
 	}

@@ -279,3 +279,36 @@ func TestDelegationAloneProvesNothing(t *testing.T) {
 		t.Fatalf("the user must be told that nothing was changed: %+v", result)
 	}
 }
+
+// Delegation is not a way around the approval floor (ADR-006 D1): the
+// delegate call and every call the child makes are asked for.
+func TestDelegationStaysUnderTheApprovalFloor(t *testing.T) {
+	provider := &script{responses: []llm.CompletionResponse{
+		call("agent__delegate", `{"task":"Read a.txt and say what it holds.","tools":["workspace.read"]}`),
+		call("workspace__read", `{"path":"a.txt"}`),
+		text("it holds alpha"),
+		text("the helper found alpha"),
+	}}
+	service, _ := parentService(t, provider)
+	service.SetApprovalFloor(true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var result *agent.AgentResult
+	asked := 0
+	for event := range service.Start(ctx, "find out what a.txt holds") {
+		if event.Approval != nil {
+			asked++
+			event.Approval.Decisions <- agent.ApprovalDecision{RequestID: event.Approval.Request.ID, State: agent.ApprovalApproved, DecidedAt: time.Now()}
+		}
+		if event.Result != nil {
+			result = event.Result
+		}
+	}
+	if result == nil || result.Response != "the helper found alpha" {
+		t.Fatalf("the approved delegation did not complete: %+v", result)
+	}
+	if result.Usage.ToolCalls != 2 || asked != 2 {
+		t.Fatalf("parent and child made %d Tool call(s) and approval was asked %d time(s); the child's read must be asked for too", result.Usage.ToolCalls, asked)
+	}
+}

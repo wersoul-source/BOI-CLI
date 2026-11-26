@@ -168,6 +168,7 @@ func qualifyProvider(ctx context.Context, runtime *app.Runtime, item llmfactory.
 		}
 		fmt.Fprintln(out, line)
 	}
+	printRecipe(out, app.RecipeForProfile(profile))
 	if hint := authFailureHint(profile.Results, item.Host); hint != "" {
 		fmt.Fprintln(out, hint)
 	}
@@ -228,4 +229,31 @@ func notFoundHint(results []coreblock.CapabilityResult, baseURL, model string) s
 		"  Model:   " + model + "\n" +
 		"Look for a missing or extra character (the address must end like .../ai/v1 and requests go to .../chat/completions),\n" +
 		"and use the model name exactly as the provider lists it. Run 'boi quickstart --change' to enter them again."
+}
+
+// printRecipe says what BOI will do with the model it just measured: the
+// state of its Tool route, how calls travel, and whether every call needs
+// approval. A probe that failed does not by itself mean "no Tools".
+func printRecipe(out io.Writer, recipe coreblock.Recipe) {
+	tools, _ := recipe.Capability(coreblock.RecipeTools)
+	fmt.Fprintln(out, "\nRecipe (how BOI will equip this model):")
+	if !recipe.Usable() {
+		fmt.Fprintln(out, "  Not usable: completion did not work. Fix the connection or the endpoint, then qualify again.")
+		return
+	}
+	line := "  Tools: " + string(tools.State)
+	if tools.Compensation != "" {
+		line += " (" + tools.Compensation + ")"
+	}
+	fmt.Fprintln(out, line+"   protocol: "+recipe.ToolProtocol)
+	switch {
+	case tools.State.Usable() && recipe.ApprovalFloor == coreblock.FloorConfirm:
+		fmt.Fprintln(out, "  A safety check did not pass, so every Tool call will need your approval.")
+		fmt.Fprintln(out, "  Runs that cannot ask ('boi ask', automation) are refused when the model calls a Tool.")
+	case !tools.State.Usable():
+		fmt.Fprintln(out, "  The model answers, plans and analyses, without Tools.")
+	}
+	if tools.Evidence != "" {
+		fmt.Fprintln(out, "  Why: "+tools.Evidence)
+	}
 }

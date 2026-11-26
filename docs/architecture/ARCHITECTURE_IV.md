@@ -171,6 +171,54 @@ a Recipe produces a new version; only declared fields may change between
 versions; a candidate version runs in shadow before it is promoted and can be
 rolled back.
 
+Implemented (P2.1, P2.2): `core.Recipe` and `core.ComposeRecipe(profile,
+verified)` in `internal/core/recipe.go`. The Recipe holds a state for
+`completion`, `tools`, `skills` and `context`, plus every probe under its own
+name, each with its compensation and the probe's evidence; `tool_protocol`
+(`native`, `envelope`, `dialect:<name>`, `none`); `approval_floor`; and a
+`version` that is a hash of its decisions. Rules as built:
+
+- A protocol that needed help is `ASSISTED`: a recovered dialect, and BOI's
+  text envelope (a prompt-level compensation). Only native tool calls with
+  both safety probes passed are `NATIVE`.
+- A safety probe that did not pass sets `approval_floor: confirm`. The route
+  is `ASSISTED` only when the caller states the floor is verified
+  (`VerifiedCompensations.ApprovalFloor`); otherwise it is `UNVERIFIED` and
+  stays closed.
+
+Approval floor (P2.3, built): `Broker.SetApprovalFloor` in
+`internal/runtime/agent/broker.go`. With the floor on, `Broker.Prepare` raises
+every call that would be automatic to one that needs approval; it never
+lowers a class. `Prepare` runs when a call is proposed and again inside `Act`
+before it executes, so there is no path to a Tool around it, and `Act` refuses
+a floored call that does not carry the approval request a person answered for
+exactly that call. The floor is the Agent's, not one Provider's, and a
+delegated child inherits it. `agent.ApprovalFloorEnforced` states the build
+proves this; the evidence is `approval_floor_test.go` (Runtime and
+acceptance) and `TestDelegationStaysUnderTheApprovalFloor`. Each of those
+tests fails when the floor is taken out.
+- No profile → everything `UNVERIFIED`. Completion failed → `BLOCKED`, and
+  the endpoint is not usable.
+
+Recipe → Runtime (P2.5, built): `app.ProviderEnvironment` composes a Recipe
+for every Provider in the Router (`app.ProviderRecipe`, with
+`agent.ApprovalFloorEnforced` as the verified compensation) and sets the
+Runtime from them: a capability is on only when every candidate's Recipe has
+it, and the approval floor is on when any candidate needs it (shared,
+strictest; D3). `app.QualifiedProviders` keeps exactly the two exclusions of
+ADR-006. Every event carries `recipe_version`. `boi env` and `boi provider
+qualify` show the Tool state, its compensation, the protocol and the floor.
+So a Provider whose safety probe failed now keeps its Tools with every call
+approved, instead of having every Tool withheld.
+
+`ComposeEnvironment` no longer drives the Runtime. It stays as the reference
+in a test that checks, for every combination of probe results, that with no
+compensation verified `Recipe.Environment()` equals it exactly.
+
+Not built yet: a Recipe per endpoint inside the Router (P2.4; today the
+Agent gets the combination), `repair_attempts`, `budgets`, `context_policy`,
+`plan_first`, `max_parallel_calls`, shadow and rollback.
+
 ### 5.3 Extension (Equipment, Extensions)
 
 Purpose: anything added to an Agent, by the user or by the Agent itself.

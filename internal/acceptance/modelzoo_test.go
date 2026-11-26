@@ -305,3 +305,60 @@ func TestReasoningDoesNotCrossProviders(t *testing.T) {
 		t.Fatalf("the dropped reasoning was not reported: fallbacks=%+v notice=%q", result.Fallbacks, result.Notice)
 	}
 }
+
+// TestModelZooRecipes: the Recipe Core composes for every simulated model,
+// from the real probe run (P2.1, P2.2). "floored" is the Tool state once the
+// approval floor is verified (P2.3); until then that route stays closed.
+func TestModelZooRecipes(t *testing.T) {
+	type want struct {
+		tools, floored coreblock.CapabilityState
+		protocol       string
+		floor          string
+		usable         bool
+	}
+	native := want{coreblock.StateNative, coreblock.StateNative, coreblock.ProtocolNative, coreblock.FloorNone, true}
+	dialect := func(name string) want {
+		return want{coreblock.StateAssisted, coreblock.StateAssisted, coreblock.ProtocolDialectPrefix + name, coreblock.FloorNone, true}
+	}
+	expectations := map[modelzoo.Trait]want{
+		modelzoo.Native: native, modelzoo.NoStream: native, modelzoo.SlowFirstLoad: native, modelzoo.MissingIndex: native,
+		modelzoo.ReasoningReplay: native, modelzoo.RejectsReplay: native,
+		modelzoo.DSML: dialect("dsml"), modelzoo.Hermes: dialect("hermes"), modelzoo.QwenXML: dialect("qwen-xml"),
+		// The model the owner's Provider resembles: Tools are not cut. They
+		// wait for the approval floor, and then run as assisted.
+		modelzoo.CorruptToken: {coreblock.StateUnverified, coreblock.StateAssisted, coreblock.ProtocolNative, coreblock.FloorConfirm, true},
+		modelzoo.Down:         {coreblock.StateBlocked, coreblock.StateBlocked, coreblock.ProtocolNone, coreblock.FloorNone, false},
+	}
+	for _, trait := range modelzoo.Traits {
+		trait := trait
+		t.Run(string(trait), func(t *testing.T) {
+			t.Parallel()
+			expected, ok := expectations[trait]
+			if !ok {
+				t.Fatalf("trait %s has no expected Recipe", trait)
+			}
+			endpoint := modelzoo.Start(t, trait)
+			name := "zoo-" + string(trait)
+			provider := adapters.NewOpenAIProvider(name, "fixture-key", endpoint.URL, "zoo-model")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			profile, err := coreblock.Qualifier{Timeout: 5 * time.Second}.Run(ctx, coreblock.ProviderTarget{Provider: name, Model: "zoo-model", EndpointClass: "local"}, provider)
+			if err != nil {
+				t.Fatal(err)
+			}
+			recipe := coreblock.ComposeRecipe(profile, coreblock.VerifiedCompensations{})
+			floored := coreblock.ComposeRecipe(profile, coreblock.VerifiedCompensations{ApprovalFloor: true})
+			tools, _ := recipe.Capability(coreblock.RecipeTools)
+			got := want{tools.State, floored.State(coreblock.RecipeTools), recipe.ToolProtocol, recipe.ApprovalFloor, recipe.Usable()}
+			if got != expected {
+				t.Errorf("recipe = %+v, want %+v\nevidence: %s", got, expected, tools.Evidence)
+			}
+			// Until a compensation is verified the Recipe allows exactly what
+			// the Runtime is given today.
+			if env := coreblock.ComposeEnvironment(profile); env.ToolCalling != tools.State.Usable() || env.Completion != recipe.Usable() {
+				t.Errorf("recipe and today's environment disagree: %+v vs tools=%s usable=%v", env, tools.State, recipe.Usable())
+			}
+			t.Logf("%-16s tools=%-10s floored=%-10s protocol=%-16s floor=%-7s version=%s", trait, got.tools, got.floored, got.protocol, got.floor, recipe.Version)
+		})
+	}
+}

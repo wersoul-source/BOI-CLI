@@ -128,5 +128,8 @@ func (s *Service) RunChild(ctx context.Context, task string, tools []string) (*A
 	}
 	child.nativeTools = native
 	child.limits = ChildLimits
+	// A child works for the same model under the same floor: delegation is
+	// not a way around approval.
+	child.broker.SetApprovalFloor(s.broker.ApprovalFloor())
 	return child.runScoped(ctx, task, scope.authorizer, scope.depth+1, scope.agentID)
 }

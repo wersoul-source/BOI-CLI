@@ -108,6 +108,11 @@ versioned result object to stdout and keeps mutation non-interactive/denied.`,
 			return writeAutomationResult(cmd.OutOrStdout(), result, err)
 		}
 		if err != nil {
+			// A stopped task still says why and what to do next: the host's
+			// notice is printed with the error, not only with an answer.
+			if result != nil && result.Notice != "" {
+				fmt.Fprintln(cmd.ErrOrStderr(), result.Notice)
+			}
 			return finishAsk(cmd, result, err)
 		}
 
