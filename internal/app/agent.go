@@ -97,6 +97,8 @@ func (r *Runtime) assemble(qualified []llmfactory.ConfiguredProvider, router *ll
 	ConfigureProviderProfileReferences(service, r.WorkspaceRoot, r.BoiDir, qualified)
 	service.SetToolCallingAllowed(environment.ToolCalling)
 	service.SetNativeToolCalling(environment.NativeTools)
+	service.SetApprovalFloor(environment.ApprovalFloor)
+	service.SetRecipeVersion(RecipeVersion(r.BoiDir, qualified))
 	return &Agent{Service: service, Qualified: qualified, Router: router, Environment: environment, Composition: composition, boiDir: r.BoiDir}, nil
 }
 

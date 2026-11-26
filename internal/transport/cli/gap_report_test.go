@@ -5,8 +5,10 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 	llm "github.com/boi-family/boi-cli/internal/runtime/llm"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 )
@@ -71,5 +73,57 @@ func TestEnvMarksAssistedTools(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in:\n%s", want, text)
 		}
+	}
+}
+
+// boi env says in plain words that a Provider keeps its Tools under the
+// approval floor, and what that means for a run that cannot ask.
+func TestEnvShowsTheApprovalFloor(t *testing.T) {
+	var out bytes.Buffer
+	printReport(&out, &app.AgentReport{ToolCalling: true, NativeTools: true, ApprovalFloor: true, Providers: []string{"maxplus"}, ProviderChecks: []app.ProviderCheck{
+		{Provider: "maxplus", Model: "m", Profile: app.ProfileMeasured, ToolCalling: true, ToolState: "ASSISTED", ToolCompensation: "approval-floor", ToolProtocol: "native", ApprovalFloor: true,
+			Gaps: []app.CapabilityGap{{Capability: "tool_observation", Status: "failed", Detail: "model replied: OBSERVATION_public"}}},
+		{Provider: "strong", Model: "m", Profile: app.ProfileMeasured, ToolCalling: true, ToolState: "NATIVE", ToolProtocol: "native"},
+		{Provider: "nothing", Model: "m", Profile: app.ProfileMeasured, ToolState: "BLOCKED"},
+	}})
+	text := out.String()
+	for _, want := range []string{
+		"every Tool call needs your approval, because maxplus did not pass a safety check",
+		"'boi ask'",
+		"maxplus/m   profile: measured   tools: yes (assisted: approval-floor)",
+		"strong/m   profile: measured   tools: yes\n",
+		"nothing/m   profile: measured   tools: no (blocked)",
+		"OBSERVATION_public",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q in:\n%s", want, text)
+		}
+	}
+}
+
+// After qualify the person reads what BOI will do with the model, not only
+// which probes failed.
+func TestQualifyPrintsTheRecipe(t *testing.T) {
+	passed := func(name string) coreblock.CapabilityResult {
+		return coreblock.CapabilityResult{Capability: name, Status: coreblock.CapabilityPassed}
+	}
+	target := coreblock.ProviderTarget{Provider: "p", Model: "m", EndpointClass: "custom"}
+	profile := &coreblock.CapabilityProfile{SchemaVersion: 1, ProbeVersion: coreblock.ProbeSuiteVersion, Fingerprint: coreblock.TargetFingerprint(target, coreblock.ProbeSuiteVersion), Target: target, GeneratedAt: time.Now(), Results: []coreblock.CapabilityResult{
+		passed("native_tool_schema"), passed("completion"), passed("authority"),
+		{Capability: "tool_observation", Status: coreblock.CapabilityFailed, Detail: "model replied: OBSERVATION_public"},
+	}}
+	var out bytes.Buffer
+	printRecipe(&out, app.RecipeForProfile(profile))
+	for _, want := range []string{"Tools: ASSISTED (approval-floor)", "protocol: native", "every Tool call will need your approval", "OBSERVATION_public"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
+	}
+	out.Reset()
+	dead := *profile
+	dead.Results = []coreblock.CapabilityResult{{Capability: "completion", Status: coreblock.CapabilityFailed}}
+	printRecipe(&out, app.RecipeForProfile(&dead))
+	if !strings.Contains(out.String(), "Not usable") {
+		t.Errorf("a dead endpoint must be called not usable:\n%s", out.String())
 	}
 }

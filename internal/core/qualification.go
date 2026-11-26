@@ -141,10 +141,16 @@ type AgentEnvironment struct {
 	NativeTools  bool
 	SkillCalling bool
 	ContextBytes int
+	// ApprovalFloor means every Tool call needs approval, because a safety
+	// probe did not pass (ADR-006, D1). It comes from a Recipe.
+	ApprovalFloor bool
 }
 
-// ComposeEnvironment is fail-closed: an absent, failed, unsupported, or
-// unverified capability is not exposed to the Agent runtime.
+// ComposeEnvironment is the gate BOI used before Architecture IV: fail-closed,
+// it can only switch capabilities off. The Runtime is no longer driven by it;
+// Recipe.Environment is. It stays as the reference the Recipe is tested
+// against: with no compensation verified, the two must agree on every
+// profile.
 func ComposeEnvironment(profile *CapabilityProfile) AgentEnvironment {
 	if profile == nil || profile.Validate() != nil {
 		return AgentEnvironment{}

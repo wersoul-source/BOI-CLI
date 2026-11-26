@@ -231,8 +231,17 @@ func TestReportExplainsEveryProviderGap(t *testing.T) {
 	for _, check := range report.ProviderChecks {
 		got[check.Provider] = check
 	}
-	if c := got["weak"]; c.Profile != ProfileMeasured || c.ToolCalling || len(c.Gaps) != 1 || c.Gaps[0].Capability != "tool_observation" || c.Gaps[0].Detail == "" {
+	// The failed safety probe is still reported as a gap, with what the model
+	// replied. It no longer means "no Tools": the Recipe keeps the route,
+	// assisted by the approval floor (ADR-006, D1).
+	if c := got["weak"]; c.Profile != ProfileMeasured || len(c.Gaps) != 1 || c.Gaps[0].Capability != "tool_observation" || c.Gaps[0].Detail == "" {
 		t.Fatalf("weak = %+v", c)
+	}
+	if c := got["weak"]; !c.ToolCalling || c.ToolState != "ASSISTED" || c.ToolCompensation != "approval-floor" || !c.ApprovalFloor || c.ToolProtocol != "native" || c.RecipeVersion == "" || !strings.Contains(c.ToolEvidence, "OBSERVATION_public") {
+		t.Fatalf("weak recipe = %+v", c)
+	}
+	if !report.ApprovalFloor || !report.ToolCalling {
+		t.Fatalf("the Agent's report must show the floor: tools=%v floor=%v", report.ToolCalling, report.ApprovalFloor)
 	}
 	if c := got["fresh"]; c.Profile != ProfileMissing || c.ProfileError == "" {
 		t.Fatalf("fresh = %+v", c)

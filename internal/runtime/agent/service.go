@@ -46,6 +46,7 @@ type Service struct {
 	skillSummaries   string
 	activeSkills     map[string]SkillDoc
 	taskRecorder     TaskRecorder
+	recipeVersion    string
 	providerProfiles map[string]string
 	// conversation holds prior interactive turns so follow-up questions keep
 	// their context. Automation runs never read or write it.
@@ -115,6 +116,14 @@ func (s *Service) SetApprovalFloor(on bool) {
 
 // ApprovalFloor reports whether the approval floor is on.
 func (s *Service) ApprovalFloor() bool { return s.broker.ApprovalFloor() }
+
+// SetRecipeVersion names the Recipe this Agent was set up from. Every event
+// of a task carries it, so a log says under which decisions it was written.
+func (s *Service) SetRecipeVersion(version string) {
+	s.mu.Lock()
+	s.recipeVersion = strings.TrimSpace(version)
+	s.mu.Unlock()
+}
 
 // SetNativeToolCalling chooses native tool definitions over text envelopes.
 // It takes effect only when every Router candidate supports them.
@@ -368,6 +377,9 @@ func (s *Service) runWith(ctx context.Context, query string, authorizer Authoriz
 	if taskSession != nil {
 		agentID = "agent-" + taskSession.ID
 		stamper = newEventStamper(taskSession.ID, agentID, parentAgentID)
+		s.mu.RLock()
+		stamper.recipeVersion = s.recipeVersion
+		s.mu.RUnlock()
 	}
 	eventRecorder, _ := taskRecorder.(EventRecorder)
 	record := func(kind string, step int, callID string, payload any) {

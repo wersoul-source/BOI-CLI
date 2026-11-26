@@ -196,17 +196,28 @@ exactly that call. The floor is the Agent's, not one Provider's, and a
 delegated child inherits it. `agent.ApprovalFloorEnforced` states the build
 proves this; the evidence is `approval_floor_test.go` (Runtime and
 acceptance) and `TestDelegationStaysUnderTheApprovalFloor`. Each of those
-tests fails when the floor is taken out. **Nothing turns the floor on for a
-real Provider yet**: wiring Recipe → Runtime is P2.5.
+tests fails when the floor is taken out.
 - No profile → everything `UNVERIFIED`. Completion failed → `BLOCKED`, and
   the endpoint is not usable.
 
-Not built yet: `repair_attempts`, `budgets`, `context_policy`, `plan_first`,
-`max_parallel_calls`, shadow and rollback. **The Runtime does not read the
-Recipe yet** (P2.5); `ComposeEnvironment` still drives it. A test checks, for
-every combination of probe results, that with no compensation verified the
-Recipe allows exactly what `ComposeEnvironment` allows, so P2.5 will not
-change behaviour by itself.
+Recipe → Runtime (P2.5, built): `app.ProviderEnvironment` composes a Recipe
+for every Provider in the Router (`app.ProviderRecipe`, with
+`agent.ApprovalFloorEnforced` as the verified compensation) and sets the
+Runtime from them: a capability is on only when every candidate's Recipe has
+it, and the approval floor is on when any candidate needs it (shared,
+strictest; D3). `app.QualifiedProviders` keeps exactly the two exclusions of
+ADR-006. Every event carries `recipe_version`. `boi env` and `boi provider
+qualify` show the Tool state, its compensation, the protocol and the floor.
+So a Provider whose safety probe failed now keeps its Tools with every call
+approved, instead of having every Tool withheld.
+
+`ComposeEnvironment` no longer drives the Runtime. It stays as the reference
+in a test that checks, for every combination of probe results, that with no
+compensation verified `Recipe.Environment()` equals it exactly.
+
+Not built yet: a Recipe per endpoint inside the Router (P2.4; today the
+Agent gets the combination), `repair_attempts`, `budgets`, `context_policy`,
+`plan_first`, `max_parallel_calls`, shadow and rollback.
 
 ### 5.3 Extension (Equipment, Extensions)
 

@@ -96,6 +96,7 @@ type eventStamper struct {
 	taskID        string
 	agentID       string
 	parentAgentID string
+	recipeVersion string
 	now           func() time.Time
 }
 
@@ -117,7 +118,7 @@ func (s *eventStamper) stamp(kind string, step int, callID string, payload any) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.seq++
-	return Event{SchemaVersion: EventSchemaVersion, Seq: s.seq, Time: s.now().UTC(), TaskID: s.taskID, AgentID: s.agentID, ParentAgentID: s.parentAgentID, Step: step, CallID: callID, Kind: kind, Payload: raw}, nil
+	return Event{SchemaVersion: EventSchemaVersion, Seq: s.seq, Time: s.now().UTC(), TaskID: s.taskID, AgentID: s.agentID, ParentAgentID: s.parentAgentID, Step: step, CallID: callID, RecipeVersion: s.recipeVersion, Kind: kind, Payload: raw}, nil
 }
 
 // eventFor maps an engine event to the envelope kind and a payload that holds

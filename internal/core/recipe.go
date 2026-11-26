@@ -338,3 +338,18 @@ func recipeVersion(recipe Recipe) string {
 	sum := sha256.Sum256(encoded)
 	return hex.EncodeToString(sum[:8])
 }
+
+// Environment turns the Recipe into the switches the Runtime is set with. A
+// dialect travels the native route: the Connector recovers the calls, so the
+// Runtime offers native tool definitions either way.
+func (r Recipe) Environment() AgentEnvironment {
+	tools := r.State(RecipeTools).Usable()
+	return AgentEnvironment{
+		Completion:    r.Usable(),
+		ToolCalling:   tools,
+		NativeTools:   tools && (r.ToolProtocol == ProtocolNative || strings.HasPrefix(r.ToolProtocol, ProtocolDialectPrefix)),
+		SkillCalling:  r.State(RecipeSkills).Usable(),
+		ContextBytes:  r.ContextBytes,
+		ApprovalFloor: tools && r.ApprovalFloor == FloorConfirm,
+	}
+}

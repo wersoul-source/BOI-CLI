@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/boi-family/boi-cli/internal/app"
+	coreblock "github.com/boi-family/boi-cli/internal/core"
 	llmfactory "github.com/boi-family/boi-cli/internal/service/provider/factory"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +61,18 @@ func printReport(out io.Writer, report *app.AgentReport) {
 		providers = strings.Join(report.Providers, ", ")
 	}
 	fmt.Fprintf(out, "Providers:   %s\n", providers)
-	fmt.Fprintf(out, "Tool calling: %s   Native tools: %s\n\n", yesNo(report.ToolCalling), yesNo(report.NativeTools))
+	fmt.Fprintf(out, "Tool calling: %s   Native tools: %s\n", yesNo(report.ToolCalling), yesNo(report.NativeTools))
+	if report.ApprovalFloor {
+		var floored []string
+		for _, check := range report.ProviderChecks {
+			if check.ApprovalFloor {
+				floored = append(floored, check.Provider)
+			}
+		}
+		fmt.Fprintf(out, "Approval:    every Tool call needs your approval, because %s did not pass a safety check.\n", strings.Join(floored, ", "))
+		fmt.Fprintln(out, "             Runs that cannot ask ('boi ask', automation) are refused when the model calls a Tool.")
+	}
+	fmt.Fprintln(out)
 	printProviderChecks(out, report.ProviderChecks)
 	for _, block := range report.Blocks {
 		required := "optional"
@@ -196,10 +208,7 @@ func printProviderChecks(out io.Writer, checks []app.ProviderCheck) {
 	for _, check := range checks {
 		line := fmt.Sprintf("  %s/%s   profile: %s", check.Provider, check.Model, check.Profile)
 		if check.Profile == app.ProfileMeasured {
-			line += "   tools: " + yesNo(check.ToolCalling)
-			if check.ToolCalling && len(check.Assisted) > 0 {
-				line += " (assisted)"
-			}
+			line += "   tools: " + toolSummary(check)
 		}
 		fmt.Fprintln(out, line)
 		if check.ProfileError != "" {
@@ -214,4 +223,26 @@ func printProviderChecks(out io.Writer, checks []app.ProviderCheck) {
 		}
 	}
 	fmt.Fprintln(out)
+}
+
+// toolSummary says in one phrase what a Provider's Recipe gives its Tool
+// route. A route that needs help is never shown as a bare "yes".
+func toolSummary(check app.ProviderCheck) string {
+	switch check.ToolState {
+	case string(coreblock.StateNative):
+		return "yes"
+	case string(coreblock.StateAssisted):
+		return "yes (assisted: " + check.ToolCompensation + ")"
+	case string(coreblock.StateBlocked):
+		return "no (blocked)"
+	case string(coreblock.StateUnverified):
+		return "no (unverified)"
+	}
+	if check.ToolCalling {
+		if len(check.Assisted) > 0 {
+			return "yes (assisted)"
+		}
+		return "yes"
+	}
+	return "no"
 }

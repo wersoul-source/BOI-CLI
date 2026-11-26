@@ -182,7 +182,8 @@ Extension may replace any part of the Trusted Foundation.
 | P1.1, P1.2, P1.6 | todo | P1.1/P1.2 split the adapter and report endpoint facts; P1.6 typed content parts |
 | P2.1, P2.2 | review | this PR: `internal/core/recipe.go`; not yet read by the Runtime (P2.5) |
 | P2.3 | review | this PR: `Broker.SetApprovalFloor`, enforcement tests for D1, D2, D3 and delegation; `agent.ApprovalFloorEnforced` |
-| P2.4–P2.8 | todo | P2.5 next (drive the Runtime from the Recipe): until then no real Provider is put under the floor and the owner's Provider still has no Tools |
+| P2.5 | review | this PR: `app.ProviderEnvironment` composes Recipes; floor shared across the Router; `recipe_version` in events; `boi env` / `qualify` show the Recipe. Not run against a real Provider |
+| P2.4, P2.6–P2.8 | todo | P2.6 is partly met (a model without Tools still answers); P2.4 (Recipe per endpoint) next with P2.7 |
 | Phase 3 (P3.1–P3.8) | todo | P3.1 needs the owner's decision first |
 | Phases 4–6 (P4.1–P6.4) | todo | |
 

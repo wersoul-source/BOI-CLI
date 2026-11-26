@@ -147,6 +147,9 @@ func TestRecipeMatchesTodaysEnvironmentUntilACompensationIsVerified(t *testing.T
 	forEveryProfile(func(profile *CapabilityProfile) {
 		count++
 		env, recipe := ComposeEnvironment(profile), ComposeRecipe(profile, VerifiedCompensations{})
+		if got := recipe.Environment(); got != env {
+			t.Fatalf("Recipe.Environment() = %+v, ComposeEnvironment = %+v for %+v", got, env, profile.Results)
+		}
 		if recipe.Usable() != env.Completion || recipe.State(RecipeTools).Usable() != env.ToolCalling || recipe.State(RecipeSkills).Usable() != env.SkillCalling {
 			t.Fatalf("recipe (usable=%v tools=%s skills=%s) differs from environment %+v for %+v", recipe.Usable(), recipe.State(RecipeTools), recipe.State(RecipeSkills), env, profile.Results)
 		}
