@@ -45,6 +45,9 @@ type zooBaseline struct {
 	assisted string
 	// fallback: the route change the run must report ("" when none).
 	fallback string
+	// misquote: the run must end with a notice that the answer altered a
+	// value a Tool returned (audit H1, S2.3). Every other trait must not.
+	misquote bool
 	gap      string
 }
 
@@ -58,7 +61,7 @@ var zooExpectations = map[modelzoo.Trait]zooBaseline{
 	modelzoo.DSML:            {marker: true, tools: true, completion: true, assisted: "dialect:dsml"},
 	modelzoo.Hermes:          {marker: true, tools: true, completion: true, assisted: "dialect:hermes"},
 	modelzoo.QwenXML:         {marker: true, tools: true, completion: true, assisted: "dialect:qwen-xml"},
-	modelzoo.CorruptToken:    {completion: true, gap: "P2.3: one corrupted token withholds every Tool; the task reply is wrong and not flagged"},
+	modelzoo.CorruptToken:    {completion: true, misquote: true, gap: "the answer is still wrong; it is now flagged. A wrong answer that is not an altered identifier would not be"},
 	modelzoo.Down:            {gap: "none: completion fails, exclusion is correct (ADR-006)"},
 }
 
@@ -102,6 +105,13 @@ func TestModelZooScriptedTask(t *testing.T) {
 			}
 			if want.fallback == "" && len(kinds) != 0 || want.fallback != "" && (len(kinds) != 1 || kinds[0] != want.fallback) {
 				t.Errorf("fallbacks = %v, baseline %q", kinds, want.fallback)
+			}
+			flagged := result != nil && len(result.Misquotes) > 0
+			if flagged != want.misquote {
+				t.Errorf("misquote flagged = %v, baseline %v (notice %q)", flagged, want.misquote, describeResult(result))
+			}
+			if want.misquote && (!strings.Contains(result.Notice, "ZOO-MARKER-public") || !strings.Contains(result.Notice, modelzoo.Marker)) {
+				t.Errorf("the notice must name both values: %q", result.Notice)
 			}
 			if want.fallback != "" && (result == nil || !strings.Contains(result.Notice, want.fallback)) {
 				t.Errorf("a fallback must reach the user's notice; notice = %q", describeResult(result))

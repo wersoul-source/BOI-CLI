@@ -152,3 +152,40 @@ func TestCommandErrorCarriesItsCauseOnce(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// The notice and the misquotes reach a script that reads --json, and an
+// answer with neither has no such field, so existing consumers see no change.
+func TestAutomationJSONCarriesTheNoticeAndMisquotes(t *testing.T) {
+	plain := &agent.AgentResult{TaskID: "t", Response: "ok", StopReason: agent.StopCompleted}
+	flagged := &agent.AgentResult{TaskID: "t", Response: "It is ZOO-MARKER-public", StopReason: agent.StopCompleted,
+		Notice:    "This answer may misquote what was read",
+		Misquotes: []agent.Misquote{{Answer: "ZOO-MARKER-public", Observed: "ZOO-MARKER-42"}}}
+	var out bytes.Buffer
+	if err := writeAutomationResult(&out, plain, nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "notice") || strings.Contains(out.String(), "misquotes") {
+		t.Fatalf("an unflagged result grew new fields: %s", out.String())
+	}
+	out.Reset()
+	if err := writeAutomationResult(&out, flagged, nil); err != nil {
+		t.Fatal(err)
+	}
+	var envelope AutomationResult
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.SchemaVersion != 1 || envelope.Status != "completed" || !strings.Contains(envelope.Notice, "misquote") || len(envelope.Misquotes) != 1 || envelope.Misquotes[0].Observed != "ZOO-MARKER-42" {
+		t.Fatalf("envelope = %#v\n%s", envelope, out.String())
+	}
+	if !strings.Contains(out.String(), `"answer":"ZOO-MARKER-public"`) || !strings.Contains(out.String(), `"observed":"ZOO-MARKER-42"`) {
+		t.Fatalf("misquote field names changed: %s", out.String())
+	}
+	// A refused run carries its notice too.
+	refused := &agent.AgentResult{TaskID: "t", StopReason: agent.StopNeedsApproval, Notice: "Every Tool call needs approval"}
+	out.Reset()
+	_ = writeAutomationResult(&out, refused, nil)
+	if !strings.Contains(out.String(), "Every Tool call needs approval") {
+		t.Fatalf("a refused run lost its notice: %s", out.String())
+	}
+}

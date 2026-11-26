@@ -215,6 +215,22 @@ approved, instead of having every Tool withheld.
 in a test that checks, for every combination of probe results, that with no
 compensation verified `Recipe.Environment()` equals it exactly.
 
+Answer check (S2.3, built, partial): after Tools ran, `agent.misquotes`
+(`internal/runtime/agent/misquote.go`) compares the identifier-like words of
+the final answer with what the Tools returned. A word that is not in the task
+or in any output, and is the same as an observed one except for exactly one
+`-`/`_` segment (or one character of a hash-like value), is a **possible
+misquote**. The model is asked once to copy the value exactly; if the answer
+still carries it, or the run cannot ask, the task completes with a notice that
+names both values and `AgentResult.Misquotes` lists them. `boi ask --json`
+carries `notice` and `misquotes` (additive; `schema_version` stays 1). The host
+never edits the answer. **It sees one kind of wrong answer**, an altered
+identifier. A wrong summary or number is invisible to it, and a possible
+misquote is only possible: a sibling identifier the answer mentions that the
+output did not contain (`user_id` beside an observed `user_name`) is reported
+too. A hash cut short at its end is not caught. The check applies to every
+model, not only weak ones, and costs one extra model call only when it fires.
+
 Not built yet: a Recipe per endpoint inside the Router (P2.4; today the
 Agent gets the combination), `repair_attempts`, `budgets`, `context_policy`,
 `plan_first`, `max_parallel_calls`, shadow and rollback.

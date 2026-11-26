@@ -86,6 +86,11 @@ func TestAModelThatFailedASafetyProbeKeepsItsToolsUnderApproval(t *testing.T) {
 	if endpoint.Requests()-probes < 2 {
 		t.Fatal("the model never received the Tool result")
 	}
+	// The model still answers with the corrupted value. It is not hidden: the
+	// person is told which value was read and which was written (audit H1).
+	if len(result.Misquotes) != 1 || result.Misquotes[0].Answer != "ZOO-MARKER-public" || result.Misquotes[0].Observed != modelzoo.Marker || !strings.Contains(result.Notice, "may misquote") {
+		t.Fatalf("the altered value was not reported: misquotes=%+v notice=%q", result.Misquotes, result.Notice)
+	}
 	log, _ := readTaskEvents(t, root)
 	want := app.RecipeVersion(filepath.Join(root, ".boi"), composed.Qualified)
 	if want == "" {
