@@ -94,6 +94,12 @@ type AutomationResult struct {
 	Artifacts          []agent.ArtifactReference `json:"artifacts"`
 	IdempotencyKeyHash string                    `json:"idempotency_key_hash,omitempty"`
 	Error              *AutomationFailure        `json:"error,omitempty"`
+	// Notice is what the host tells the person next to the response: that
+	// Tools need approval, that the route changed, that nothing was changed.
+	// Misquotes lists values the answer altered from what a Tool returned.
+	// Both are additive and omitted when empty; schema_version stays 1.
+	Notice    string           `json:"notice,omitempty"`
+	Misquotes []agent.Misquote `json:"misquotes,omitempty"`
 }
 
 type AutomationUsage struct {
@@ -140,6 +146,8 @@ func automationEnvelope(result *agent.AgentResult, runErr error) (AutomationResu
 		envelope.Manifest = result.Manifest
 		envelope.Artifacts = append([]agent.ArtifactReference{}, result.Artifacts...)
 		envelope.IdempotencyKeyHash = result.IdempotencyKeyHash
+		envelope.Notice = result.Notice
+		envelope.Misquotes = result.Misquotes
 		envelope.Usage = AutomationUsage{Steps: result.Steps, InputTokens: result.Usage.InputTokens, OutputTokens: result.Usage.OutputTokens, ProviderCalls: result.Usage.ProviderCalls, ToolCalls: result.Usage.ToolCalls, DurationMS: result.Duration.Milliseconds()}
 	}
 	if code != ExitCompleted {

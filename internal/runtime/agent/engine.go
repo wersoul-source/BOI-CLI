@@ -289,6 +289,7 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 	skillCalls := 0
 	recoveries := 0
 	challenged := false
+	misquoteChallenged := false
 	provider, model := "", ""
 
 	for step := 1; step <= limits.MaxSteps; step++ {
@@ -389,6 +390,23 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 					continue
 				}
 			}
+			// A value the Tools returned and the answer then altered (S2.3,
+			// audit H1). The model is asked once to copy it exactly; if the
+			// answer still carries the altered value, or nobody can be asked,
+			// the person is told which value, never shown a clean "done".
+			var misquoted []Misquote
+			if toolCalls > 0 {
+				misquoted = misquotes(task, decision.Response, observedTexts(state.Steps))
+			}
+			if len(misquoted) > 0 && !misquoteChallenged && !e.NoChallenge {
+				misquoteChallenged = true
+				reason := misquoteReason(misquoted)
+				e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &Verification{Passed: false, Reason: reason}})
+				if e.tryRecover(runCtx, state, Failure{Phase: PhaseVerify, Err: errors.New(reason), Attempt: recoveries + 1}, &recoveries, limits, step) {
+					lastError = reason
+					continue
+				}
+			}
 			verification, verifyErr := e.verify(runCtx, VerificationInput{Task: task, Response: decision.Response})
 			e.emit(EngineEvent{Kind: "verification", Phase: PhaseVerify, Step: step, Verification: &verification})
 			if verifyErr != nil || !verification.Passed {
@@ -415,6 +433,14 @@ func (e *Engine) Run(ctx context.Context, task string) (*AgentResult, error) {
 				if withheld {
 					result.Notice = withheldNotice
 				}
+			}
+			// After the host's other notices, so none of them is replaced.
+			if len(misquoted) > 0 {
+				result.Misquotes = misquoted
+				if result.Notice != "" {
+					result.Notice += "\n"
+				}
+				result.Notice += misquoteNotice(misquoted)
 			}
 			return result, nil
 		}

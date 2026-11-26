@@ -89,6 +89,9 @@ type AgentResult struct {
 	// Fallbacks are the route changes this run made, each with its reason. A
 	// fallback is never silent (Architecture IV, P1.5).
 	Fallbacks []llm.Fallback
+	// Misquotes are values the answer altered from what a Tool returned. They
+	// are reported, never repaired: the host does not edit the model's words.
+	Misquotes []Misquote
 	// Outcome and ChangedPaths are what the host recorded: see Outcome.
 	Outcome      Outcome
 	ChangedPaths []string
